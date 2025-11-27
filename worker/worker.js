@@ -1,7 +1,17 @@
 /**
  * SideCar API Worker
  * Zero dependencies - uses native fetch for Supabase and Gemini
+ * Multi-mode support: formalize, improve, summarize, translate
  */
+
+// System instructions per mode
+const MODE_INSTRUCTIONS = {
+  formalize: "Actua com un editor professional. Reescriu el text proporcionat en un registre formal i professional, mantenint l'idioma original. NO afegeixis explicacions, només el text resultant.",
+  improve: "Actua com un corrector expert. Corregeix gramàtica i ortografia, millora la claredat i l'estil, però mantén el to i l'idioma original. NO afegeixis explicacions, només el text resultant.",
+  summarize: "Actua com un redactor expert. Fes un resum concís del text proporcionat en el mateix idioma. NO afegeixis explicacions, només el resum.",
+  translate_en: "You are a professional translator. Translate the following text to English. Do NOT add explanations, only the translated text.",
+  translate_es: "Eres un traductor profesional. Traduce el siguiente texto al español (castellano). NO añadas explicaciones, solo el texto traducido."
+};
 
 export default {
   async fetch(request, env) {
@@ -35,9 +45,10 @@ export default {
         );
       }
 
-      if (mode !== 'formalize') {
+      // Validate mode
+      if (!MODE_INSTRUCTIONS[mode]) {
         return jsonResponse(
-          { error: 'Invalid mode. Supported modes: formalize' },
+          { error: `Invalid mode. Supported modes: ${Object.keys(MODE_INSTRUCTIONS).join(', ')}` },
           400,
           corsHeaders
         );
@@ -63,15 +74,16 @@ export default {
         );
       }
 
-      // Step 4: Call Gemini API
-      const formalizedText = await callGemini(env, text);
+      // Step 4: Call Gemini API with mode-specific instruction
+      const processedText = await callGemini(env, text, MODE_INSTRUCTIONS[mode]);
 
       // Step 5: Return success response
       return jsonResponse(
         {
           status: 'ok',
-          result_text: formalizedText,
+          result_text: processedText,
           credits_remaining: creditsResult.credits_remaining,
+          mode: mode
         },
         200,
         corsHeaders
@@ -131,12 +143,9 @@ async function deductCredits(env, licenseKeyHash, operation) {
 }
 
 /**
- * Call Gemini API for text formalization
+ * Call Gemini API with custom system instruction
  */
-async function callGemini(env, text) {
-  const systemInstruction =
-    "Actua com un editor professional. Reescriu el text proporcionat en un registre formal i administratiu, mantenint l'idioma original. NO afegeixis explicacions, només el text resultant.";
-
+async function callGemini(env, text, systemInstruction) {
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
     {

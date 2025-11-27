@@ -1,6 +1,6 @@
 /**
  * SideCar - Google Docs Add-on
- * Formalitza text seleccionat usant IA
+ * Multi-mode text processing with AI
  */
 
 // URL del Worker desplegat a Cloudflare
@@ -41,12 +41,18 @@ function getLicenseKey() {
 }
 
 /**
- * Formalitza el text seleccionat
+ * Processa el text seleccionat amb el mode especificat
+ * @param {string} mode - Mode d'operació (formalize, improve, summarize, translate_en, translate_es)
  */
-function formalizeSelection() {
+function processSelection(mode) {
+  // Default mode if not specified
+  mode = mode || 'formalize';
+  console.log('SideCar: Processing with mode:', mode);
+
   // Obtenir la llicència
   const licenseKey = getLicenseKey();
   if (!licenseKey) {
+    console.log('SideCar: No license key configured');
     return { success: false, error: 'No hi ha cap llicència configurada' };
   }
 
@@ -55,6 +61,7 @@ function formalizeSelection() {
   const selection = doc.getSelection();
 
   if (!selection) {
+    console.log('SideCar: No text selected');
     return { success: false, error: 'No hi ha cap text seleccionat' };
   }
 
@@ -84,20 +91,25 @@ function formalizeSelection() {
   }
 
   if (!selectedText || selectedText.trim() === '') {
+    console.log('SideCar: Selection contains no text');
     return { success: false, error: 'La selecció no conté text' };
   }
+
+  console.log('SideCar: Selected text length:', selectedText.length);
 
   // Cridar l'API
   try {
     const payload = {
       license_key: licenseKey,
-      mode: 'formalize',
+      mode: mode,
       text: selectedText,
       doc_metadata: {
         doc_id: doc.getId(),
         doc_name: doc.getName()
       }
     };
+
+    console.log('SideCar: Calling API with mode:', mode);
 
     const options = {
       method: 'post',
@@ -110,11 +122,14 @@ function formalizeSelection() {
     const responseCode = response.getResponseCode();
     const responseData = JSON.parse(response.getContentText());
 
+    console.log('SideCar: API response code:', responseCode);
+
     if (responseCode !== 200) {
       let errorMsg = responseData.error || 'Error desconegut';
       if (errorMsg === 'LICENSE_NOT_FOUND') errorMsg = 'Llicència no trobada';
       if (errorMsg === 'LICENSE_INACTIVE') errorMsg = 'Llicència inactiva';
       if (errorMsg === 'INSUFFICIENT_CREDITS') errorMsg = 'Crèdits insuficients';
+      console.log('SideCar: API error:', errorMsg);
       return { success: false, error: errorMsg };
     }
 
@@ -124,14 +139,22 @@ function formalizeSelection() {
       // Eliminar el text original i inserir el nou
       textElement.deleteText(startOffset, endOffset);
       textElement.insertText(startOffset, resultText);
+      console.log('SideCar: Text replaced successfully');
     }
 
     return {
       success: true,
-      credits_remaining: responseData.credits_remaining
+      credits_remaining: responseData.credits_remaining,
+      mode: responseData.mode
     };
 
   } catch (error) {
+    console.log('SideCar: Connection error:', error.message);
     return { success: false, error: 'Error de connexió: ' + error.message };
   }
+}
+
+// Mantenir compatibilitat amb versions anteriors
+function formalizeSelection() {
+  return processSelection('formalize');
 }

@@ -28,15 +28,18 @@
       margin-bottom: 6px;
       color: #5f6368;
     }
-    input[type="text"] {
+    input[type="text"],
+    select {
       width: 100%;
       padding: 8px 12px;
       border: 1px solid #dadce0;
       border-radius: 4px;
       font-size: 13px;
       outline: none;
+      background-color: white;
     }
-    input[type="text"]:focus {
+    input[type="text"]:focus,
+    select:focus {
       border-color: #1a73e8;
       box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
     }
@@ -100,6 +103,9 @@
       border-top: 1px solid #e8eaed;
       margin: 20px 0;
     }
+    .mode-icon {
+      margin-right: 6px;
+    }
   </style>
 </head>
 <body>
@@ -114,9 +120,19 @@
   <div class="divider"></div>
 
   <div class="section">
-    <label>Accions</label>
-    <button class="btn-primary" id="formalizeBtn" onclick="formalize()">
-      Formalitzar Selecció
+    <label for="modeSelector">Mode d'Operació</label>
+    <select id="modeSelector">
+      <option value="formalize">👔 Formalitzar</option>
+      <option value="improve">✨ Millorar Redacció</option>
+      <option value="summarize">📝 Resumir</option>
+      <option value="translate_en">🌍 Traduir a Anglès</option>
+      <option value="translate_es">🌍 Traduir a Castellà</option>
+    </select>
+  </div>
+
+  <div class="section">
+    <button class="btn-primary" id="executeBtn" onclick="executeAction()">
+      Executar SideCar
     </button>
     <div class="credits" id="creditsInfo"></div>
   </div>
@@ -140,9 +156,9 @@
     }
 
     function setLoading(loading) {
-      var btn = document.getElementById('formalizeBtn');
+      var btn = document.getElementById('executeBtn');
       btn.disabled = loading;
-      btn.textContent = loading ? 'Processant...' : 'Formalitzar Selecció';
+      btn.textContent = loading ? 'Processant...' : 'Executar SideCar';
     }
 
     function saveLicense() {
@@ -161,15 +177,24 @@
         .setLicenseKey(key);
     }
 
-    function formalize() {
+    function executeAction() {
+      var mode = document.getElementById('modeSelector').value;
       setLoading(true);
-      showStatus('Processant text amb IA...', 'info');
+
+      var modeNames = {
+        'formalize': 'Formalitzant',
+        'improve': 'Millorant',
+        'summarize': 'Resumint',
+        'translate_en': 'Traduint a anglès',
+        'translate_es': 'Traduint a castellà'
+      };
+      showStatus(modeNames[mode] + ' text amb IA...', 'info');
 
       google.script.run
         .withSuccessHandler(function(result) {
           setLoading(false);
           if (result.success) {
-            showStatus('Text formalitzat correctament!', 'success');
+            showStatus('Text processat correctament!', 'success');
             document.getElementById('creditsInfo').textContent =
               'Crèdits restants: ' + result.credits_remaining;
           } else {
@@ -180,7 +205,7 @@
           setLoading(false);
           showStatus('Error: ' + err.message, 'error');
         })
-        .formalizeSelection();
+        .processSelection(mode);
     }
   </script>
 </body>
