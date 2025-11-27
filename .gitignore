@@ -2,7 +2,9 @@
 .env.*
 !.env.example
 .mcp.json
+.dev.vars
 supabase/.temp/
+.wrangler/
 node_modules/
 dist/
 .DS_Store
