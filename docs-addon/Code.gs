@@ -10,6 +10,7 @@ function showSidebar() {
   DocumentApp.getUi().showSidebar(html);
 }
 
+// --- GESTIÓ DE LLICÈNCIA ---
 function setLicenseKey(key) {
   PropertiesService.getUserProperties().setProperty('SIDECAR_LICENSE_KEY', key);
   return "OK";
@@ -17,6 +18,32 @@ function setLicenseKey(key) {
 
 function getLicenseKey() {
   return PropertiesService.getUserProperties().getProperty('SIDECAR_LICENSE_KEY') || "";
+}
+
+// --- GESTIÓ DE SETTINGS (GEM CONFIG) ---
+function saveSettings(settingsJSON) {
+  PropertiesService.getUserProperties().setProperty('SIDECAR_SETTINGS', JSON.stringify(settingsJSON));
+  return "OK";
+}
+
+function getSettings() {
+  const stored = PropertiesService.getUserProperties().getProperty('SIDECAR_SETTINGS');
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch (e) {
+      return getDefaultSettings();
+    }
+  }
+  return getDefaultSettings();
+}
+
+function getDefaultSettings() {
+  return {
+    style_guide: "",
+    knowledge_base: "",
+    strict_mode: false
+  };
 }
 
 // --- NUCLI HÍBRID AMB SMART MARKERS ---
@@ -32,6 +59,9 @@ function processUserCommand(instruction) {
   const licenseKey = getLicenseKey();
   if (!licenseKey) throw new Error("Configura la llicència (⚙️).");
 
+  // Recuperar settings del "Cervell"
+  const settings = getSettings();
+
   // 1. INDEXACIÓ DEL DOCUMENT
   let elementsToProcess = [];
 
@@ -46,11 +76,9 @@ function processUserCommand(instruction) {
         elementsToProcess.push(el);
       }
     });
-    // Eliminar duplicats
     elementsToProcess = [...new Set(elementsToProcess)];
     isSelection = true;
   } else {
-    // Tot el document
     const numChildren = body.getNumChildren();
     for (let i = 0; i < numChildren; i++) {
       const child = body.getChild(i);
@@ -61,7 +89,6 @@ function processUserCommand(instruction) {
     }
   }
 
-  // Construïm el payload amb IDs virtuals {{0}}...
   elementsToProcess.forEach((el, index) => {
     const text = el.asText().getText();
     if (text.trim().length > 0) {
@@ -72,16 +99,29 @@ function processUserCommand(instruction) {
 
   if (!contentPayload.trim()) throw new Error("No hi ha text vàlid.");
 
-  // 2. Crida al Worker
+  // 2. Crida al Worker (amb settings injectats)
+  const payload = {
+    license_key: licenseKey,
+    user_instruction: instruction,
+    text: contentPayload,
+    doc_metadata: { doc_id: doc.getId() }
+  };
+
+  // Injectar camps de context si existeixen
+  if (settings.style_guide && settings.style_guide.trim()) {
+    payload.style_guide = settings.style_guide;
+  }
+  if (settings.knowledge_base && settings.knowledge_base.trim()) {
+    payload.knowledge_base = settings.knowledge_base;
+  }
+  if (settings.strict_mode === true) {
+    payload.strict_mode = true;
+  }
+
   const options = {
     'method': 'post',
     'contentType': 'application/json',
-    'payload': JSON.stringify({
-      license_key: licenseKey,
-      user_instruction: instruction,
-      text: contentPayload,
-      doc_metadata: { doc_id: doc.getId() }
-    }),
+    'payload': JSON.stringify(payload),
     'muteHttpExceptions': true
   };
 
@@ -97,7 +137,6 @@ function processUserCommand(instruction) {
 
     // 3. APLICACIÓ DE CANVIS
     if (aiData.mode === 'UPDATE_BY_ID') {
-      // ESTRATÈGIA NO DESTRUCTIVA (Cirurgia)
       for (const [id, newText] of Object.entries(aiData.updates)) {
         const targetElement = mapIdToElement[id];
         if (targetElement) {
@@ -105,7 +144,6 @@ function processUserCommand(instruction) {
         }
       }
     } else {
-      // ESTRATÈGIA RECONSTRUCCIÓ (Resums globals)
       if (isSelection) {
          if (elementsToProcess.length > 0) {
             elementsToProcess[0].asText().setText(aiData.blocks.map(b=>b.text).join('\n'));
@@ -128,41 +166,23 @@ function processUserCommand(instruction) {
 
 // --- FUNCIONS DE RENDERITZAT I PRESERVACIÓ D'ESTIL ---
 
-/**
- * Funció INFAL·LIBLE per preservar estil (Tècnica Insert-Delete)
- * En lloc d'esborrar i perdre l'estil, inserim primer per heretar-lo.
- */
 function updateParagraphPreservingAttributes(element, newMarkdownText) {
   const textObj = element.editAsText();
   const oldText = textObj.getText();
 
-  // 1. Netejar Markdown (treure asteriscos per al text pla)
   const cleanText = newMarkdownText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
 
-  // 2. ESTRATÈGIA "CAVALL DE TROIA" (Insertar abans d'esborrar)
   if (oldText.length > 0) {
-    // A. Inserim el NOU text al principi (índex 0)
-    // Apps Script farà que hereti l'estil (Mida 24, Color Blau, etc.) del caràcter 0 original.
     textObj.insertText(0, cleanText);
-
-    // B. Ara tenim "NOU TEXT" + "ANTIC TEXT".
-    // Esborrem l'antic text, que ara comença després del nou.
-    // (Des de la longitud del nou, fins al final)
     const startOfOld = cleanText.length;
-    // Calculem l'índex final amb cura
     const endOfOld = startOfOld + oldText.length - 1;
-
     if (endOfOld >= startOfOld) {
       textObj.deleteText(startOfOld, endOfOld);
     }
-
   } else {
-    // Si el paràgraf estava buit, no tenim d'on heretar. Fem setText normal.
     textObj.setText(cleanText);
   }
 
-  // 3. FINALMENT, APLIQUEM LES NOVES NEGRETES/CURSIVES DE LA IA
-  // (Això posarà negreta sobre la mida 24 que ja hem preservat)
   applyInlineMarkdown(element, newMarkdownText);
 }
 
@@ -170,22 +190,18 @@ function applyInlineMarkdown(element, originalMarkdown) {
   const textObj = element.editAsText();
   const cleanText = textObj.getText();
 
-  // Negreta (**text**)
   const boldPattern = /\*\*(.+?)\*\*/g;
   let match;
   let searchStart = 0;
 
-  // Reiniciem regex cada cop
   while ((match = boldPattern.exec(originalMarkdown)) !== null) {
     const content = match[1];
     const pos = cleanText.indexOf(content, searchStart);
     if (pos !== -1) {
       textObj.setBold(pos, pos + content.length - 1, true);
-      // Opcional: actualitzar searchStart per optimitzar
     }
   }
 
-  // Cursiva (*text*)
   const italicPattern = /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g;
   searchStart = 0;
   while ((match = italicPattern.exec(originalMarkdown)) !== null) {
@@ -197,7 +213,6 @@ function applyInlineMarkdown(element, originalMarkdown) {
   }
 }
 
-// Fallback per reescriptura total (Resums)
 function renderFullDocument(body, blocks) {
   body.clear();
   blocks.forEach(block => {
