@@ -4,134 +4,395 @@
     <base target="_top">
     <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
     <style>
-      /* Estils Generals */
+      :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f7f8f9;
+        --text-primary: #1a1a1a;
+        --text-secondary: #6b7280;
+        --text-muted: #9ca3af;
+        --border: #e5e7eb;
+        --accent: #2563eb;
+        --accent-hover: #1d4ed8;
+        --user-bg: #2563eb;
+        --user-text: #ffffff;
+        --ai-bg: #f3f4f6;
+        --error-bg: #fef2f2;
+        --error-text: #dc2626;
+        --success: #10b981;
+      }
+
+      * { box-sizing: border-box; }
+
       body {
-        padding: 0; margin: 0;
-        font-family: 'Google Sans', Roboto, Arial, sans-serif;
-        background-color: #f8f9fa;
-        height: 100vh; display: flex; flex-direction: column;
+        margin: 0; padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg-secondary);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        font-size: 14px;
+        color: var(--text-primary);
       }
 
-      /* Capçalera */
+      /* Header */
       .header {
-        background: white; padding: 12px; border-bottom: 1px solid #dadce0;
-        display: flex; justify-content: space-between; align-items: center;
+        background: var(--bg-primary);
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
-      .header h1 { margin: 0; font-size: 16px; color: #202124; }
-      .settings-btn { cursor: pointer; opacity: 0.6; font-size: 18px; }
-      .settings-btn:hover { opacity: 1; }
 
-      /* Panell de Configuració (Ocult per defecte) */
+      .header-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .header-logo {
+        width: 28px; height: 28px;
+        background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .header-logo svg {
+        width: 16px; height: 16px;
+        fill: white;
+      }
+
+      .header h1 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+        letter-spacing: -0.3px;
+      }
+
+      .settings-btn {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+
+      .settings-btn:hover { background: var(--bg-secondary); }
+
+      .settings-btn svg {
+        width: 18px; height: 18px;
+        stroke: var(--text-secondary);
+      }
+
+      /* Config Panel */
       #configPanel {
-        background: #fff; padding: 15px; border-bottom: 1px solid #ddd;
+        background: var(--bg-primary);
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
         display: none;
       }
 
-      /* Historial del Xat */
-      #chatHistory {
-        flex-grow: 1; overflow-y: auto; padding: 15px;
-        display: flex; flex-direction: column; gap: 12px;
+      .config-label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+        display: block;
       }
 
-      /* Bombolles de missatge */
+      .config-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .config-input {
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+
+      .config-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      .config-btn {
+        padding: 10px 16px;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+
+      .config-btn:hover { background: var(--accent-hover); }
+
+      /* Chat History */
+      #chatHistory {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* Messages */
       .msg {
-        padding: 10px 14px; border-radius: 18px;
-        font-size: 13px; line-height: 1.4;
-        max-width: 85%; word-wrap: break-word;
+        max-width: 88%;
+        padding: 12px 16px;
+        border-radius: 16px;
+        font-size: 13px;
+        line-height: 1.5;
+        word-wrap: break-word;
+        animation: fadeIn 0.2s ease;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
       }
 
       .msg.user {
         align-self: flex-end;
-        background-color: #d2e3fc; color: #174ea6;
+        background: var(--user-bg);
+        color: var(--user-text);
         border-bottom-right-radius: 4px;
       }
 
       .msg.ai {
         align-self: flex-start;
-        background-color: #ffffff; color: #202124;
-        border: 1px solid #dadce0; border-bottom-left-radius: 4px;
+        background: var(--ai-bg);
+        color: var(--text-primary);
+        border-bottom-left-radius: 4px;
       }
 
       .msg.system {
-        align-self: center; background: none; border: none;
-        font-size: 11px; color: #5f6368; text-align: center; width: 100%; margin-top: 10px;
+        align-self: center;
+        background: none;
+        padding: 8px 16px;
+        font-size: 12px;
+        color: var(--text-muted);
+        text-align: center;
+        max-width: 100%;
       }
 
       .msg.error {
-        align-self: center; background-color: #fce8e6; color: #c5221f; border: 1px solid #f5c6cb;
+        align-self: flex-start;
+        background: var(--error-bg);
+        color: var(--error-text);
+        border-bottom-left-radius: 4px;
       }
 
-      /* Peu de pàgina (Input) */
-      .footer {
-        padding: 10px; background: white; border-top: 1px solid #dadce0;
+      /* Typing indicator */
+      .typing {
+        display: flex;
+        gap: 4px;
+        padding: 16px;
       }
-      .input-wrapper { display: flex; gap: 8px; }
+
+      .typing span {
+        width: 6px; height: 6px;
+        background: var(--text-muted);
+        border-radius: 50%;
+        animation: bounce 1.4s infinite ease-in-out both;
+      }
+
+      .typing span:nth-child(1) { animation-delay: -0.32s; }
+      .typing span:nth-child(2) { animation-delay: -0.16s; }
+
+      @keyframes bounce {
+        0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+        40% { transform: scale(1); opacity: 1; }
+      }
+
+      /* Footer */
+      .footer {
+        padding: 16px 20px;
+        background: var(--bg-primary);
+        border-top: 1px solid var(--border);
+      }
+
+      .input-wrapper {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+      }
 
       textarea {
-        flex-grow: 1; height: 38px; padding: 8px; resize: none;
-        border: 1px solid #dadce0; border-radius: 20px; outline: none; font-family: inherit;
+        flex: 1;
+        min-height: 42px;
+        max-height: 120px;
+        padding: 11px 16px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        font-size: 13px;
+        font-family: inherit;
+        line-height: 1.4;
+        resize: none;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
       }
-      textarea:focus { border-color: #1a73e8; }
 
-      button#sendBtn {
-        background: #1a73e8; color: white; border: none;
-        width: 40px; height: 40px; border-radius: 50%;
-        cursor: pointer; display: flex; align-items: center; justify-content: center;
-        font-size: 18px; transition: background 0.2s;
+      textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
       }
-      button#sendBtn:hover { background: #174ea6; }
-      button#sendBtn:disabled { background: #dadce0; cursor: default; }
 
-      .credits-info { text-align: center; font-size: 10px; color: #9aa0a6; margin-top: 6px; }
+      textarea::placeholder { color: var(--text-muted); }
+
+      #sendBtn {
+        width: 42px; height: 42px;
+        background: var(--accent);
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s, transform 0.1s;
+        flex-shrink: 0;
+      }
+
+      #sendBtn:hover { background: var(--accent-hover); }
+      #sendBtn:active { transform: scale(0.95); }
+      #sendBtn:disabled { background: var(--border); cursor: default; }
+
+      #sendBtn svg {
+        width: 18px; height: 18px;
+        fill: white;
+      }
+
+      .credits-info {
+        text-align: center;
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 10px;
+      }
+
+      /* Welcome state */
+      .welcome {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-secondary);
+      }
+
+      .welcome-icon {
+        width: 48px; height: 48px;
+        background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+      }
+
+      .welcome-icon svg { width: 24px; height: 24px; fill: white; }
+
+      .welcome h2 {
+        margin: 0 0 8px;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .welcome p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .tip {
+        margin-top: 16px;
+        padding: 12px;
+        background: #f0f9ff;
+        border-radius: 8px;
+        font-size: 12px;
+        color: #0369a1;
+      }
     </style>
   </head>
   <body>
 
     <div class="header">
-      <h1>SideCar 🤖</h1>
-      <div class="settings-btn" onclick="toggleConfig()">⚙️</div>
+      <div class="header-brand">
+        <div class="header-logo">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <h1>SideCar</h1>
+      </div>
+      <div class="settings-btn" onclick="toggleConfig()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+      </div>
     </div>
 
     <div id="configPanel">
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:5px;">Llicència API</label>
-      <div style="display:flex; gap:5px;">
-        <input type="text" id="licenseInput" placeholder="SIDECAR-..." style="flex-grow:1; padding:5px; border:1px solid #ddd; border-radius:4px;">
-        <button class="share" onclick="saveLicense()">Desar</button>
+      <label class="config-label">Clau de llicencia</label>
+      <div class="config-row">
+        <input type="text" id="licenseInput" class="config-input" placeholder="SIDECAR-XXXX-XXXX">
+        <button class="config-btn" onclick="saveLicense()">Desar</button>
       </div>
     </div>
 
     <div id="chatHistory">
-      <div class="msg system">Hola! Selecciona text (o res per a tot el doc) i digues-me què vols fer.</div>
-      <div class="msg system" style="font-size:10px;">💡 Truc: Si no selecciones res, mantindré les imatges i el format intactes!</div>
+      <div class="welcome">
+        <div class="welcome-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <h2>Hola!</h2>
+        <p>Selecciona text o deixa-ho buit per editar tot el document.</p>
+        <div class="tip">Si no selecciones res, les imatges i el format es preservaran.</div>
+      </div>
     </div>
 
     <div class="footer">
       <div class="input-wrapper">
-        <textarea id="userInput" placeholder="Ex: Corregeix faltes, resumeix..."></textarea>
-        <button id="sendBtn" onclick="sendMessage()">➤</button>
+        <textarea id="userInput" placeholder="Escriu una instruccio..." rows="1"></textarea>
+        <button id="sendBtn" onclick="sendMessage()">
+          <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
       </div>
       <div id="creditsDisplay" class="credits-info"></div>
     </div>
 
     <script>
-      // Inicialització
       window.onload = function() {
-        // Carregar llicència
         google.script.run.withSuccessHandler(function(key) {
           if (key) {
             document.getElementById('licenseInput').value = key;
           } else {
-            toggleConfig(); // Si no n'hi ha, obrim settings
+            toggleConfig();
           }
         }).getLicenseKey();
 
-        // Listener per enviar amb Enter
         var input = document.getElementById('userInput');
         input.addEventListener("keydown", function(event) {
           if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault(); // Evita salt de línia
+            event.preventDefault();
             sendMessage();
           }
+        });
+
+        // Auto-resize textarea
+        input.addEventListener("input", function() {
+          this.style.height = "auto";
+          this.style.height = Math.min(this.scrollHeight, 120) + "px";
         });
       };
 
@@ -144,18 +405,39 @@
         var key = document.getElementById('licenseInput').value;
         google.script.run.withSuccessHandler(function() {
           toggleConfig();
-          addBubble('system', '✅ Llicència guardada correctament.');
+          addBubble('system', 'Llicencia guardada');
         }).setLicenseKey(key);
       }
 
+      function clearWelcome() {
+        var welcome = document.querySelector('.welcome');
+        if (welcome) welcome.remove();
+      }
+
       function addBubble(type, text) {
+        clearWelcome();
         var history = document.getElementById('chatHistory');
         var div = document.createElement('div');
         div.className = 'msg ' + type;
         div.innerText = text;
         history.appendChild(div);
-        // Scroll automàtic al final
         history.scrollTop = history.scrollHeight;
+      }
+
+      function showTyping() {
+        clearWelcome();
+        var history = document.getElementById('chatHistory');
+        var div = document.createElement('div');
+        div.className = 'msg ai typing';
+        div.id = 'typingIndicator';
+        div.innerHTML = '<span></span><span></span><span></span>';
+        history.appendChild(div);
+        history.scrollTop = history.scrollHeight;
+      }
+
+      function hideTyping() {
+        var typing = document.getElementById('typingIndicator');
+        if (typing) typing.remove();
       }
 
       function sendMessage() {
@@ -163,27 +445,29 @@
         var text = input.value.trim();
         if (!text) return;
 
-        // 1. Feedback visual immediat
         addBubble('user', text);
         input.value = '';
+        input.style.height = 'auto';
+
         var btn = document.getElementById('sendBtn');
         btn.disabled = true;
+        showTyping();
 
-        // 2. Crida al Backend (Code.gs)
         google.script.run
           .withSuccessHandler(function(res) {
+            hideTyping();
             btn.disabled = false;
             addBubble('ai', res.ai_response);
             if (res.credits !== undefined) {
-              document.getElementById('creditsDisplay').innerText = 'Crèdits restants: ' + res.credits;
+              document.getElementById('creditsDisplay').innerText = res.credits + ' credits';
             }
           })
           .withFailureHandler(function(err) {
+            hideTyping();
             btn.disabled = false;
-            // Missatges d'error amigables
-            let errorMsg = err.message;
-            if (errorMsg.includes("ScriptError")) errorMsg = "Error desconegut d'Apps Script.";
-            addBubble('error', "⚠️ " + errorMsg);
+            var errorMsg = err.message;
+            if (errorMsg.includes("ScriptError")) errorMsg = "Error inesperat";
+            addBubble('error', errorMsg);
           })
           .processUserCommand(text);
       }
