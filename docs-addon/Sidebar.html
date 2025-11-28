@@ -5,40 +5,27 @@
     <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
     <style>
       body { padding: 0; margin: 0; font-family: 'Google Sans', Roboto, Arial; background: #f8f9fa; height: 100vh; display: flex; flex-direction: column; }
-
-      /* TAB BAR */
       .tabs { display: flex; background: white; border-bottom: 1px solid #ddd; }
       .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: #5f6368; font-weight: 500; font-size: 14px; border-bottom: 2px solid transparent; }
       .tab.active { color: #1a73e8; border-bottom: 2px solid #1a73e8; }
-      .tab:hover { background: #f1f3f4; }
-
-      /* CONTENT AREAS */
       .content-panel { flex-grow: 1; display: none; overflow-y: auto; padding: 15px; }
       .content-panel.active { display: flex; flex-direction: column; }
-
-      /* XAT STYLES */
       #chatHistory { flex-grow: 1; display: flex; flex-direction: column; gap: 12px; margin-bottom: 10px; }
       .msg { padding: 10px 14px; border-radius: 18px; font-size: 13px; line-height: 1.4; max-width: 85%; }
       .msg.user { align-self: flex-end; background: #d2e3fc; color: #174ea6; border-bottom-right-radius: 4px; }
       .msg.ai { align-self: flex-start; background: white; border: 1px solid #dadce0; border-bottom-left-radius: 4px; }
       .msg.system { align-self: center; font-size: 11px; color: #666; width: 100%; text-align: center; margin-top: 10px; }
-      .msg.error { align-self: center; background: #fce8e6; color: #c5221f; border: 1px solid #f5c6cb; }
-
-      /* BRAIN STYLES */
       .form-group { margin-bottom: 15px; }
       label { display: block; font-weight: bold; font-size: 12px; margin-bottom: 5px; color: #3c4043; }
-      textarea, input[type="text"] { width: 100%; padding: 8px; border: 1px solid #dadce0; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 13px; }
-      textarea { resize: vertical; min-height: 60px; }
+      textarea, input[type="text"] { width: 100%; padding: 8px; border: 1px solid #dadce0; border-radius: 4px; box-sizing: border-box; }
+      .file-box { border: 1px dashed #dadce0; padding: 15px; text-align: center; border-radius: 4px; background: white; }
       .checkbox-group { display: flex; align-items: center; gap: 8px; background: #fff; padding: 10px; border: 1px solid #dadce0; border-radius: 4px; }
-      .hint { font-size: 11px; color: #70757a; margin-top: 2px; }
-
-      /* FOOTER */
       .footer { padding: 10px; background: white; border-top: 1px solid #ddd; }
       .input-wrapper { display: flex; gap: 8px; }
       textarea#userInput { height: 38px; border-radius: 20px; resize: none; }
       button.send-btn { background: #1a73e8; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
       button.action-btn { background: #1a73e8; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: 500; }
-
+      button.secondary { background: #f1f3f4; color: #3c4043; margin-top: 5px; }
       .hidden { display: none !important; }
     </style>
   </head>
@@ -51,7 +38,7 @@
 
     <div id="chatPanel" class="content-panel active">
       <div id="chatHistory">
-        <div class="msg system">Hola! Soc SideCar.</div>
+        <div class="msg system">Hola! Soc el teu editor.</div>
       </div>
     </div>
 
@@ -62,14 +49,18 @@
       </div>
 
       <div class="form-group">
-        <label>Guia d'Estil (Personalitat)</label>
-        <textarea id="styleGuide" placeholder="Ex: Sigues formal, no usis emojis, escriu frases curtes..."></textarea>
+        <label>Guia d'Estil</label>
+        <textarea id="styleGuide" placeholder="Ex: Sigues formal, no usis emojis..."></textarea>
       </div>
 
       <div class="form-group">
-        <label>Base de Coneixement (Context)</label>
-        <textarea id="knowledgeBase" style="min-height: 120px;" placeholder="Enganxa aqui normativa, llista de preus o dades de l'empresa..."></textarea>
-        <div class="hint" id="charCount">0 / 20000 caracters</div>
+        <label>Fitxer de Coneixement (PDF/TXT)</label>
+        <div class="file-box">
+          <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md">
+          <div id="fileStatus" style="margin-top:5px; font-size:11px; color:#666;">Cap fitxer seleccionat</div>
+          <button class="action-btn secondary" style="margin-top:10px;" onclick="uploadFile()">Pujar Fitxer</button>
+          <button class="action-btn secondary" style="margin-top:5px; color:red;" onclick="clearFile()">Esborrar</button>
+        </div>
       </div>
 
       <div class="form-group">
@@ -77,18 +68,18 @@
           <input type="checkbox" id="strictMode">
           <div>
             <label style="margin:0">Mode Estricte</label>
-            <div class="hint">Nomes respon amb info del Coneixement.</div>
+            <div style="font-size:10px; color:#666;">Nomes respon amb info del Fitxer/Context.</div>
           </div>
         </div>
       </div>
 
-      <button class="action-btn" onclick="saveSettings()">Desar Memoria</button>
+      <button class="action-btn" onclick="saveSettings()">Desar Configuracio</button>
       <div id="saveStatus" style="text-align:center; font-size:12px; margin-top:5px; color:#188038;"></div>
     </div>
 
     <div id="footerBar" class="footer">
       <div class="input-wrapper">
-        <textarea id="userInput" placeholder="Escriu aqui..."></textarea>
+        <textarea id="userInput" placeholder="Pregunta o mana..."></textarea>
         <button class="send-btn" id="sendBtn" onclick="sendMessage()">&#10148;</button>
       </div>
     </div>
@@ -99,29 +90,24 @@
       window.onload = function() {
         google.script.run.withSuccessHandler(function(jsonStr) {
           currentSettings = JSON.parse(jsonStr);
-
           document.getElementById('licenseKey').value = currentSettings.license_key || "";
           document.getElementById('styleGuide').value = currentSettings.style_guide || "";
-          document.getElementById('knowledgeBase').value = currentSettings.knowledge_base || "";
           document.getElementById('strictMode').checked = currentSettings.strict_mode || false;
-
-          updateCharCount();
-
           if (!currentSettings.license_key) switchTab('brain');
-
         }).getSettings();
+
+        google.script.run.withSuccessHandler(function(info) {
+          if (info.hasFile) document.getElementById('fileStatus').innerText = "Actiu: " + info.name;
+        }).getKnowledgeFileInfo();
 
         document.getElementById('userInput').addEventListener("keydown", function(e) {
           if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
-
-        document.getElementById('knowledgeBase').addEventListener('input', updateCharCount);
       };
 
       function switchTab(tabName) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.content-panel').forEach(p => p.classList.remove('active'));
-
         if (tabName === 'chat') {
           document.querySelector('.tab:first-child').classList.add('active');
           document.getElementById('chatPanel').classList.add('active');
@@ -133,29 +119,52 @@
         }
       }
 
-      function updateCharCount() {
-        const len = document.getElementById('knowledgeBase').value.length;
-        document.getElementById('charCount').innerText = len + " / 20000 caracters";
+      function uploadFile() {
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput.files.length === 0) return alert("Selecciona un fitxer primer.");
+
+        const file = fileInput.files[0];
+        if (file.size > 10 * 1024 * 1024) return alert("Maxim 10MB per ara.");
+
+        document.getElementById('fileStatus').innerText = "Pujant " + file.name + "...";
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const base64 = e.target.result.split(',')[1];
+          google.script.run
+            .withSuccessHandler(function(res) {
+              document.getElementById('fileStatus').innerText = "Actiu: " + res.name;
+              alert("Fitxer pujat al cervell correctament!");
+            })
+            .withFailureHandler(function(err) {
+              document.getElementById('fileStatus').innerText = "Error en pujada";
+              alert("Error: " + err.message);
+            })
+            .uploadFileToWorker(base64, file.type, file.name);
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function clearFile() {
+        google.script.run.withSuccessHandler(() => {
+          document.getElementById('fileStatus').innerText = "Cap fitxer seleccionat";
+        }).clearKnowledgeFile();
       }
 
       function saveSettings() {
         const btn = document.querySelector('.action-btn');
         btn.disabled = true;
         btn.innerText = "Desant...";
-
         const newSettings = {
           license_key: document.getElementById('licenseKey').value,
           style_guide: document.getElementById('styleGuide').value,
-          knowledge_base: document.getElementById('knowledgeBase').value,
           strict_mode: document.getElementById('strictMode').checked
         };
-
         google.script.run.withSuccessHandler(function() {
           btn.disabled = false;
-          btn.innerText = "Desar Memoria";
-          document.getElementById('saveStatus').innerText = "Configuracio actualitzada!";
-          setTimeout(() => { document.getElementById('saveStatus').innerText = ""; }, 3000);
-
+          btn.innerText = "Desar Configuracio";
+          document.getElementById('saveStatus').innerText = "Guardat!";
+          setTimeout(() => { document.getElementById('saveStatus').innerText = ""; }, 2000);
           currentSettings = newSettings;
         }).saveSettings(JSON.stringify(newSettings));
       }
@@ -164,12 +173,10 @@
         var input = document.getElementById('userInput');
         var text = input.value.trim();
         if (!text) return;
-
         addBubble('user', text);
         input.value = '';
         var btn = document.getElementById('sendBtn');
         btn.disabled = true;
-
         google.script.run
           .withSuccessHandler(function(res) {
             btn.disabled = false;
@@ -177,7 +184,7 @@
           })
           .withFailureHandler(function(err) {
             btn.disabled = false;
-            addBubble('error', err.message);
+            addBubble('error', "Error: " + err.message);
           })
           .processUserCommand(text);
       }
