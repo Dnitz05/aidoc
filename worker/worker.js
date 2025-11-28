@@ -1,5 +1,6 @@
 /**
- * SideCar API Worker - Block-Based Architecture (JSON Protocol)
+ * SideCar API Worker - Smart Markers Pattern (Non-Destructive)
+ * Preserva imatges, taules i estructura del document
  */
 export default {
   async fetch(request, env) {
@@ -17,9 +18,8 @@ export default {
       const { license_key, text, user_instruction, doc_metadata } = body;
 
       if (!license_key) throw new Error("missing_license");
-      if (!text) throw new Error("missing_text");
 
-      // 1. Validació de Llicència i Crèdits
+      // 1. Supabase (Crèdits)
       const msgBuffer = new TextEncoder().encode(license_key);
       const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -35,7 +35,7 @@ export default {
         body: JSON.stringify({
           p_license_key_hash: licenseHash,
           p_cost: 1,
-          p_operation: 'custom_blocks',
+          p_operation: 'smart_markers',
           p_metadata: doc_metadata || {}
         })
       });
@@ -43,32 +43,29 @@ export default {
       if (!supabaseResp.ok) throw new Error("supabase_error");
       const supabaseData = await supabaseResp.json();
 
-      // 2. Prompt "Block-Based" per a Gemini 2.0 Flash
-      const systemInstruction = `Ets SideCar, un editor professional d'IA.
-      La teva missió és editar, resumir o reescriure el text seguint les instruccions de l'usuari.
+      // 2. Prompt Híbrid (Smart Markers)
+      const systemInstruction = `Ets SideCar, un editor expert que preserva el format del document.
 
-      FORMAT DE RESPOSTA (ESTRICTE JSON):
-      Retorna ÚNICAMENT un objecte JSON amb aquesta estructura exacta. NO usis Markdown.
+INPUT: Rebràs un text on cada paràgraf comença amb un marcador ID, ex: "{{12}} El text...".
 
-      {
-        "change_summary": "Explicació molt breu (1 frase) del que has fet, en català",
-        "blocks": [
-          {
-            "type": "HEADING_1" | "HEADING_2" | "HEADING_3" | "PARAGRAPH" | "BULLET_LIST" | "NUMBERED_LIST",
-            "text": "El contingut textual del bloc",
-            "formatting": [
-              { "style": "BOLD" | "ITALIC", "start": 0, "length": 5 }
-            ]
-          }
-        ]
-      }
+INSTRUCCIONS DE FORMAT (CRÍTIC):
+Tens dos modes de funcionament segons què demani l'usuari:
 
-      REGLES:
-      1. El camp "formatting" és una llista de rangs per aplicar estils (start és l'índex dins del string "text").
-      2. Si l'usuari demana resumir, estructura bé el resultat amb títols i llistes.
-      3. Mantén la coherència visual.`;
+MODE A: CORRECCIÓ / MILLORA / TRADUCCIÓ (Preservar Estructura)
+Si l'usuari vol millorar, corregir, traduir o modificar el text existent SENSE canviar l'estructura:
+- Retorna JSON: { "mode": "UPDATE_BY_ID", "updates": { "0": "Text corregit...", "2": "Text traduït..." }, "change_summary": "Explicació breu en català" }
+- Només inclou els IDs que han canviat. Si un paràgraf no necessita canvis, NO l'incloguis.
+- Dins del text, pots usar **negreta** i *cursiva* per formatar paraules importants.
+- IMPORTANT: Els IDs han de ser strings, no números.
 
-      const userPrompt = `TEXT ORIGINAL: "${text}"\n\nINSTRUCCIÓ: "${user_instruction || "Millora el text"}"`;
+MODE B: RESUM / REESCRIPTURA TOTAL (Canviar Estructura)
+Si l'usuari demana un resum, esquema, reorganització o canvi radical que fa impossible mantenir la correspondència 1 a 1:
+- Retorna JSON: { "mode": "REWRITE_FULL", "blocks": [...], "change_summary": "Explicació breu en català" }
+- Estructura de blocks: [{ "type": "HEADING_1|HEADING_2|HEADING_3|PARAGRAPH|BULLET_LIST|NUMBERED_LIST", "text": "contingut", "formatting": [{"style": "BOLD|ITALIC", "start": 0, "length": 5}] }]
+
+REGLA D'OR: Prioritza SEMPRE el MODE A (UPDATE_BY_ID) si és possible. Només usa MODE B si l'usuari explícitament demana canviar l'estructura (resumir, reorganitzar, etc.).`;
+
+      const userPrompt = `TEXT AMB MARCADORS:\n${text}\n\nINSTRUCCIÓ: "${user_instruction || "Millora el text"}"`;
 
       // 3. Crida a Gemini
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`;
@@ -83,12 +80,19 @@ export default {
       });
 
       if (!geminiResp.ok) throw new Error("gemini_error: " + await geminiResp.text());
-
       const geminiData = await geminiResp.json();
-      const rawContent = geminiData.candidates[0].content.parts[0].text;
 
-      // Intentem parsejar per assegurar que és JSON vàlid abans d'enviar
-      const parsedResponse = JSON.parse(rawContent);
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(geminiData.candidates[0].content.parts[0].text);
+      } catch (e) {
+        // Fallback si el JSON falla
+        parsedResponse = {
+          mode: "REWRITE_FULL",
+          change_summary: "He processat el text (format de resposta ajustat).",
+          blocks: [{ type: "PARAGRAPH", text: geminiData.candidates[0].content.parts[0].text, formatting: [] }]
+        };
+      }
 
       return new Response(JSON.stringify({
         status: "ok",
