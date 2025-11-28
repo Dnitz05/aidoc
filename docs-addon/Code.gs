@@ -28,22 +28,33 @@ function getLicenseKey() {
 function processUserCommand(instruction) {
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
+  let textToProcess = "";
+  let targetElement = null; // Guardem on escriurem la resposta
 
-  // 1. Validacions
+  // 1. Validar llicència
   const licenseKey = getLicenseKey();
   if (!licenseKey) throw new Error("Configura la llicència primer (⚙️).");
 
-  if (!selection) throw new Error("Selecciona text al document abans d'enviar l'ordre.");
+  // 2. LÒGICA INTEL·LIGENT DE SELECCIÓ
+  if (selection) {
+    // CAS A: L'usuari ha seleccionat una part específica
+    const elements = selection.getRangeElements();
+    const firstElement = elements[0].getElement();
 
-  const elements = selection.getRangeElements();
-  const firstElement = elements[0].getElement(); // MVP: Només primer element
+    if (firstElement.editAsText) {
+      targetElement = firstElement.editAsText();
+      textToProcess = targetElement.getText();
+    }
+  }
 
-  if (!firstElement.editAsText) throw new Error("La selecció no és text editable.");
+  // CAS B: No hi ha selecció -> Agafem TOT el document
+  if (!textToProcess) {
+    const body = doc.getBody();
+    textToProcess = body.getText();
+    targetElement = body.editAsText();
+  }
 
-  const textElement = firstElement.editAsText();
-  const textToProcess = textElement.getText();
-
-  if (!textToProcess.trim()) throw new Error("La selecció està buida.");
+  if (!textToProcess.trim()) throw new Error("El document està buit.");
 
   // 2. Preparar Payload
   const payload = {

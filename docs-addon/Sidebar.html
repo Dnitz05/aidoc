@@ -116,6 +116,16 @@
             toggleConfig(); // Si no hi ha clau, obrim config
           }
         }).getLicenseKey();
+
+        // UX: Escoltar tecla Enter al textarea
+        var input = document.getElementById('userInput');
+        input.addEventListener("keydown", function(event) {
+          // Si és Enter i NO tenim Shift premut
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault(); // Evita el salt de línia
+            sendMessage(); // Envia
+          }
+        });
       };
 
       function toggleConfig() {
