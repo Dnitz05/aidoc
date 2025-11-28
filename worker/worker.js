@@ -1,10 +1,12 @@
 /**
- * SideCar API Worker - Chat Mode (Fase 6)
- * Gestiona peticions, descompta crèdits i retorna text + explicació (change_summary).
+ * SideCar API Worker - Chat Mode (Fase 6 + Format Híbrid)
+ * Gestiona peticions, descompta crèdits i retorna text + explicació.
+ * - Selecció parcial: text pla
+ * - Document sencer: Markdown per preservar estructura
  */
 export default {
   async fetch(request, env) {
-    // 1. CORS Headers (Permetre accés des de Google Docs)
+    // 1. CORS Headers
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -27,14 +29,15 @@ export default {
       if (!license_key) throw new Error("missing_license");
       if (!text) throw new Error("missing_text");
 
+      // Detectar si és document sencer
+      const isFullDocument = doc_metadata?.is_full_document || false;
+
       // 3. Validació de Llicència i Crèdits (Supabase RPC)
-      // Generem el hash SHA-256 de la llicència
       const msgBuffer = new TextEncoder().encode(license_key);
       const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const licenseHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // Cridem a la base de dades
       const supabaseResp = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/use_license_credits`, {
         method: 'POST',
         headers: {
@@ -53,22 +56,43 @@ export default {
       if (!supabaseResp.ok) throw new Error("supabase_error");
       const supabaseData = await supabaseResp.json();
 
-      // Control de crèdits (opcional: si RPC retorna error lògic)
-      // Per ara assumim que si la DB respon 200, l'operació s'ha fet o s'ha gestionat l'error allà.
+      // 4. Preparar Prompt per a Gemini (DIFERENT segons mode)
+      let systemInstruction;
 
-      // 4. Preparar Prompt per a Gemini (Mode XAT)
-      // Forcem que Gemini respongui SEMPRE en JSON per poder separar el text de l'explicació.
-      const systemInstruction = `Ets SideCar, un assistent editorial expert.
-      La teva tasca és editar el text proporcionat seguint les instruccions de l'usuari.
+      if (isFullDocument) {
+        // MODE DOCUMENT SENCER: Demanem Markdown per reconstruir estructura
+        systemInstruction = `Ets SideCar, un assistent editorial expert.
+La teva tasca és editar el text COMPLET d'un document seguint les instruccions de l'usuari.
 
-      INSTRUCCIONS DE FORMAT (CRÍTIC):
-      1. Respon ÚNICAMENT amb un objecte JSON vàlid.
-      2. NO facis servir blocs de codi markdown (\`\`\`json).
-      3. El JSON ha de tenir exactament aquests camps:
-         - "result_text": El text completament reescrit/modificat.
-         - "change_summary": Una explicació molt breu (màxim 1 frase, to amable) del català.`;
+INSTRUCCIONS DE FORMAT (CRÍTIC):
+1. Respon ÚNICAMENT amb un objecte JSON vàlid.
+2. NO facis servir blocs de codi markdown (\`\`\`json).
+3. El JSON ha de tenir exactament aquests camps:
+   - "result_text": El text complet reescrit AMB FORMAT MARKDOWN:
+     * Usa # per títols principals, ## per subtítols, ### per seccions
+     * Usa **text** per negreta
+     * Usa *text* per cursiva
+     * Usa - o * per llistes amb vinyetes
+     * Usa 1. 2. 3. per llistes numerades
+   - "change_summary": Una explicació molt breu (màxim 1 frase, to amable) del que has fet, en català.
 
-      const userPrompt = `TEXT ORIGINAL: "${text}"\n\nINSTRUCCIÓ DE L'USUARI: "${user_instruction || "Millora aquest text"}"`;
+IMPORTANT: Preserva l'estructura del document (títols, llistes, paràgrafs) usant Markdown.`;
+      } else {
+        // MODE SELECCIÓ PARCIAL: Text pla sense markdown
+        systemInstruction = `Ets SideCar, un assistent editorial expert.
+La teva tasca és editar el FRAGMENT de text proporcionat seguint les instruccions de l'usuari.
+
+INSTRUCCIONS DE FORMAT (CRÍTIC):
+1. Respon ÚNICAMENT amb un objecte JSON vàlid.
+2. NO facis servir blocs de codi markdown (\`\`\`json).
+3. El JSON ha de tenir exactament aquests camps:
+   - "result_text": El text modificat. SENSE format markdown, només text pla.
+   - "change_summary": Una explicació molt breu (màxim 1 frase, to amable) del que has fet, en català.
+
+IMPORTANT: Retorna NOMÉS text pla, sense asteriscs ni símbols de format.`;
+      }
+
+      const userPrompt = `TEXT ORIGINAL:\n"${text}"\n\nINSTRUCCIÓ DE L'USUARI: "${user_instruction || "Millora aquest text"}"`;
 
       // 5. Crida a Gemini API
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`;
