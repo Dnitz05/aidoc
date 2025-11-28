@@ -250,3 +250,108 @@ function renderFullDocument(body, blocks) {
     }
   });
 }
+
+// --- RECEIPTS (Custom Macros) ---
+
+/**
+ * Obté les receptes de l'usuari des del Worker
+ */
+function getReceiptsFromWorker() {
+  const settings = JSON.parse(getSettings());
+  if (!settings.license_key) return { receipts: [] };
+
+  const payload = {
+    action: 'get_receipts',
+    license_key: settings.license_key
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const json = JSON.parse(response.getContentText());
+
+    if (response.getResponseCode() !== 200 || json.status !== 'ok') {
+      return { receipts: [] };
+    }
+
+    return { receipts: json.receipts || [] };
+  } catch (e) {
+    return { receipts: [] };
+  }
+}
+
+/**
+ * Guarda una nova recepta al Worker
+ */
+function saveReceiptToWorker(label, instruction, icon) {
+  const settings = JSON.parse(getSettings());
+  if (!settings.license_key) throw new Error("Falta llicència.");
+
+  const payload = {
+    action: 'save_receipt',
+    license_key: settings.license_key,
+    label: label,
+    instruction: instruction,
+    icon: icon || '⚡'
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const json = JSON.parse(response.getContentText());
+
+    if (response.getResponseCode() !== 200 || json.status !== 'ok') {
+      throw new Error(json.error_code || "Error guardant recepta");
+    }
+
+    return { success: true, receipt: json.receipt };
+  } catch (e) {
+    throw new Error("Error: " + e.message);
+  }
+}
+
+/**
+ * Elimina una recepta
+ */
+function deleteReceiptFromWorker(receiptId) {
+  const settings = JSON.parse(getSettings());
+  if (!settings.license_key) throw new Error("Falta llicència.");
+
+  const payload = {
+    action: 'delete_receipt',
+    license_key: settings.license_key,
+    receipt_id: receiptId
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const json = JSON.parse(response.getContentText());
+
+    if (response.getResponseCode() !== 200 || json.status !== 'ok') {
+      throw new Error(json.error_code || "Error eliminant recepta");
+    }
+
+    return { success: true };
+  } catch (e) {
+    throw new Error("Error: " + e.message);
+  }
+}

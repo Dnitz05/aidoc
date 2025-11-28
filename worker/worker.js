@@ -24,6 +24,27 @@ export default {
       }
 
       // ═══════════════════════════════════════════════════════════
+      // ACCIÓ: GET_RECEIPTS (Obtenir receptes d'usuari)
+      // ═══════════════════════════════════════════════════════════
+      if (body.action === 'get_receipts') {
+        return await handleGetReceipts(body, env, corsHeaders);
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // ACCIÓ: SAVE_RECEIPT (Guardar nova recepta)
+      // ═══════════════════════════════════════════════════════════
+      if (body.action === 'save_receipt') {
+        return await handleSaveReceipt(body, env, corsHeaders);
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // ACCIÓ: DELETE_RECEIPT (Eliminar recepta)
+      // ═══════════════════════════════════════════════════════════
+      if (body.action === 'delete_receipt') {
+        return await handleDeleteReceipt(body, env, corsHeaders);
+      }
+
+      // ═══════════════════════════════════════════════════════════
       // ACCIÓ: CHAT (Flux principal de processament)
       // ═══════════════════════════════════════════════════════════
       return await handleChat(body, env, corsHeaders);
@@ -271,5 +292,142 @@ IMPORTANT:
     status: "ok",
     data: parsedResponse,
     credits_remaining: supabaseData.credits_remaining || 0
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RECEIPTS HANDLERS (Custom Macros)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Hash license key using SHA-256
+ */
+async function hashLicenseKey(licenseKey) {
+  const msgBuffer = new TextEncoder().encode(licenseKey);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Handler per obtenir les receptes de l'usuari
+ */
+async function handleGetReceipts(body, env, corsHeaders) {
+  const { license_key } = body;
+
+  if (!license_key) throw new Error("missing_license");
+
+  const licenseHash = await hashLicenseKey(license_key);
+
+  // Consultar Supabase
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/user_receipts?license_key_hash=eq.${licenseHash}&order=created_at.desc`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const receipts = await response.json();
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    receipts: receipts.map(r => ({
+      id: r.id,
+      label: r.label,
+      instruction: r.instruction,
+      icon: r.icon
+    }))
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Handler per guardar una nova recepta
+ */
+async function handleSaveReceipt(body, env, corsHeaders) {
+  const { license_key, label, instruction, icon } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!label || !label.trim()) throw new Error("missing_label");
+  if (!instruction || !instruction.trim()) throw new Error("missing_instruction");
+
+  const licenseHash = await hashLicenseKey(license_key);
+
+  // Inserir a Supabase
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/user_receipts`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        license_key_hash: licenseHash,
+        label: label.trim(),
+        instruction: instruction.trim(),
+        icon: icon || '⚡'
+      })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const [newReceipt] = await response.json();
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    receipt: {
+      id: newReceipt.id,
+      label: newReceipt.label,
+      instruction: newReceipt.instruction,
+      icon: newReceipt.icon
+    }
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Handler per eliminar una recepta
+ */
+async function handleDeleteReceipt(body, env, corsHeaders) {
+  const { license_key, receipt_id } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!receipt_id) throw new Error("missing_receipt_id");
+
+  const licenseHash = await hashLicenseKey(license_key);
+
+  // Eliminar de Supabase (només si pertany a l'usuari)
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/user_receipts?id=eq.${receipt_id}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    deleted: true
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }

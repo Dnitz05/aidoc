@@ -74,18 +74,117 @@
       button.secondary { background: #f1f3f4; color: #3c4043; margin-top: 5px; }
 
       .hidden { display: none !important; }
+
+      /* RECEIPTS (Custom Macros) */
+      .receipts-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 15px;
+      }
+      .receipt-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 10px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: transform 0.1s, box-shadow 0.1s;
+      }
+      .receipt-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+      .receipt-btn:active { transform: translateY(0); }
+      .receipt-btn .icon { font-size: 14px; }
+      .receipt-btn .delete-x {
+        margin-left: 4px;
+        opacity: 0.7;
+        font-size: 10px;
+      }
+      .receipt-btn .delete-x:hover { opacity: 1; }
+
+      .add-receipt-btn {
+        background: #f1f3f4;
+        color: #5f6368;
+        border: 2px dashed #dadce0;
+        padding: 10px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .add-receipt-btn:hover { background: #e8eaed; border-color: #1a73e8; color: #1a73e8; }
+
+      #newReceiptForm {
+        background: white;
+        border: 1px solid #dadce0;
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 10px;
+      }
+      #newReceiptForm input, #newReceiptForm textarea {
+        margin-bottom: 8px;
+      }
+      .emoji-picker {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+      .emoji-picker span {
+        cursor: pointer;
+        font-size: 18px;
+        padding: 4px;
+        border-radius: 4px;
+        border: 2px solid transparent;
+      }
+      .emoji-picker span:hover { background: #f1f3f4; }
+      .emoji-picker span.selected { border-color: #1a73e8; background: #e8f0fe; }
     </style>
   </head>
   <body>
 
     <div class="tabs">
       <div class="tab active" onclick="switchTab('chat')">Xat</div>
+      <div class="tab" onclick="switchTab('tools')">Eines</div>
       <div class="tab" onclick="switchTab('brain')">Cervell</div>
     </div>
 
     <div id="chatPanel" class="content-panel active">
       <div id="chatHistory">
         <div class="msg system">Hola! Soc SideCar.</div>
+      </div>
+    </div>
+
+    <div id="toolsPanel" class="content-panel">
+      <label style="margin-bottom:10px;">Les Teves Receptes</label>
+      <div id="receiptsList" class="receipts-grid">
+        <!-- Receptes es carreguen dinàmicament -->
+      </div>
+      <button class="add-receipt-btn" onclick="toggleNewReceiptForm()">+ Nova Recepta</button>
+
+      <div id="newReceiptForm" class="hidden">
+        <label>Icona</label>
+        <div class="emoji-picker" id="emojiPicker">
+          <span onclick="selectEmoji('⚡')">⚡</span>
+          <span onclick="selectEmoji('🚀')">🚀</span>
+          <span onclick="selectEmoji('✨')">✨</span>
+          <span onclick="selectEmoji('📝')">📝</span>
+          <span onclick="selectEmoji('🎯')">🎯</span>
+          <span onclick="selectEmoji('💡')">💡</span>
+          <span onclick="selectEmoji('🔥')">🔥</span>
+          <span onclick="selectEmoji('💎')">💎</span>
+        </div>
+        <label>Nom del Botó</label>
+        <input type="text" id="receiptLabel" placeholder="Ex: Fes-ho Èpic">
+        <label>Instrucció per la IA</label>
+        <textarea id="receiptInstruction" rows="3" placeholder="Ex: Reescriu el text amb un to èpic i dramatic..."></textarea>
+        <button class="action-btn" onclick="saveNewReceipt()">Guardar Recepta</button>
+        <button class="action-btn secondary" onclick="toggleNewReceiptForm()">Cancel·lar</button>
       </div>
     </div>
 
@@ -156,12 +255,19 @@
       function switchTab(tabName) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.content-panel').forEach(p => p.classList.remove('active'));
+
+        const tabs = document.querySelectorAll('.tab');
         if (tabName === 'chat') {
-          document.querySelector('.tab:first-child').classList.add('active');
+          tabs[0].classList.add('active');
           document.getElementById('chatPanel').classList.add('active');
           document.getElementById('footerBar').classList.remove('hidden');
+        } else if (tabName === 'tools') {
+          tabs[1].classList.add('active');
+          document.getElementById('toolsPanel').classList.add('active');
+          document.getElementById('footerBar').classList.remove('hidden');
+          loadReceipts();
         } else {
-          document.querySelector('.tab:last-child').classList.add('active');
+          tabs[2].classList.add('active');
           document.getElementById('brainPanel').classList.add('active');
           document.getElementById('footerBar').classList.add('hidden');
         }
@@ -275,6 +381,115 @@
 
         h.appendChild(d);
         h.scrollTop = h.scrollHeight;
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // RECEIPTS (Custom Macros)
+      // ═══════════════════════════════════════════════════════════
+
+      let selectedEmoji = '⚡';
+
+      function loadReceipts() {
+        const container = document.getElementById('receiptsList');
+        container.innerHTML = '<div style="color:#999;font-size:11px;">Carregant...</div>';
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            container.innerHTML = '';
+            if (result.receipts && result.receipts.length > 0) {
+              result.receipts.forEach(function(r) {
+                const btn = document.createElement('button');
+                btn.className = 'receipt-btn';
+                btn.innerHTML = '<span class="icon">' + r.icon + '</span>' + r.label +
+                  '<span class="delete-x" onclick="event.stopPropagation(); deleteReceipt(\'' + r.id + '\')">✕</span>';
+                btn.onclick = function() { runReceipt(r.instruction, r.label); };
+                container.appendChild(btn);
+              });
+            } else {
+              container.innerHTML = '<div style="color:#999;font-size:11px;">Cap recepta encara. Crea la primera!</div>';
+            }
+          })
+          .withFailureHandler(function(err) {
+            container.innerHTML = '<div style="color:#c5221f;font-size:11px;">Error carregant receptes</div>';
+          })
+          .getReceiptsFromWorker();
+      }
+
+      function toggleNewReceiptForm() {
+        const form = document.getElementById('newReceiptForm');
+        form.classList.toggle('hidden');
+        if (!form.classList.contains('hidden')) {
+          document.getElementById('receiptLabel').value = '';
+          document.getElementById('receiptInstruction').value = '';
+          selectEmoji('⚡');
+        }
+      }
+
+      function selectEmoji(emoji) {
+        selectedEmoji = emoji;
+        document.querySelectorAll('.emoji-picker span').forEach(function(s) {
+          s.classList.remove('selected');
+          if (s.innerText === emoji) s.classList.add('selected');
+        });
+      }
+
+      function saveNewReceipt() {
+        const label = document.getElementById('receiptLabel').value.trim();
+        const instruction = document.getElementById('receiptInstruction').value.trim();
+
+        if (!label) return alert('Posa un nom al botó');
+        if (!instruction) return alert('Escriu la instrucció per la IA');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            toggleNewReceiptForm();
+            loadReceipts();
+          })
+          .withFailureHandler(function(err) {
+            alert('Error: ' + err.message);
+          })
+          .saveReceiptToWorker(label, instruction, selectedEmoji);
+      }
+
+      function deleteReceipt(receiptId) {
+        if (!confirm('Eliminar aquesta recepta?')) return;
+
+        google.script.run
+          .withSuccessHandler(function() {
+            loadReceipts();
+          })
+          .withFailureHandler(function(err) {
+            alert('Error: ' + err.message);
+          })
+          .deleteReceiptFromWorker(receiptId);
+      }
+
+      function runReceipt(instruction, label) {
+        // Canviar a pestanya Xat
+        switchTab('chat');
+
+        // Mostrar que s'executa la recepta
+        addBubble('user', '🎯 ' + label);
+        showThinking();
+
+        document.getElementById('sendBtn').disabled = true;
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            hideThinking();
+            document.getElementById('sendBtn').disabled = false;
+            addBubble('ai', res.ai_response, res.mode === 'edit');
+
+            if (res.credits !== undefined) {
+              document.getElementById('creditsDisplay').innerText = 'Credits: ' + res.credits;
+            }
+          })
+          .withFailureHandler(function(err) {
+            hideThinking();
+            document.getElementById('sendBtn').disabled = false;
+            addBubble('error', 'Error: ' + err.message);
+          })
+          .processUserCommand(instruction);
       }
     </script>
   </body>
