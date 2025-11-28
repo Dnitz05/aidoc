@@ -19,68 +19,58 @@ function getLicenseKey() {
   return PropertiesService.getUserProperties().getProperty('SIDECAR_LICENSE_KEY') || "";
 }
 
-// --- NUCLI HÍBRID (Smart Markers) ---
+// --- NUCLI HÍBRID AMB SMART MARKERS ---
 function processUserCommand(instruction) {
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
   const body = doc.getBody();
 
   let contentPayload = "";
-  let mapIdToElement = {}; // Mapa per recuperar elements per ID
+  let mapIdToElement = {};
   let isSelection = false;
 
   const licenseKey = getLicenseKey();
   if (!licenseKey) throw new Error("Configura la llicència (⚙️).");
 
-  // 1. INDEXACIÓ DEL DOCUMENT (Assignem IDs virtuals)
+  // 1. INDEXACIÓ DEL DOCUMENT
   let elementsToProcess = [];
 
   if (selection) {
-    // Si hi ha selecció, només processem els elements seleccionats
     const ranges = selection.getRangeElements();
     ranges.forEach(r => {
       const el = r.getElement();
-      // Només elements amb text
       if (el.getType() === DocumentApp.ElementType.TEXT) {
-        elementsToProcess.push(el.getParent()); // Agafem el paràgraf pare
+         elementsToProcess.push(el.getParent());
       } else if (el.getType() === DocumentApp.ElementType.PARAGRAPH ||
                  el.getType() === DocumentApp.ElementType.LIST_ITEM) {
         elementsToProcess.push(el);
       }
     });
+    // Eliminar duplicats
+    elementsToProcess = [...new Set(elementsToProcess)];
     isSelection = true;
   } else {
-    // Si no, processem tot el Body (fills directes: Paràgrafs, Llistes)
-    // IGNOREM Taules i Imatges per no trencar-les
+    // Tot el document
     const numChildren = body.getNumChildren();
     for (let i = 0; i < numChildren; i++) {
       const child = body.getChild(i);
-      const type = child.getType();
-      // Només paràgrafs i llistes (text editable)
-      if (type === DocumentApp.ElementType.PARAGRAPH ||
-          type === DocumentApp.ElementType.LIST_ITEM) {
+      if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
+          child.getType() === DocumentApp.ElementType.LIST_ITEM) {
         elementsToProcess.push(child);
       }
-      // Taules, imatges, etc. es SALTEN (es preservaran!)
     }
   }
 
-  // Construïm el text amb marcadors: {{0}} Text... {{1}} Text...
-  let validIndex = 0;
-  elementsToProcess.forEach((el, originalIndex) => {
-    try {
-      const text = el.asText().getText();
-      if (text && text.trim().length > 0) { // Saltem paràgrafs buits
-        contentPayload += `{{${validIndex}}} ${text}\n`;
-        mapIdToElement[String(validIndex)] = el; // Clau com a string
-        validIndex++;
-      }
-    } catch (e) {
-      // Element sense text, el saltem
+  // Construïm el payload amb IDs virtuals {{0}}...
+  elementsToProcess.forEach((el, index) => {
+    const text = el.asText().getText();
+    if (text.trim().length > 0) {
+      contentPayload += `{{${index}}} ${text}\n`;
+      mapIdToElement[index] = el;
     }
   });
 
-  if (!contentPayload.trim()) throw new Error("No hi ha text vàlid per processar.");
+  if (!contentPayload.trim()) throw new Error("No hi ha text vàlid.");
 
   // 2. Crida al Worker
   const options = {
@@ -105,39 +95,23 @@ function processUserCommand(instruction) {
 
     const aiData = json.data;
 
-    // 3. APLICACIÓ DE CANVIS (Híbrida)
-
+    // 3. APLICACIÓ DE CANVIS
     if (aiData.mode === 'UPDATE_BY_ID') {
-      // ═══════════════════════════════════════════════════════════
-      // ESTRATÈGIA NO DESTRUCTIVA (Cirurgia per ID)
-      // Només toquem els elements que la IA ha modificat
-      // Les imatges i taules es preserven perquè NO estan al mapa
-      // ═══════════════════════════════════════════════════════════
-
-      for (const [id, newTextWithMarkdown] of Object.entries(aiData.updates)) {
-        const targetElement = mapIdToElement[String(id)];
+      // ESTRATÈGIA NO DESTRUCTIVA (Cirurgia)
+      for (const [id, newText] of Object.entries(aiData.updates)) {
+        const targetElement = mapIdToElement[id];
         if (targetElement) {
-          // Usem la funció blindada que preserva font/tamany/color
-          updateParagraphPreservingAttributes(targetElement, newTextWithMarkdown);
+          updateParagraphPreservingAttributes(targetElement, newText);
         }
       }
-
     } else {
-      // ═══════════════════════════════════════════════════════════
-      // ESTRATÈGIA RECONSTRUCCIÓ (Resums, canvis d'estructura)
-      // Aquí SÍ fem clear() perquè l'estructura canvia totalment
-      // ═══════════════════════════════════════════════════════════
-
-      if (isSelection && aiData.blocks) {
-        // En selecció, substituïm el text del primer element
-        const firstEl = Object.values(mapIdToElement)[0];
-        if (firstEl) {
-          const combinedText = aiData.blocks.map(b => b.text).join('\n');
-          firstEl.asText().setText(combinedText);
-        }
-      } else if (aiData.blocks) {
-        // Document sencer: reconstrucció total
-        renderFullDocument(body, aiData.blocks);
+      // ESTRATÈGIA RECONSTRUCCIÓ (Resums globals)
+      if (isSelection) {
+         if (elementsToProcess.length > 0) {
+            elementsToProcess[0].asText().setText(aiData.blocks.map(b=>b.text).join('\n'));
+         }
+      } else {
+         renderFullDocument(body, aiData.blocks);
       }
     }
 
@@ -152,203 +126,89 @@ function processUserCommand(instruction) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// UTILITATS DE FORMAT
-// ═══════════════════════════════════════════════════════════════════
+// --- FUNCIONS DE RENDERITZAT I PRESERVACIÓ D'ESTIL ---
 
 /**
- * Neteja els marcadors de Markdown per obtenir text pla
- */
-function cleanMarkdown(text) {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')  // **bold** → bold
-    .replace(/\*(.+?)\*/g, '$1');      // *italic* → italic
-}
-
-/**
- * Funció BLINDADA per preservar estil (Font i Tamany)
- * Captura els atributs ABANS de modificar i els reimposició DESPRÉS
+ * Funció INFAL·LIBLE per preservar estil (Tècnica Insert-Delete)
+ * En lloc d'esborrar i perdre l'estil, inserim primer per heretar-lo.
  */
 function updateParagraphPreservingAttributes(element, newMarkdownText) {
   const textObj = element.editAsText();
+  const oldText = textObj.getText();
 
-  // 1. CAPTURA D'ESTILS CRÍTICS (Abans de tocar res)
-  // Llegim els atributs del primer caràcter (índex 0)
-  // Si el paràgraf és buit, usem valors segurs per defecte.
-  let currentFontSize = 11;
-  let currentFontFamily = 'Arial';
-  let currentColor = '#000000';
-  let currentAlignment = null;
-  let currentHeading = null;
+  // 1. Netejar Markdown (treure asteriscos per al text pla)
+  const cleanText = newMarkdownText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
 
-  try {
-    // Intentem llegir els atributs existents
-    const attrs = textObj.getAttributes(0);
+  // 2. ESTRATÈGIA "CAVALL DE TROIA" (Insertar abans d'esborrar)
+  if (oldText.length > 0) {
+    // A. Inserim el NOU text al principi (índex 0)
+    // Apps Script farà que hereti l'estil (Mida 24, Color Blau, etc.) del caràcter 0 original.
+    textObj.insertText(0, cleanText);
 
-    // Validem que no siguin nuls (això evita el text minúscul)
-    if (attrs[DocumentApp.Attribute.FONT_SIZE]) {
-      currentFontSize = attrs[DocumentApp.Attribute.FONT_SIZE];
-    }
-    if (attrs[DocumentApp.Attribute.FONT_FAMILY]) {
-      currentFontFamily = attrs[DocumentApp.Attribute.FONT_FAMILY];
-    }
-    if (attrs[DocumentApp.Attribute.FOREGROUND_COLOR]) {
-      currentColor = attrs[DocumentApp.Attribute.FOREGROUND_COLOR];
+    // B. Ara tenim "NOU TEXT" + "ANTIC TEXT".
+    // Esborrem l'antic text, que ara comença després del nou.
+    // (Des de la longitud del nou, fins al final)
+    const startOfOld = cleanText.length;
+    // Calculem l'índex final amb cura
+    const endOfOld = startOfOld + oldText.length - 1;
+
+    if (endOfOld >= startOfOld) {
+      textObj.deleteText(startOfOld, endOfOld);
     }
 
-    // L'alineació i heading pertanyen al paràgraf, no al text
-    if (element.getAlignment) {
-      currentAlignment = element.getAlignment();
-    }
-    if (element.getHeading) {
-      currentHeading = element.getHeading();
-    }
-  } catch (e) {
-    console.log("No s'han pogut llegir estils originals, usant defectes.");
+  } else {
+    // Si el paràgraf estava buit, no tenim d'on heretar. Fem setText normal.
+    textObj.setText(cleanText);
   }
 
-  // 2. NETEJA I SUBSTITUCIÓ
-  // Treiem els asteriscos del markdown per no ensuciar el text
-  const cleanText = cleanMarkdown(newMarkdownText);
-
-  // Aquesta és l'acció destructiva:
-  textObj.setText(cleanText);
-
-  // 3. RE-APLICACIÓ FORÇADA D'ESTILS (Resurrecció)
-  // Apliquem els estils capturats a tot el nou rang de text
-  const end = cleanText.length - 1;
-
-  if (end >= 0) {
-    try {
-      // Imposem la font i el tamany originals
-      textObj.setFontSize(0, end, currentFontSize);
-      textObj.setFontFamily(0, end, currentFontFamily);
-      textObj.setForegroundColor(0, end, currentColor);
-
-      // Imposem l'alineació i heading
-      if (currentAlignment && element.setAlignment) {
-        element.setAlignment(currentAlignment);
-      }
-      if (currentHeading && element.setHeading) {
-        element.setHeading(currentHeading);
-      }
-    } catch (e) {
-      console.log("Error re-aplicant estils: " + e.message);
-    }
-  }
-
-  // 4. FINALMENT, APLIQUEM LES NOVES NEGRETES/CURSIVES DE LA IA
+  // 3. FINALMENT, APLIQUEM LES NOVES NEGRETES/CURSIVES DE LA IA
+  // (Això posarà negreta sobre la mida 24 que ja hem preservat)
   applyInlineMarkdown(element, newMarkdownText);
 }
 
-/**
- * Aplica format inline (negreta/cursiva) basant-se en marcadors Markdown
- * Aquesta funció busca on estaven els ** i * i aplica l'estil corresponent
- */
 function applyInlineMarkdown(element, originalMarkdown) {
   const textObj = element.editAsText();
   const cleanText = textObj.getText();
 
-  // ─── NEGRETA (**text**) ───
+  // Negreta (**text**)
   const boldPattern = /\*\*(.+?)\*\*/g;
   let match;
   let searchStart = 0;
 
-  // Creem una còpia per iterar sense interferències
-  const markdownCopy = originalMarkdown;
-
-  while ((match = boldPattern.exec(markdownCopy)) !== null) {
-    const boldContent = match[1]; // El text dins dels **
-
-    // Busquem aquesta subcadena en el text net
-    const pos = cleanText.indexOf(boldContent, searchStart);
-    if (pos !== -1 && pos + boldContent.length <= cleanText.length) {
-      try {
-        textObj.setBold(pos, pos + boldContent.length - 1, true);
-      } catch (e) {}
-      searchStart = pos + boldContent.length;
+  // Reiniciem regex cada cop
+  while ((match = boldPattern.exec(originalMarkdown)) !== null) {
+    const content = match[1];
+    const pos = cleanText.indexOf(content, searchStart);
+    if (pos !== -1) {
+      textObj.setBold(pos, pos + content.length - 1, true);
+      // Opcional: actualitzar searchStart per optimitzar
     }
   }
 
-  // ─── CURSIVA (*text* però NO **text**) ───
-  // Usem un patró que exclou els dobles asteriscos
+  // Cursiva (*text*)
   const italicPattern = /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g;
   searchStart = 0;
-
-  while ((match = italicPattern.exec(markdownCopy)) !== null) {
-    const italicContent = match[1]; // El text dins dels *
-
-    const pos = cleanText.indexOf(italicContent, searchStart);
-    if (pos !== -1 && pos + italicContent.length <= cleanText.length) {
-      try {
-        textObj.setItalic(pos, pos + italicContent.length - 1, true);
-      } catch (e) {}
-      searchStart = pos + italicContent.length;
+  while ((match = italicPattern.exec(originalMarkdown)) !== null) {
+    const content = match[1];
+    const pos = cleanText.indexOf(content, searchStart);
+    if (pos !== -1) {
+      textObj.setItalic(pos, pos + content.length - 1, true);
     }
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// MOTOR DE RECONSTRUCCIÓ (per a resums/reescriptures totals)
-// ═══════════════════════════════════════════════════════════════════
-
+// Fallback per reescriptura total (Resums)
 function renderFullDocument(body, blocks) {
   body.clear();
-
   blocks.forEach(block => {
     let element;
-    const text = block.text || "";
-
     switch (block.type) {
-      case 'HEADING_1':
-        element = body.appendParagraph(text);
-        element.setHeading(DocumentApp.ParagraphHeading.HEADING1);
-        break;
-      case 'HEADING_2':
-        element = body.appendParagraph(text);
-        element.setHeading(DocumentApp.ParagraphHeading.HEADING2);
-        break;
-      case 'HEADING_3':
-        element = body.appendParagraph(text);
-        element.setHeading(DocumentApp.ParagraphHeading.HEADING3);
-        break;
-      case 'BULLET_LIST':
-        element = body.appendListItem(text);
-        element.setGlyphType(DocumentApp.GlyphType.BULLET);
-        break;
-      case 'NUMBERED_LIST':
-        element = body.appendListItem(text);
-        element.setGlyphType(DocumentApp.GlyphType.NUMBER);
-        break;
-      default: // PARAGRAPH
-        element = body.appendParagraph(text);
-        element.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    }
-
-    // Aplicar format si hi ha array de formatting
-    if (block.formatting && block.formatting.length > 0) {
-      applyBlockFormatting(element, block.formatting);
-    }
-  });
-}
-
-/**
- * Aplica format basat en l'array de formatting dels blocs JSON
- */
-function applyBlockFormatting(element, formattingRules) {
-  const textObj = element.editAsText();
-  const textLength = element.getText().length;
-
-  formattingRules.forEach(fmt => {
-    const start = fmt.start || 0;
-    const end = start + (fmt.length || 1) - 1;
-
-    // Validar límits
-    if (start >= 0 && end < textLength && start <= end) {
-      try {
-        if (fmt.style === 'BOLD') textObj.setBold(start, end, true);
-        if (fmt.style === 'ITALIC') textObj.setItalic(start, end, true);
-      } catch (e) {}
+      case 'HEADING_1': element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.HEADING1); break;
+      case 'HEADING_2': element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.HEADING2); break;
+      case 'HEADING_3': element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.HEADING3); break;
+      case 'BULLET_LIST': element = body.appendListItem(block.text).setGlyphType(DocumentApp.GlyphType.BULLET); break;
+      case 'NUMBERED_LIST': element = body.appendListItem(block.text).setGlyphType(DocumentApp.GlyphType.NUMBER); break;
+      default: element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.NORMAL);
     }
   });
 }
