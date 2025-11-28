@@ -1,6 +1,5 @@
 /**
- * SideCar API Worker - Phase 8: RAG Express / Gem Config
- * Suporta: Smart Markers + Style Guide + Knowledge Base + Strict Mode
+ * SideCar API Worker - RAG Express / Gem Config
  */
 export default {
   async fetch(request, env) {
@@ -15,19 +14,12 @@ export default {
 
     try {
       const body = await request.json();
-      const {
-        license_key,
-        text,
-        user_instruction,
-        doc_metadata,
-        style_guide,
-        knowledge_base,
-        strict_mode
-      } = body;
+      const { license_key, text, user_instruction, doc_metadata, style_guide, knowledge_base, strict_mode } = body;
 
       if (!license_key) throw new Error("missing_license");
+      if (!text) throw new Error("missing_text");
 
-      // 1. Supabase (Crèdits)
+      // 1. Validació de Llicència
       const msgBuffer = new TextEncoder().encode(license_key);
       const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -43,17 +35,50 @@ export default {
         body: JSON.stringify({
           p_license_key_hash: licenseHash,
           p_cost: 1,
-          p_operation: 'gem_config',
+          p_operation: 'rag_express',
           p_metadata: doc_metadata || {}
         })
       });
-
-      if (!supabaseResp.ok) throw new Error("supabase_error");
       const supabaseData = await supabaseResp.json();
 
-      // 2. PROMPT MIXER - Construcció modular del System Instruction
-      const systemInstruction = buildSystemInstruction(style_guide, knowledge_base, strict_mode);
-      const userPrompt = `TEXT AMB MARCADORS:\n${text}\n\nINSTRUCCIÓ: "${user_instruction || "Millora el text"}"`;
+      // 2. Construcció del Prompt Modular (The Mixer)
+      let systemInstruction = `Ets SideCar, un editor professional d'IA.
+
+FORMAT DE RESPOSTA (ESTRICTE JSON):
+Retorna ÚNICAMENT un objecte JSON amb aquesta estructura. NO usis Markdown fora del JSON.
+{
+  "change_summary": "Explicació breu (1 frase)",
+  "blocks": [
+    {
+      "type": "HEADING_1" | "HEADING_2" | "HEADING_3" | "PARAGRAPH" | "BULLET_LIST" | "NUMBERED_LIST",
+      "text": "Contingut",
+      "formatting": [{ "style": "BOLD" | "ITALIC", "start": 0, "length": 5 }]
+    }
+  ]
+}`;
+
+      // Injecció de Personalitat (Estil)
+      if (style_guide && style_guide.trim()) {
+        systemInstruction += `\n\nGUIA D'ESTIL DE L'USUARI (Personalitat):\n${style_guide}\nSegueix aquestes preferències de to i format.`;
+      }
+
+      // Injecció de Coneixement (RAG)
+      if (knowledge_base && knowledge_base.trim()) {
+        systemInstruction += `\n\nBASE DE CONEIXEMENT (Context Prioritari):\n${knowledge_base}\nUsa aquesta informació com a veritat absoluta.`;
+      }
+
+      // Lògica de Control (Mode Estricte)
+      if (strict_mode) {
+        systemInstruction += `\n\nMODE ESTRICTE ACTIVAT:
+1. Respon ÚNICAMENT basant-te en la 'BASE DE CONEIXEMENT' proporcionada.
+2. Si la resposta no es troba explícitament al text del coneixement, has de respondre (al change_summary): "No tinc informació suficient al context per respondre".
+3. Està PROHIBIT utilitzar el teu coneixement general per inventar dades.`;
+      } else {
+        systemInstruction += `\n\nMODE OBERT:
+Prioritza la 'BASE DE CONEIXEMENT', però pots utilitzar el teu coneixement general i sentit comú per complementar la resposta o omplir buits.`;
+      }
+
+      const userPrompt = `TEXT ORIGINAL: "${text}"\n\nINSTRUCCIÓ: "${user_instruction || "Processa el text"}"`;
 
       // 3. Crida a Gemini
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`;
@@ -72,13 +97,12 @@ export default {
 
       let parsedResponse;
       try {
-        parsedResponse = JSON.parse(geminiData.candidates[0].content.parts[0].text);
+         parsedResponse = JSON.parse(geminiData.candidates[0].content.parts[0].text);
       } catch (e) {
-        parsedResponse = {
-          mode: "REWRITE_FULL",
-          change_summary: "He processat el text (format de resposta ajustat).",
-          blocks: [{ type: "PARAGRAPH", text: geminiData.candidates[0].content.parts[0].text, formatting: [] }]
-        };
+         parsedResponse = {
+            change_summary: "Error de format JSON.",
+            blocks: [{ type: "PARAGRAPH", text: geminiData.candidates[0].content.parts[0].text, formatting: [] }]
+         };
       }
 
       return new Response(JSON.stringify({
@@ -93,71 +117,3 @@ export default {
     }
   }
 };
-
-/**
- * PROMPT MIXER - Construeix el System Instruction dinàmicament
- */
-function buildSystemInstruction(styleGuide, knowledgeBase, strictMode) {
-  // CAPA 0: Base tècnica (sempre present)
-  let instruction = `Ets SideCar, un editor expert que preserva el format del document.
-
-INPUT: Rebràs un text on cada paràgraf comença amb un marcador ID, ex: "{{12}} El text...".
-
-INSTRUCCIONS DE FORMAT (CRÍTIC):
-Tens dos modes de funcionament segons què demani l'usuari:
-
-MODE A: CORRECCIÓ / MILLORA / TRADUCCIÓ (Preservar Estructura)
-Si l'usuari vol millorar, corregir, traduir o modificar el text existent SENSE canviar l'estructura:
-- Retorna JSON: { "mode": "UPDATE_BY_ID", "updates": { "0": "Text corregit...", "2": "Text traduït..." }, "change_summary": "Explicació breu en català" }
-- Només inclou els IDs que han canviat. Si un paràgraf no necessita canvis, NO l'incloguis.
-- Dins del text, pots usar **negreta** i *cursiva* per formatar paraules importants.
-- IMPORTANT: Els IDs han de ser strings, no números.
-
-MODE B: RESUM / REESCRIPTURA TOTAL (Canviar Estructura)
-Si l'usuari demana un resum, esquema, reorganització o canvi radical que fa impossible mantenir la correspondència 1 a 1:
-- Retorna JSON: { "mode": "REWRITE_FULL", "blocks": [...], "change_summary": "Explicació breu en català" }
-- Estructura de blocks: [{ "type": "HEADING_1|HEADING_2|HEADING_3|PARAGRAPH|BULLET_LIST|NUMBERED_LIST", "text": "contingut", "formatting": [{"style": "BOLD|ITALIC", "start": 0, "length": 5}] }]
-
-REGLA D'OR: Prioritza SEMPRE el MODE A (UPDATE_BY_ID) si és possible. Només usa MODE B si l'usuari explícitament demana canviar l'estructura.`;
-
-  // CAPA 1: Guia d'Estil (si existeix)
-  if (styleGuide && styleGuide.trim()) {
-    instruction += `
-
-═══════════════════════════════════════════════════════════
-GUIA D'ESTIL DE L'USUARI (segueix aquestes preferències):
-═══════════════════════════════════════════════════════════
-${styleGuide.trim()}`;
-  }
-
-  // CAPA 2: Base de Coneixement (si existeix)
-  if (knowledgeBase && knowledgeBase.trim()) {
-    instruction += `
-
-═══════════════════════════════════════════════════════════
-BASE DE CONEIXEMENT / CONTEXT DE REFERÈNCIA:
-═══════════════════════════════════════════════════════════
-${knowledgeBase.trim()}`;
-  }
-
-  // CAPA 3: Mode Estricte vs Obert
-  if (knowledgeBase && knowledgeBase.trim()) {
-    if (strictMode === true) {
-      instruction += `
-
-⚠️ MODE ESTRICTE ACTIVAT ⚠️
-CRÍTIC: Respon ÚNICAMENT basant-te en la 'BASE DE CONEIXEMENT' proporcionada.
-- Si la informació no hi és, digues explícitament: "No tinc aquesta informació al context proporcionat."
-- NO usis el teu coneixement general del món.
-- NO inventis ni infereixis dades que no estiguin explícitament al context.`;
-    } else {
-      instruction += `
-
-MODE OBERT: Prioritza la 'BASE DE CONEIXEMENT' com a font de veritat.
-- Si hi ha contradicció, el context proporcionat guanya sobre el teu coneixement general.
-- Pots usar el teu coneixement general per omplir buits o complementar.`;
-    }
-  }
-
-  return instruction;
-}

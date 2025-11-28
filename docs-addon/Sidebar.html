@@ -4,640 +4,160 @@
     <base target="_top">
     <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
     <style>
-      :root {
-        --bg-primary: #ffffff;
-        --bg-secondary: #f7f8f9;
-        --text-primary: #1a1a1a;
-        --text-secondary: #6b7280;
-        --text-muted: #9ca3af;
-        --border: #e5e7eb;
-        --accent: #2563eb;
-        --accent-hover: #1d4ed8;
-        --user-bg: #2563eb;
-        --user-text: #ffffff;
-        --ai-bg: #f3f4f6;
-        --error-bg: #fef2f2;
-        --error-text: #dc2626;
-        --success: #10b981;
-        --purple: #7c3aed;
-      }
+      body { padding: 0; margin: 0; font-family: 'Google Sans', Roboto, Arial; background: #f8f9fa; height: 100vh; display: flex; flex-direction: column; }
 
-      * { box-sizing: border-box; }
+      /* TAB BAR */
+      .tabs { display: flex; background: white; border-bottom: 1px solid #ddd; }
+      .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: #5f6368; font-weight: 500; font-size: 14px; border-bottom: 2px solid transparent; }
+      .tab.active { color: #1a73e8; border-bottom: 2px solid #1a73e8; }
+      .tab:hover { background: #f1f3f4; }
 
-      body {
-        margin: 0; padding: 0;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: var(--bg-secondary);
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-        font-size: 14px;
-        color: var(--text-primary);
-      }
+      /* CONTENT AREAS */
+      .content-panel { flex-grow: 1; display: none; overflow-y: auto; padding: 15px; }
+      .content-panel.active { display: flex; flex-direction: column; }
 
-      /* Header amb logo */
-      .header {
-        background: var(--bg-primary);
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--border);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
+      /* XAT STYLES */
+      #chatHistory { flex-grow: 1; display: flex; flex-direction: column; gap: 12px; margin-bottom: 10px; }
+      .msg { padding: 10px 14px; border-radius: 18px; font-size: 13px; line-height: 1.4; max-width: 85%; }
+      .msg.user { align-self: flex-end; background: #d2e3fc; color: #174ea6; border-bottom-right-radius: 4px; }
+      .msg.ai { align-self: flex-start; background: white; border: 1px solid #dadce0; border-bottom-left-radius: 4px; }
+      .msg.system { align-self: center; font-size: 11px; color: #666; width: 100%; text-align: center; margin-top: 10px; }
+      .msg.error { align-self: center; background: #fce8e6; color: #c5221f; border: 1px solid #f5c6cb; }
 
-      .header-brand {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
+      /* BRAIN STYLES */
+      .form-group { margin-bottom: 15px; }
+      label { display: block; font-weight: bold; font-size: 12px; margin-bottom: 5px; color: #3c4043; }
+      textarea, input[type="text"] { width: 100%; padding: 8px; border: 1px solid #dadce0; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 13px; }
+      textarea { resize: vertical; min-height: 60px; }
+      .checkbox-group { display: flex; align-items: center; gap: 8px; background: #fff; padding: 10px; border: 1px solid #dadce0; border-radius: 4px; }
+      .hint { font-size: 11px; color: #70757a; margin-top: 2px; }
 
-      .header-logo {
-        width: 26px; height: 26px;
-        background: linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%);
-        border-radius: 7px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
+      /* FOOTER */
+      .footer { padding: 10px; background: white; border-top: 1px solid #ddd; }
+      .input-wrapper { display: flex; gap: 8px; }
+      textarea#userInput { height: 38px; border-radius: 20px; resize: none; }
+      button.send-btn { background: #1a73e8; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
+      button.action-btn { background: #1a73e8; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: 500; }
 
-      .header-logo svg { width: 14px; height: 14px; fill: white; }
-
-      .header h1 {
-        margin: 0;
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text-primary);
-      }
-
-      .settings-btn {
-        width: 30px; height: 30px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: background 0.15s;
-      }
-
-      .settings-btn:hover { background: var(--bg-secondary); }
-      .settings-btn svg { width: 16px; height: 16px; stroke: var(--text-secondary); }
-
-      /* Tabs de navegació */
-      .tabs {
-        display: flex;
-        background: var(--bg-primary);
-        border-bottom: 1px solid var(--border);
-      }
-
-      .tab {
-        flex: 1;
-        padding: 10px;
-        text-align: center;
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--text-secondary);
-        cursor: pointer;
-        border-bottom: 2px solid transparent;
-        transition: all 0.15s;
-      }
-
-      .tab:hover { color: var(--text-primary); background: var(--bg-secondary); }
-
-      .tab.active {
-        color: var(--accent);
-        border-bottom-color: var(--accent);
-      }
-
-      /* Panells */
-      .panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
-      .panel.active { display: flex; }
-
-      /* Config Panel (llicència) */
-      #configPanel {
-        background: var(--bg-primary);
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--border);
-        display: none;
-      }
-
-      .config-label {
-        font-size: 11px;
-        font-weight: 500;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 6px;
-        display: block;
-      }
-
-      .config-row { display: flex; gap: 8px; }
-
-      .config-input {
-        flex: 1;
-        padding: 8px 10px;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        font-size: 12px;
-        outline: none;
-        transition: border-color 0.15s;
-      }
-
-      .config-input:focus { border-color: var(--accent); }
-
-      .config-btn {
-        padding: 8px 14px;
-        background: var(--accent);
-        color: white;
-        border: none;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 500;
-        cursor: pointer;
-      }
-
-      .config-btn:hover { background: var(--accent-hover); }
-
-      /* Chat Panel */
-      #chatHistory {
-        flex: 1;
-        overflow-y: auto;
-        padding: 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-
-      .msg {
-        max-width: 88%;
-        padding: 10px 14px;
-        border-radius: 14px;
-        font-size: 13px;
-        line-height: 1.45;
-        word-wrap: break-word;
-        animation: fadeIn 0.2s ease;
-      }
-
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(4px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-
-      .msg.user {
-        align-self: flex-end;
-        background: var(--user-bg);
-        color: var(--user-text);
-        border-bottom-right-radius: 4px;
-      }
-
-      .msg.ai {
-        align-self: flex-start;
-        background: var(--ai-bg);
-        color: var(--text-primary);
-        border-bottom-left-radius: 4px;
-      }
-
-      .msg.system {
-        align-self: center;
-        background: none;
-        padding: 6px 12px;
-        font-size: 11px;
-        color: var(--text-muted);
-        text-align: center;
-        max-width: 100%;
-      }
-
-      .msg.error {
-        align-self: flex-start;
-        background: var(--error-bg);
-        color: var(--error-text);
-        border-bottom-left-radius: 4px;
-      }
-
-      .typing { display: flex; gap: 4px; padding: 14px; }
-      .typing span {
-        width: 6px; height: 6px;
-        background: var(--text-muted);
-        border-radius: 50%;
-        animation: bounce 1.4s infinite ease-in-out both;
-      }
-      .typing span:nth-child(1) { animation-delay: -0.32s; }
-      .typing span:nth-child(2) { animation-delay: -0.16s; }
-
-      @keyframes bounce {
-        0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
-        40% { transform: scale(1); opacity: 1; }
-      }
-
-      .welcome {
-        text-align: center;
-        padding: 30px 16px;
-        color: var(--text-secondary);
-      }
-
-      .welcome-icon {
-        width: 44px; height: 44px;
-        background: linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%);
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 12px;
-      }
-
-      .welcome-icon svg { width: 22px; height: 22px; fill: white; }
-      .welcome h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: var(--text-primary); }
-      .welcome p { margin: 0; font-size: 12px; line-height: 1.5; }
-
-      /* Footer (input) */
-      .footer {
-        padding: 12px 16px;
-        background: var(--bg-primary);
-        border-top: 1px solid var(--border);
-      }
-
-      .input-wrapper { display: flex; gap: 8px; align-items: flex-end; }
-
-      textarea {
-        flex: 1;
-        min-height: 38px;
-        max-height: 100px;
-        padding: 9px 14px;
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        font-size: 13px;
-        font-family: inherit;
-        line-height: 1.4;
-        resize: none;
-        outline: none;
-      }
-
-      textarea:focus { border-color: var(--accent); }
-      textarea::placeholder { color: var(--text-muted); }
-
-      #sendBtn {
-        width: 38px; height: 38px;
-        background: var(--accent);
-        border: none;
-        border-radius: 10px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-
-      #sendBtn:hover { background: var(--accent-hover); }
-      #sendBtn:disabled { background: var(--border); cursor: default; }
-      #sendBtn svg { width: 16px; height: 16px; fill: white; }
-
-      .credits-info {
-        text-align: center;
-        font-size: 10px;
-        color: var(--text-muted);
-        margin-top: 8px;
-      }
-
-      /* Brain Panel */
-      #brainPanel {
-        padding: 16px;
-        overflow-y: auto;
-        background: var(--bg-secondary);
-      }
-
-      .brain-section {
-        background: var(--bg-primary);
-        border-radius: 10px;
-        padding: 14px;
-        margin-bottom: 12px;
-        border: 1px solid var(--border);
-      }
-
-      .brain-section:last-child { margin-bottom: 0; }
-
-      .brain-label {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--text-primary);
-        margin-bottom: 4px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .brain-label svg { width: 14px; height: 14px; }
-
-      .brain-hint {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-bottom: 10px;
-        line-height: 1.4;
-      }
-
-      .brain-textarea {
-        width: 100%;
-        min-height: 80px;
-        padding: 10px 12px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        font-size: 12px;
-        font-family: inherit;
-        line-height: 1.5;
-        resize: vertical;
-        outline: none;
-      }
-
-      .brain-textarea:focus { border-color: var(--accent); }
-      .brain-textarea.large { min-height: 140px; }
-
-      .char-count {
-        text-align: right;
-        font-size: 10px;
-        color: var(--text-muted);
-        margin-top: 4px;
-      }
-
-      .char-count.warning { color: #f59e0b; }
-      .char-count.danger { color: var(--error-text); }
-
-      /* Checkbox estil */
-      .checkbox-wrapper {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 0;
-      }
-
-      .checkbox-wrapper input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
-        accent-color: var(--accent);
-        cursor: pointer;
-      }
-
-      .checkbox-label {
-        font-size: 13px;
-        color: var(--text-primary);
-        cursor: pointer;
-      }
-
-      .checkbox-hint {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-left: 28px;
-        margin-top: -4px;
-      }
-
-      /* Save button */
-      .save-section {
-        padding-top: 8px;
-      }
-
-      .save-btn {
-        width: 100%;
-        padding: 12px;
-        background: linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        transition: opacity 0.15s;
-      }
-
-      .save-btn:hover { opacity: 0.9; }
-      .save-btn svg { width: 16px; height: 16px; fill: white; }
-
-      .save-status {
-        text-align: center;
-        font-size: 11px;
-        color: var(--success);
-        margin-top: 8px;
-        opacity: 0;
-        transition: opacity 0.3s;
-      }
-
-      .save-status.show { opacity: 1; }
+      .hidden { display: none !important; }
     </style>
   </head>
   <body>
-
-    <div class="header">
-      <div class="header-brand">
-        <div class="header-logo">
-          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        </div>
-        <h1>SideCar</h1>
-      </div>
-      <div class="settings-btn" onclick="toggleConfig()">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
-          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
-        </svg>
-      </div>
-    </div>
-
-    <div id="configPanel">
-      <label class="config-label">Clau de llicencia</label>
-      <div class="config-row">
-        <input type="text" id="licenseInput" class="config-input" placeholder="SIDECAR-XXXX-XXXX">
-        <button class="config-btn" onclick="saveLicense()">Desar</button>
-      </div>
-    </div>
 
     <div class="tabs">
       <div class="tab active" onclick="switchTab('chat')">Xat</div>
       <div class="tab" onclick="switchTab('brain')">Cervell</div>
     </div>
 
-    <!-- CHAT PANEL -->
-    <div id="chatPanel" class="panel active">
+    <div id="chatPanel" class="content-panel active">
       <div id="chatHistory">
-        <div class="welcome">
-          <div class="welcome-icon">
-            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-          </div>
-          <h2>Hola!</h2>
-          <p>Selecciona text o deixa-ho buit per editar tot el document.</p>
-        </div>
-      </div>
-      <div class="footer">
-        <div class="input-wrapper">
-          <textarea id="userInput" placeholder="Escriu una instruccio..." rows="1"></textarea>
-          <button id="sendBtn" onclick="sendMessage()">
-            <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-          </button>
-        </div>
-        <div id="creditsDisplay" class="credits-info"></div>
+        <div class="msg system">Hola! Soc SideCar.</div>
       </div>
     </div>
 
-    <!-- BRAIN PANEL -->
-    <div id="brainPanel" class="panel">
-      <div class="brain-section">
-        <div class="brain-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          Guia d'Estil
-        </div>
-        <div class="brain-hint">Com vols que escrigui? (to, veu, preferencies)</div>
-        <textarea id="styleGuide" class="brain-textarea" placeholder="Ex: Usa un to formal i professional. Evita frases massa llargues. No usis la paraula 'problema', substitueix-la per 'repte'."></textarea>
-        <div class="char-count" id="styleCount">0 / 2.000</div>
+    <div id="brainPanel" class="content-panel">
+      <div class="form-group">
+        <label>Llicencia API</label>
+        <input type="text" id="licenseKey" placeholder="SIDECAR-...">
       </div>
 
-      <div class="brain-section">
-        <div class="brain-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-          Base de Coneixement
-        </div>
-        <div class="brain-hint">Enganxa informacio de referencia (normatives, dades, context)</div>
-        <textarea id="knowledgeBase" class="brain-textarea large" placeholder="Ex: El termini de lliurament es de 5 dies laborables. Els preus inclouen IVA. El producte X costa 29.99..."></textarea>
-        <div class="char-count" id="knowledgeCount">0 / 20.000</div>
+      <div class="form-group">
+        <label>Guia d'Estil (Personalitat)</label>
+        <textarea id="styleGuide" placeholder="Ex: Sigues formal, no usis emojis, escriu frases curtes..."></textarea>
       </div>
 
-      <div class="brain-section">
-        <div class="checkbox-wrapper">
+      <div class="form-group">
+        <label>Base de Coneixement (Context)</label>
+        <textarea id="knowledgeBase" style="min-height: 120px;" placeholder="Enganxa aqui normativa, llista de preus o dades de l'empresa..."></textarea>
+        <div class="hint" id="charCount">0 / 20000 caracters</div>
+      </div>
+
+      <div class="form-group">
+        <div class="checkbox-group">
           <input type="checkbox" id="strictMode">
-          <label class="checkbox-label" for="strictMode">Mode Estricte</label>
+          <div>
+            <label style="margin:0">Mode Estricte</label>
+            <div class="hint">Nomes respon amb info del Coneixement.</div>
+          </div>
         </div>
-        <div class="checkbox-hint">Si actiu, la IA nomes usara la Base de Coneixement. No inventara res.</div>
       </div>
 
-      <div class="save-section">
-        <button class="save-btn" onclick="saveMemory()">
-          <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          Desar Memoria
-        </button>
-        <div class="save-status" id="saveStatus">Memoria guardada!</div>
+      <button class="action-btn" onclick="saveSettings()">Desar Memoria</button>
+      <div id="saveStatus" style="text-align:center; font-size:12px; margin-top:5px; color:#188038;"></div>
+    </div>
+
+    <div id="footerBar" class="footer">
+      <div class="input-wrapper">
+        <textarea id="userInput" placeholder="Escriu aqui..."></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">&#10148;</button>
       </div>
     </div>
 
     <script>
-      // Tab switching
-      function switchTab(tab) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      let currentSettings = {};
 
-        if (tab === 'chat') {
+      window.onload = function() {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          currentSettings = JSON.parse(jsonStr);
+
+          document.getElementById('licenseKey').value = currentSettings.license_key || "";
+          document.getElementById('styleGuide').value = currentSettings.style_guide || "";
+          document.getElementById('knowledgeBase').value = currentSettings.knowledge_base || "";
+          document.getElementById('strictMode').checked = currentSettings.strict_mode || false;
+
+          updateCharCount();
+
+          if (!currentSettings.license_key) switchTab('brain');
+
+        }).getSettings();
+
+        document.getElementById('userInput').addEventListener("keydown", function(e) {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+
+        document.getElementById('knowledgeBase').addEventListener('input', updateCharCount);
+      };
+
+      function switchTab(tabName) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.content-panel').forEach(p => p.classList.remove('active'));
+
+        if (tabName === 'chat') {
           document.querySelector('.tab:first-child').classList.add('active');
           document.getElementById('chatPanel').classList.add('active');
+          document.getElementById('footerBar').classList.remove('hidden');
         } else {
           document.querySelector('.tab:last-child').classList.add('active');
           document.getElementById('brainPanel').classList.add('active');
+          document.getElementById('footerBar').classList.add('hidden');
         }
       }
 
-      // Character counters
-      function updateCharCount(textarea, countEl, max) {
-        const len = textarea.value.length;
-        countEl.textContent = len.toLocaleString() + ' / ' + max.toLocaleString();
-        countEl.className = 'char-count';
-        if (len > max * 0.9) countEl.classList.add('warning');
-        if (len > max) countEl.classList.add('danger');
+      function updateCharCount() {
+        const len = document.getElementById('knowledgeBase').value.length;
+        document.getElementById('charCount').innerText = len + " / 20000 caracters";
       }
 
-      // Init
-      window.onload = function() {
-        // Load license
-        google.script.run.withSuccessHandler(function(key) {
-          if (key) {
-            document.getElementById('licenseInput').value = key;
-          } else {
-            toggleConfig();
-          }
-        }).getLicenseKey();
+      function saveSettings() {
+        const btn = document.querySelector('.action-btn');
+        btn.disabled = true;
+        btn.innerText = "Desant...";
 
-        // Load settings
-        google.script.run.withSuccessHandler(function(settings) {
-          document.getElementById('styleGuide').value = settings.style_guide || '';
-          document.getElementById('knowledgeBase').value = settings.knowledge_base || '';
-          document.getElementById('strictMode').checked = settings.strict_mode || false;
-
-          // Update counters
-          updateCharCount(document.getElementById('styleGuide'), document.getElementById('styleCount'), 2000);
-          updateCharCount(document.getElementById('knowledgeBase'), document.getElementById('knowledgeCount'), 20000);
-        }).getSettings();
-
-        // Chat input listeners
-        var input = document.getElementById('userInput');
-        input.addEventListener("keydown", function(event) {
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            sendMessage();
-          }
-        });
-        input.addEventListener("input", function() {
-          this.style.height = "auto";
-          this.style.height = Math.min(this.scrollHeight, 100) + "px";
-        });
-
-        // Brain textarea listeners
-        document.getElementById('styleGuide').addEventListener('input', function() {
-          updateCharCount(this, document.getElementById('styleCount'), 2000);
-        });
-        document.getElementById('knowledgeBase').addEventListener('input', function() {
-          updateCharCount(this, document.getElementById('knowledgeCount'), 20000);
-        });
-      };
-
-      function toggleConfig() {
-        var panel = document.getElementById('configPanel');
-        panel.style.display = (panel.style.display === 'none') ? 'block' : 'none';
-      }
-
-      function saveLicense() {
-        var key = document.getElementById('licenseInput').value;
-        google.script.run.withSuccessHandler(function() {
-          toggleConfig();
-          addBubble('system', 'Llicencia guardada');
-        }).setLicenseKey(key);
-      }
-
-      function saveMemory() {
-        var settings = {
+        const newSettings = {
+          license_key: document.getElementById('licenseKey').value,
           style_guide: document.getElementById('styleGuide').value,
           knowledge_base: document.getElementById('knowledgeBase').value,
           strict_mode: document.getElementById('strictMode').checked
         };
 
         google.script.run.withSuccessHandler(function() {
-          var status = document.getElementById('saveStatus');
-          status.classList.add('show');
-          setTimeout(function() { status.classList.remove('show'); }, 2000);
-        }).saveSettings(settings);
-      }
+          btn.disabled = false;
+          btn.innerText = "Desar Memoria";
+          document.getElementById('saveStatus').innerText = "Configuracio actualitzada!";
+          setTimeout(() => { document.getElementById('saveStatus').innerText = ""; }, 3000);
 
-      function clearWelcome() {
-        var welcome = document.querySelector('.welcome');
-        if (welcome) welcome.remove();
-      }
-
-      function addBubble(type, text) {
-        clearWelcome();
-        var history = document.getElementById('chatHistory');
-        var div = document.createElement('div');
-        div.className = 'msg ' + type;
-        div.innerText = text;
-        history.appendChild(div);
-        history.scrollTop = history.scrollHeight;
-      }
-
-      function showTyping() {
-        clearWelcome();
-        var history = document.getElementById('chatHistory');
-        var div = document.createElement('div');
-        div.className = 'msg ai typing';
-        div.id = 'typingIndicator';
-        div.innerHTML = '<span></span><span></span><span></span>';
-        history.appendChild(div);
-        history.scrollTop = history.scrollHeight;
-      }
-
-      function hideTyping() {
-        var typing = document.getElementById('typingIndicator');
-        if (typing) typing.remove();
+          currentSettings = newSettings;
+        }).saveSettings(JSON.stringify(newSettings));
       }
 
       function sendMessage() {
@@ -647,29 +167,28 @@
 
         addBubble('user', text);
         input.value = '';
-        input.style.height = 'auto';
-
         var btn = document.getElementById('sendBtn');
         btn.disabled = true;
-        showTyping();
 
         google.script.run
           .withSuccessHandler(function(res) {
-            hideTyping();
             btn.disabled = false;
             addBubble('ai', res.ai_response);
-            if (res.credits !== undefined) {
-              document.getElementById('creditsDisplay').innerText = res.credits + ' credits';
-            }
           })
           .withFailureHandler(function(err) {
-            hideTyping();
             btn.disabled = false;
-            var errorMsg = err.message;
-            if (errorMsg.includes("ScriptError")) errorMsg = "Error inesperat";
-            addBubble('error', errorMsg);
+            addBubble('error', err.message);
           })
           .processUserCommand(text);
+      }
+
+      function addBubble(type, text) {
+        var h = document.getElementById('chatHistory');
+        var d = document.createElement('div');
+        d.className = 'msg ' + type;
+        d.innerText = text;
+        h.appendChild(d);
+        h.scrollTop = h.scrollHeight;
       }
     </script>
   </body>

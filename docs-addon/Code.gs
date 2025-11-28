@@ -2,7 +2,7 @@
 const API_URL = 'https://sidecar-api.conteucontes.workers.dev';
 
 function onOpen() {
-  DocumentApp.getUi().createMenu('SideCar').addItem('Obrir Xatbot', 'showSidebar').addToUi();
+  DocumentApp.getUi().createMenu('SideCar').addItem('Obrir SideCar', 'showSidebar').addToUi();
 }
 
 function showSidebar() {
@@ -10,113 +10,59 @@ function showSidebar() {
   DocumentApp.getUi().showSidebar(html);
 }
 
-// --- GESTIÓ DE LLICÈNCIA ---
-function setLicenseKey(key) {
-  PropertiesService.getUserProperties().setProperty('SIDECAR_LICENSE_KEY', key);
-  return "OK";
-}
-
-function getLicenseKey() {
-  return PropertiesService.getUserProperties().getProperty('SIDECAR_LICENSE_KEY') || "";
-}
-
-// --- GESTIÓ DE SETTINGS (GEM CONFIG) ---
-function saveSettings(settingsJSON) {
-  PropertiesService.getUserProperties().setProperty('SIDECAR_SETTINGS', JSON.stringify(settingsJSON));
+// --- GESTIÓ DE CONFIGURACIÓ (La Memòria) ---
+function saveSettings(jsonSettings) {
+  PropertiesService.getUserProperties().setProperty('SIDECAR_SETTINGS', jsonSettings);
   return "OK";
 }
 
 function getSettings() {
-  const stored = PropertiesService.getUserProperties().getProperty('SIDECAR_SETTINGS');
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      return getDefaultSettings();
-    }
-  }
-  return getDefaultSettings();
-}
-
-function getDefaultSettings() {
-  return {
+  const json = PropertiesService.getUserProperties().getProperty('SIDECAR_SETTINGS');
+  if (json) return json;
+  return JSON.stringify({
+    license_key: "",
     style_guide: "",
     knowledge_base: "",
     strict_mode: false
-  };
+  });
 }
 
-// --- NUCLI HÍBRID AMB SMART MARKERS ---
+// --- NUCLI DEL PROCESSAMENT ---
 function processUserCommand(instruction) {
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
-  const body = doc.getBody();
+  let textToProcess = "";
+  let isFullDocument = false;
 
-  let contentPayload = "";
-  let mapIdToElement = {};
-  let isSelection = false;
+  // 1. Recuperar Configuració (Memòria)
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
 
-  const licenseKey = getLicenseKey();
-  if (!licenseKey) throw new Error("Configura la llicència (⚙️).");
+  if (!settings.license_key) throw new Error("Configura la llicència a la pestanya 'Cervell'.");
 
-  // Recuperar settings del "Cervell"
-  const settings = getSettings();
-
-  // 1. INDEXACIÓ DEL DOCUMENT
-  let elementsToProcess = [];
-
+  // 2. Extracció de Text
   if (selection) {
-    const ranges = selection.getRangeElements();
-    ranges.forEach(r => {
-      const el = r.getElement();
-      if (el.getType() === DocumentApp.ElementType.TEXT) {
-         elementsToProcess.push(el.getParent());
-      } else if (el.getType() === DocumentApp.ElementType.PARAGRAPH ||
-                 el.getType() === DocumentApp.ElementType.LIST_ITEM) {
-        elementsToProcess.push(el);
-      }
-    });
-    elementsToProcess = [...new Set(elementsToProcess)];
-    isSelection = true;
-  } else {
-    const numChildren = body.getNumChildren();
-    for (let i = 0; i < numChildren; i++) {
-      const child = body.getChild(i);
-      if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
-          child.getType() === DocumentApp.ElementType.LIST_ITEM) {
-        elementsToProcess.push(child);
-      }
-    }
+    const elements = selection.getRangeElements();
+    textToProcess = elements[0].getElement().asText().getText();
   }
 
-  elementsToProcess.forEach((el, index) => {
-    const text = el.asText().getText();
-    if (text.trim().length > 0) {
-      contentPayload += `{{${index}}} ${text}\n`;
-      mapIdToElement[index] = el;
-    }
-  });
+  if (!textToProcess) {
+    textToProcess = doc.getBody().getText();
+    isFullDocument = true;
+  }
 
-  if (!contentPayload.trim()) throw new Error("No hi ha text vàlid.");
+  if (!textToProcess.trim()) throw new Error("El document està buit.");
 
-  // 2. Crida al Worker (amb settings injectats)
+  // 3. Crida al Worker (Amb Context)
   const payload = {
-    license_key: licenseKey,
+    license_key: settings.license_key,
     user_instruction: instruction,
-    text: contentPayload,
-    doc_metadata: { doc_id: doc.getId() }
+    text: textToProcess,
+    doc_metadata: { doc_id: doc.getId() },
+    style_guide: settings.style_guide,
+    knowledge_base: settings.knowledge_base,
+    strict_mode: settings.strict_mode
   };
-
-  // Injectar camps de context si existeixen
-  if (settings.style_guide && settings.style_guide.trim()) {
-    payload.style_guide = settings.style_guide;
-  }
-  if (settings.knowledge_base && settings.knowledge_base.trim()) {
-    payload.knowledge_base = settings.knowledge_base;
-  }
-  if (settings.strict_mode === true) {
-    payload.strict_mode = true;
-  }
 
   const options = {
     'method': 'post',
@@ -133,29 +79,16 @@ function processUserCommand(instruction) {
       throw new Error(json.error_code || "Error API");
     }
 
-    const aiData = json.data;
-
-    // 3. APLICACIÓ DE CANVIS
-    if (aiData.mode === 'UPDATE_BY_ID') {
-      for (const [id, newText] of Object.entries(aiData.updates)) {
-        const targetElement = mapIdToElement[id];
-        if (targetElement) {
-          updateParagraphPreservingAttributes(targetElement, newText);
-        }
-      }
+    // 4. Renderitzat
+    if (isFullDocument) {
+      renderFullDocument(doc.getBody(), json.data.blocks);
     } else {
-      if (isSelection) {
-         if (elementsToProcess.length > 0) {
-            elementsToProcess[0].asText().setText(aiData.blocks.map(b=>b.text).join('\n'));
-         }
-      } else {
-         renderFullDocument(body, aiData.blocks);
-      }
+      renderSelection(selection, json.data.blocks);
     }
 
     return {
       ok: true,
-      ai_response: aiData.change_summary,
+      ai_response: json.data.change_summary,
       credits: json.credits_remaining
     };
 
@@ -164,55 +97,7 @@ function processUserCommand(instruction) {
   }
 }
 
-// --- FUNCIONS DE RENDERITZAT I PRESERVACIÓ D'ESTIL ---
-
-function updateParagraphPreservingAttributes(element, newMarkdownText) {
-  const textObj = element.editAsText();
-  const oldText = textObj.getText();
-
-  const cleanText = newMarkdownText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
-
-  if (oldText.length > 0) {
-    textObj.insertText(0, cleanText);
-    const startOfOld = cleanText.length;
-    const endOfOld = startOfOld + oldText.length - 1;
-    if (endOfOld >= startOfOld) {
-      textObj.deleteText(startOfOld, endOfOld);
-    }
-  } else {
-    textObj.setText(cleanText);
-  }
-
-  applyInlineMarkdown(element, newMarkdownText);
-}
-
-function applyInlineMarkdown(element, originalMarkdown) {
-  const textObj = element.editAsText();
-  const cleanText = textObj.getText();
-
-  const boldPattern = /\*\*(.+?)\*\*/g;
-  let match;
-  let searchStart = 0;
-
-  while ((match = boldPattern.exec(originalMarkdown)) !== null) {
-    const content = match[1];
-    const pos = cleanText.indexOf(content, searchStart);
-    if (pos !== -1) {
-      textObj.setBold(pos, pos + content.length - 1, true);
-    }
-  }
-
-  const italicPattern = /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g;
-  searchStart = 0;
-  while ((match = italicPattern.exec(originalMarkdown)) !== null) {
-    const content = match[1];
-    const pos = cleanText.indexOf(content, searchStart);
-    if (pos !== -1) {
-      textObj.setItalic(pos, pos + content.length - 1, true);
-    }
-  }
-}
-
+// --- MOTOR DE RENDERITZAT ---
 function renderFullDocument(body, blocks) {
   body.clear();
   blocks.forEach(block => {
@@ -224,6 +109,62 @@ function renderFullDocument(body, blocks) {
       case 'BULLET_LIST': element = body.appendListItem(block.text).setGlyphType(DocumentApp.GlyphType.BULLET); break;
       case 'NUMBERED_LIST': element = body.appendListItem(block.text).setGlyphType(DocumentApp.GlyphType.NUMBER); break;
       default: element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    }
+    if (block.formatting) applyFormatting(element, block.formatting);
+  });
+}
+
+function renderSelection(selection, blocks) {
+  const elements = selection.getRangeElements();
+  const targetElement = elements[0].getElement().asText();
+  let combinedText = "";
+  let combinedFormatting = [];
+
+  blocks.forEach(block => {
+    const baseIndex = combinedText.length;
+    combinedText += block.text + "\n";
+    if (block.formatting) {
+      block.formatting.forEach(fmt => {
+        combinedFormatting.push({ style: fmt.style, start: baseIndex + fmt.start, length: fmt.length });
+      });
+    }
+  });
+  combinedText = combinedText.trim();
+
+  // Preservació d'estils (Tècnica Insert-Delete)
+  const oldText = targetElement.getText();
+  if (elements[0].isPartial()) {
+     const start = elements[0].getStartOffset();
+     const end = elements[0].getEndOffsetInclusive();
+     targetElement.insertText(start, combinedText);
+     targetElement.deleteText(start + combinedText.length, end + combinedText.length);
+     applyFormattingWithOffset(targetElement, combinedFormatting, start);
+  } else {
+     targetElement.insertText(0, combinedText);
+     if (oldText.length > 0) targetElement.deleteText(combinedText.length, combinedText.length + oldText.length - 1);
+     applyFormatting(targetElement, combinedFormatting);
+  }
+}
+
+function applyFormatting(element, rules) {
+  const textObj = element.editAsText();
+  rules.forEach(fmt => {
+    const end = fmt.start + fmt.length - 1;
+    if (end < element.getText().length) {
+      if (fmt.style === 'BOLD') textObj.setBold(fmt.start, end, true);
+      if (fmt.style === 'ITALIC') textObj.setItalic(fmt.start, end, true);
+    }
+  });
+}
+
+function applyFormattingWithOffset(element, rules, baseOffset) {
+  const textObj = element.editAsText();
+  rules.forEach(fmt => {
+    const absStart = baseOffset + fmt.start;
+    const absEnd = absStart + fmt.length - 1;
+    if (absEnd < element.getText().length) {
+      if (fmt.style === 'BOLD') textObj.setBold(absStart, absEnd, true);
+      if (fmt.style === 'ITALIC') textObj.setItalic(absStart, absEnd, true);
     }
   });
 }
