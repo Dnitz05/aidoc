@@ -42,12 +42,13 @@ function getLicenseKey() {
 
 /**
  * Processa el text seleccionat amb el mode especificat
- * @param {string} mode - Mode d'operació (formalize, improve, summarize, translate_en, translate_es)
+ * @param {string} mode - Mode d'operació (formalize, improve, summarize, translate_en, translate_es, custom)
+ * @param {string} customInstruction - Instrucció personalitzada (només per mode 'custom')
  */
-function processSelection(mode) {
+function processSelection(mode, customInstruction) {
   // Default mode if not specified
   mode = mode || 'formalize';
-  console.log('SideCar: Processing with mode:', mode);
+  console.log('SideCar: Processing with mode:', mode, 'instruction:', customInstruction ? 'yes' : 'no');
 
   // Obtenir la llicència
   const licenseKey = getLicenseKey();
@@ -109,6 +110,11 @@ function processSelection(mode) {
       }
     };
 
+    // Afegir instrucció personalitzada si és mode custom
+    if (mode === 'custom' && customInstruction) {
+      payload.user_instruction = customInstruction;
+    }
+
     console.log('SideCar: Calling API with mode:', mode);
 
     const options = {
@@ -145,7 +151,8 @@ function processSelection(mode) {
     return {
       success: true,
       credits_remaining: responseData.credits_remaining,
-      mode: responseData.mode
+      mode: responseData.mode,
+      change_summary: responseData.change_summary || null
     };
 
   } catch (error) {

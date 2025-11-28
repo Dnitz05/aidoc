@@ -1,10 +1,10 @@
 /**
  * SideCar API Worker
  * Zero dependencies - uses native fetch for Supabase and Gemini
- * Multi-mode support: formalize, improve, summarize, translate
+ * Multi-mode support + Custom instruction mode (Chat-to-Edit)
  */
 
-// System instructions per mode
+// System instructions per mode predefinit
 const MODE_INSTRUCTIONS = {
   formalize: "Actua com un editor professional. Reescriu el text proporcionat en un registre formal i professional, mantenint l'idioma original. NO afegeixis explicacions, només el text resultant.",
   improve: "Actua com un corrector expert. Corregeix gramàtica i ortografia, millora la claredat i l'estil, però mantén el to i l'idioma original. NO afegeixis explicacions, només el text resultant.",
@@ -12,6 +12,19 @@ const MODE_INSTRUCTIONS = {
   translate_en: "You are a professional translator. Translate the following text to English. Do NOT add explanations, only the translated text.",
   translate_es: "Eres un traductor profesional. Traduce el siguiente texto al español (castellano). NO añadas explicaciones, solo el texto traducido."
 };
+
+// Prompt per al mode custom (Chat-to-Edit)
+const CUSTOM_SYSTEM_PROMPT = `Ets un editor de text expert. La teva tasca és modificar un text segons les instruccions de l'usuari.
+
+IMPORTANT: Has de respondre SEMPRE en format JSON pur (sense blocs de codi markdown).
+Estructura del JSON de resposta:
+{
+  "result_text": "El text modificat complet",
+  "change_summary": "Una explicació molt breu (màxim 15 paraules) del que has fet, en català"
+}
+
+Exemple de resposta correcta:
+{"result_text": "El text ja modificat aquí...", "change_summary": "He formalitzat el to i corregit errors ortogràfics."}`;
 
 export default {
   async fetch(request, env) {
@@ -35,7 +48,7 @@ export default {
     try {
       // Step 1: Validate input
       const body = await request.json();
-      const { license_key, mode, text, doc_metadata } = body;
+      const { license_key, mode, text, doc_metadata, user_instruction } = body;
 
       if (!license_key || !mode || !text) {
         return jsonResponse(
@@ -46,9 +59,19 @@ export default {
       }
 
       // Validate mode
-      if (!MODE_INSTRUCTIONS[mode]) {
+      const isCustomMode = mode === 'custom';
+      if (!isCustomMode && !MODE_INSTRUCTIONS[mode]) {
         return jsonResponse(
-          { error: `Invalid mode. Supported modes: ${Object.keys(MODE_INSTRUCTIONS).join(', ')}` },
+          { error: `Invalid mode. Supported modes: ${Object.keys(MODE_INSTRUCTIONS).join(', ')}, custom` },
+          400,
+          corsHeaders
+        );
+      }
+
+      // Custom mode requires user_instruction
+      if (isCustomMode && !user_instruction) {
+        return jsonResponse(
+          { error: 'Custom mode requires user_instruction' },
           400,
           corsHeaders
         );
@@ -74,14 +97,26 @@ export default {
         );
       }
 
-      // Step 4: Call Gemini API with mode-specific instruction
-      const processedText = await callGemini(env, text, MODE_INSTRUCTIONS[mode]);
+      // Step 4: Call Gemini API
+      let result;
+      if (isCustomMode) {
+        // Custom mode: expects JSON response with result_text and change_summary
+        result = await callGeminiCustom(env, text, user_instruction);
+      } else {
+        // Predefined modes: simple text response
+        const processedText = await callGemini(env, text, MODE_INSTRUCTIONS[mode]);
+        result = {
+          result_text: processedText,
+          change_summary: null
+        };
+      }
 
       // Step 5: Return success response
       return jsonResponse(
         {
           status: 'ok',
-          result_text: processedText,
+          result_text: result.result_text,
+          change_summary: result.change_summary,
           credits_remaining: creditsResult.credits_remaining,
           mode: mode
         },
@@ -143,7 +178,7 @@ async function deductCredits(env, licenseKeyHash, operation) {
 }
 
 /**
- * Call Gemini API with custom system instruction
+ * Call Gemini API with predefined system instruction (simple text response)
  */
 async function callGemini(env, text, systemInstruction) {
   const response = await fetch(
@@ -173,8 +208,6 @@ async function callGemini(env, text, systemInstruction) {
   }
 
   const data = await response.json();
-
-  // Extract text from Gemini response
   const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!resultText) {
@@ -182,6 +215,68 @@ async function callGemini(env, text, systemInstruction) {
   }
 
   return resultText;
+}
+
+/**
+ * Call Gemini API for custom mode (JSON response with result_text and change_summary)
+ */
+async function callGeminiCustom(env, text, userInstruction) {
+  const userPrompt = `Text original:\n"${text}"\n\nInstrucció de l'usuari:\n"${userInstruction}"`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        system_instruction: {
+          parts: [{ text: CUSTOM_SYSTEM_PROMPT }]
+        },
+        contents: [
+          {
+            parts: [{ text: userPrompt }]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Gemini API error:', errorText);
+    throw new Error('Gemini API request failed');
+  }
+
+  const data = await response.json();
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!rawText) {
+    throw new Error('No text in Gemini response');
+  }
+
+  // Parse JSON response from Gemini
+  try {
+    // Clean up potential markdown code blocks
+    const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+
+    return {
+      result_text: parsed.result_text || rawText,
+      change_summary: parsed.change_summary || 'Canvis aplicats.'
+    };
+  } catch (e) {
+    // Fallback if JSON parsing fails
+    console.error('JSON parse error:', e, 'Raw:', rawText);
+    return {
+      result_text: rawText,
+      change_summary: 'Canvis aplicats.'
+    };
+  }
 }
 
 /**

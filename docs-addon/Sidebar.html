@@ -16,11 +16,16 @@
     h2 {
       font-size: 16px;
       font-weight: 500;
-      margin: 0 0 16px 0;
+      margin: 0 0 8px 0;
       color: #1a73e8;
     }
+    .subtitle {
+      font-size: 11px;
+      color: #5f6368;
+      margin-bottom: 16px;
+    }
     .section {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     label {
       display: block;
@@ -29,17 +34,21 @@
       color: #5f6368;
     }
     input[type="text"],
-    select {
+    select,
+    textarea {
       width: 100%;
       padding: 8px 12px;
       border: 1px solid #dadce0;
       border-radius: 4px;
       font-size: 13px;
+      font-family: inherit;
       outline: none;
       background-color: white;
+      resize: vertical;
     }
     input[type="text"]:focus,
-    select:focus {
+    select:focus,
+    textarea:focus {
       border-color: #1a73e8;
       box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
     }
@@ -73,8 +82,8 @@
       background-color: #e8eaed;
     }
     #status {
-      margin-top: 16px;
-      padding: 12px;
+      margin-top: 12px;
+      padding: 10px;
       border-radius: 4px;
       font-size: 12px;
       display: none;
@@ -101,43 +110,119 @@
     }
     .divider {
       border-top: 1px solid #e8eaed;
-      margin: 20px 0;
+      margin: 16px 0;
     }
-    .mode-icon {
-      margin-right: 6px;
+
+    /* AI Feedback Area */
+    #aiFeedback {
+      display: none;
+      margin-top: 16px;
+      padding: 12px;
+      background-color: #f8f9fa;
+      border-left: 3px solid #1a73e8;
+      border-radius: 0 4px 4px 0;
+    }
+    #aiFeedback .header {
+      font-weight: 500;
+      color: #1a73e8;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    #aiFeedback .summary {
+      font-style: italic;
+      color: #3c4043;
+      line-height: 1.4;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #e8eaed;
+      margin-bottom: 16px;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      color: #5f6368;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab:hover {
+      color: #1a73e8;
+      background-color: #f8f9fa;
+    }
+    .tab.active {
+      color: #1a73e8;
+      border-bottom-color: #1a73e8;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
     }
   </style>
 </head>
 <body>
   <h2>SideCar</h2>
+  <p class="subtitle">Assistent d'edició amb IA</p>
 
+  <!-- License Section -->
   <div class="section">
     <label for="licenseKey">Clau de Llicència</label>
     <input type="text" id="licenseKey" placeholder="SIDECAR-XXXX-XXXX">
-    <button class="btn-secondary" onclick="saveLicense()">Desar Llicència</button>
+    <button class="btn-secondary" onclick="saveLicense()">Desar</button>
   </div>
 
   <div class="divider"></div>
 
-  <div class="section">
-    <label for="modeSelector">Mode d'Operació</label>
-    <select id="modeSelector">
-      <option value="formalize">👔 Formalitzar</option>
-      <option value="improve">✨ Millorar Redacció</option>
-      <option value="summarize">📝 Resumir</option>
-      <option value="translate_en">🌍 Traduir a Anglès</option>
-      <option value="translate_es">🌍 Traduir a Castellà</option>
-    </select>
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('custom')">💬 Instrucció</div>
+    <div class="tab" onclick="switchTab('presets')">⚡ Ràpid</div>
   </div>
 
-  <div class="section">
-    <button class="btn-primary" id="executeBtn" onclick="executeAction()">
-      Executar SideCar
+  <!-- Custom Instruction Tab -->
+  <div id="customTab" class="tab-content active">
+    <div class="section">
+      <label for="customPrompt">Què vols fer amb el text?</label>
+      <textarea id="customPrompt" rows="3" placeholder="Ex: Fes-ho més formal, corregeix faltes i canvia 'cotxe' per 'vehicle'"></textarea>
+    </div>
+    <button class="btn-primary" id="customBtn" onclick="runCustom()">
+      Enviar Instrucció
     </button>
-    <div class="credits" id="creditsInfo"></div>
   </div>
 
+  <!-- Presets Tab -->
+  <div id="presetsTab" class="tab-content">
+    <div class="section">
+      <label for="modeSelector">Mode predefinit</label>
+      <select id="modeSelector">
+        <option value="formalize">👔 Formalitzar</option>
+        <option value="improve">✨ Millorar Redacció</option>
+        <option value="summarize">📝 Resumir</option>
+        <option value="translate_en">🌍 Traduir a Anglès</option>
+        <option value="translate_es">🌍 Traduir a Castellà</option>
+      </select>
+    </div>
+    <button class="btn-primary" id="presetBtn" onclick="runPreset()">
+      Executar
+    </button>
+  </div>
+
+  <!-- AI Feedback -->
+  <div id="aiFeedback">
+    <div class="header">🤖 SideCar diu:</div>
+    <div class="summary" id="aiSummary"></div>
+  </div>
+
+  <!-- Status -->
   <div id="status"></div>
+  <div class="credits" id="creditsInfo"></div>
 
   <script>
     // Load saved license on init
@@ -149,16 +234,45 @@
       })
       .getLicenseKey();
 
+    function switchTab(tab) {
+      // Update tab buttons
+      document.querySelectorAll('.tab').forEach(function(t) {
+        t.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      // Update tab content
+      document.querySelectorAll('.tab-content').forEach(function(c) {
+        c.classList.remove('active');
+      });
+      document.getElementById(tab + 'Tab').classList.add('active');
+    }
+
     function showStatus(message, type) {
       var status = document.getElementById('status');
       status.textContent = message;
       status.className = type;
     }
 
-    function setLoading(loading) {
-      var btn = document.getElementById('executeBtn');
+    function showFeedback(summary) {
+      var feedback = document.getElementById('aiFeedback');
+      var summaryEl = document.getElementById('aiSummary');
+      if (summary) {
+        summaryEl.textContent = summary;
+        feedback.style.display = 'block';
+      } else {
+        feedback.style.display = 'none';
+      }
+    }
+
+    function setLoading(btnId, loading) {
+      var btn = document.getElementById(btnId);
       btn.disabled = loading;
-      btn.textContent = loading ? 'Processant...' : 'Executar SideCar';
+      if (btnId === 'customBtn') {
+        btn.textContent = loading ? 'Pensant...' : 'Enviar Instrucció';
+      } else {
+        btn.textContent = loading ? 'Processant...' : 'Executar';
+      }
     }
 
     function saveLicense() {
@@ -177,10 +291,40 @@
         .setLicenseKey(key);
     }
 
-    function executeAction() {
-      var mode = document.getElementById('modeSelector').value;
-      setLoading(true);
+    function runCustom() {
+      var instruction = document.getElementById('customPrompt').value.trim();
+      if (!instruction) {
+        showStatus('Escriu alguna instrucció', 'error');
+        return;
+      }
 
+      setLoading('customBtn', true);
+      showStatus('Processant instrucció amb IA...', 'info');
+      showFeedback(null);
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          setLoading('customBtn', false);
+          if (result.success) {
+            showStatus('Text modificat correctament!', 'success');
+            showFeedback(result.change_summary);
+            document.getElementById('creditsInfo').textContent =
+              'Crèdits restants: ' + result.credits_remaining;
+          } else {
+            showStatus('Error: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          setLoading('customBtn', false);
+          showStatus('Error: ' + err.message, 'error');
+        })
+        .processSelection('custom', instruction);
+    }
+
+    function runPreset() {
+      var mode = document.getElementById('modeSelector').value;
+
+      setLoading('presetBtn', true);
       var modeNames = {
         'formalize': 'Formalitzant',
         'improve': 'Millorant',
@@ -188,11 +332,12 @@
         'translate_en': 'Traduint a anglès',
         'translate_es': 'Traduint a castellà'
       };
-      showStatus(modeNames[mode] + ' text amb IA...', 'info');
+      showStatus(modeNames[mode] + ' text...', 'info');
+      showFeedback(null);
 
       google.script.run
         .withSuccessHandler(function(result) {
-          setLoading(false);
+          setLoading('presetBtn', false);
           if (result.success) {
             showStatus('Text processat correctament!', 'success');
             document.getElementById('creditsInfo').textContent =
@@ -202,10 +347,10 @@
           }
         })
         .withFailureHandler(function(err) {
-          setLoading(false);
+          setLoading('presetBtn', false);
           showStatus('Error: ' + err.message, 'error');
         })
-        .processSelection(mode);
+        .processSelection(mode, null);
     }
   </script>
 </body>
