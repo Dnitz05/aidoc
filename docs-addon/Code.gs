@@ -108,7 +108,7 @@ function processUserCommand(instruction) {
 
   let elementsToProcess = [];
   if (selection) {
-    const ranges = selection.getRangeElements();
+    const ranges = selection.getRangeElements() || [];
     ranges.forEach(r => {
       const el = r.getElement();
       if (el.getType() === DocumentApp.ElementType.TEXT) elementsToProcess.push(el.getParent());
