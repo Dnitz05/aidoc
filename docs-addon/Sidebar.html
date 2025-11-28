@@ -4,6 +4,7 @@
     <base target="_top">
     <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
     <style>
+      /* Estils Generals */
       body {
         padding: 0; margin: 0;
         font-family: 'Google Sans', Roboto, Arial, sans-serif;
@@ -11,7 +12,7 @@
         height: 100vh; display: flex; flex-direction: column;
       }
 
-      /* Capçalera fixa */
+      /* Capçalera */
       .header {
         background: white; padding: 12px; border-bottom: 1px solid #dadce0;
         display: flex; justify-content: space-between; align-items: center;
@@ -20,20 +21,24 @@
       .settings-btn { cursor: pointer; opacity: 0.6; font-size: 18px; }
       .settings-btn:hover { opacity: 1; }
 
-      /* Zona de configuració (Overlay) */
+      /* Panell de Configuració (Ocult per defecte) */
       #configPanel {
         background: #fff; padding: 15px; border-bottom: 1px solid #ddd;
-        display: none; /* Ocult per defecte */
+        display: none;
       }
 
-      /* Zona de Xat (Scrollable) */
+      /* Historial del Xat */
       #chatHistory {
         flex-grow: 1; overflow-y: auto; padding: 15px;
         display: flex; flex-direction: column; gap: 12px;
       }
 
       /* Bombolles de missatge */
-      .msg { padding: 10px 14px; border-radius: 18px; font-size: 13px; line-height: 1.4; max-width: 85%; word-wrap: break-word; }
+      .msg {
+        padding: 10px 14px; border-radius: 18px;
+        font-size: 13px; line-height: 1.4;
+        max-width: 85%; word-wrap: break-word;
+      }
 
       .msg.user {
         align-self: flex-end;
@@ -43,16 +48,18 @@
 
       .msg.ai {
         align-self: flex-start;
-        background-color: #ffffff; color: #202124; border: 1px solid #dadce0;
-        border-bottom-left-radius: 4px;
+        background-color: #ffffff; color: #202124;
+        border: 1px solid #dadce0; border-bottom-left-radius: 4px;
       }
 
       .msg.system {
         align-self: center; background: none; border: none;
-        font-size: 11px; color: #5f6368; text-align: center; width: 100%;
+        font-size: 11px; color: #5f6368; text-align: center; width: 100%; margin-top: 10px;
       }
 
-      .msg.error { background-color: #fce8e6; color: #c5221f; align-self: center; }
+      .msg.error {
+        align-self: center; background-color: #fce8e6; color: #c5221f; border: 1px solid #f5c6cb;
+      }
 
       /* Peu de pàgina (Input) */
       .footer {
@@ -76,7 +83,6 @@
       button#sendBtn:disabled { background: #dadce0; cursor: default; }
 
       .credits-info { text-align: center; font-size: 10px; color: #9aa0a6; margin-top: 6px; }
-
     </style>
   </head>
   <body>
@@ -87,43 +93,44 @@
     </div>
 
     <div id="configPanel">
-      <label style="font-size:12px; font-weight:bold;">Llicència API</label>
-      <div style="display:flex; gap:5px; margin-top:5px;">
-        <input type="text" id="licenseInput" placeholder="SIDECAR-..." style="flex-grow:1; padding:5px;">
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:5px;">Llicència API</label>
+      <div style="display:flex; gap:5px;">
+        <input type="text" id="licenseInput" placeholder="SIDECAR-..." style="flex-grow:1; padding:5px; border:1px solid #ddd; border-radius:4px;">
         <button class="share" onclick="saveLicense()">Desar</button>
       </div>
     </div>
 
     <div id="chatHistory">
-      <div class="msg system">Hola! Selecciona text al document i digues-me com vols modificar-lo.</div>
+      <div class="msg system">Hola! Selecciona text (o res per a tot el doc) i digues-me què vols fer.</div>
+      <div class="msg system" style="font-size:10px;">💡 Truc: Si no selecciones res, mantindré les imatges i el format intactes!</div>
     </div>
 
     <div class="footer">
       <div class="input-wrapper">
-        <textarea id="userInput" placeholder="Ex: Fes-ho més formal..."></textarea>
+        <textarea id="userInput" placeholder="Ex: Corregeix faltes, resumeix..."></textarea>
         <button id="sendBtn" onclick="sendMessage()">➤</button>
       </div>
       <div id="creditsDisplay" class="credits-info"></div>
     </div>
 
     <script>
-      // En carregar, comprovem si tenim llicència
+      // Inicialització
       window.onload = function() {
+        // Carregar llicència
         google.script.run.withSuccessHandler(function(key) {
           if (key) {
             document.getElementById('licenseInput').value = key;
           } else {
-            toggleConfig(); // Si no hi ha clau, obrim config
+            toggleConfig(); // Si no n'hi ha, obrim settings
           }
         }).getLicenseKey();
 
-        // UX: Escoltar tecla Enter al textarea
+        // Listener per enviar amb Enter
         var input = document.getElementById('userInput');
         input.addEventListener("keydown", function(event) {
-          // Si és Enter i NO tenim Shift premut
           if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault(); // Evita el salt de línia
-            sendMessage(); // Envia
+            event.preventDefault(); // Evita salt de línia
+            sendMessage();
           }
         });
       };
@@ -137,7 +144,7 @@
         var key = document.getElementById('licenseInput').value;
         google.script.run.withSuccessHandler(function() {
           toggleConfig();
-          addBubble('system', 'Clau guardada correctament.');
+          addBubble('system', '✅ Llicència guardada correctament.');
         }).setLicenseKey(key);
       }
 
@@ -147,7 +154,7 @@
         div.className = 'msg ' + type;
         div.innerText = text;
         history.appendChild(div);
-        // Auto-scroll al final
+        // Scroll automàtic al final
         history.scrollTop = history.scrollHeight;
       }
 
@@ -156,22 +163,27 @@
         var text = input.value.trim();
         if (!text) return;
 
-        // UI Updates
+        // 1. Feedback visual immediat
         addBubble('user', text);
         input.value = '';
         var btn = document.getElementById('sendBtn');
         btn.disabled = true;
 
-        // Backend call
+        // 2. Crida al Backend (Code.gs)
         google.script.run
           .withSuccessHandler(function(res) {
             btn.disabled = false;
             addBubble('ai', res.ai_response);
-            document.getElementById('creditsDisplay').innerText = 'Crèdits: ' + res.credits;
+            if (res.credits !== undefined) {
+              document.getElementById('creditsDisplay').innerText = 'Crèdits restants: ' + res.credits;
+            }
           })
           .withFailureHandler(function(err) {
             btn.disabled = false;
-            addBubble('error', err.message);
+            // Missatges d'error amigables
+            let errorMsg = err.message;
+            if (errorMsg.includes("ScriptError")) errorMsg = "Error desconegut d'Apps Script.";
+            addBubble('error', "⚠️ " + errorMsg);
           })
           .processUserCommand(text);
       }
