@@ -117,28 +117,8 @@ function processUserCommand(instruction) {
       for (const [id, newTextWithMarkdown] of Object.entries(aiData.updates)) {
         const targetElement = mapIdToElement[String(id)];
         if (targetElement) {
-          // Guardem alguns atributs del paràgraf (no del text)
-          let alignment = null;
-          let heading = null;
-          try {
-            if (targetElement.getAlignment) alignment = targetElement.getAlignment();
-            if (targetElement.getHeading) heading = targetElement.getHeading();
-          } catch (e) {}
-
-          // Netejem el markdown per fer setText()
-          const cleanText = cleanMarkdown(newTextWithMarkdown);
-
-          // Apliquem el text net
-          targetElement.asText().setText(cleanText);
-
-          // Restaurem atributs de paràgraf
-          try {
-            if (alignment) targetElement.setAlignment(alignment);
-            if (heading) targetElement.setHeading(heading);
-          } catch (e) {}
-
-          // Apliquem negreta i cursiva del markdown
-          applyInlineMarkdown(targetElement, newTextWithMarkdown);
+          // Usem la funció blindada que preserva font/tamany/color
+          updateParagraphPreservingAttributes(targetElement, newTextWithMarkdown);
         }
       }
 
@@ -183,6 +163,82 @@ function cleanMarkdown(text) {
   return text
     .replace(/\*\*(.+?)\*\*/g, '$1')  // **bold** → bold
     .replace(/\*(.+?)\*/g, '$1');      // *italic* → italic
+}
+
+/**
+ * Funció BLINDADA per preservar estil (Font i Tamany)
+ * Captura els atributs ABANS de modificar i els reimposició DESPRÉS
+ */
+function updateParagraphPreservingAttributes(element, newMarkdownText) {
+  const textObj = element.editAsText();
+
+  // 1. CAPTURA D'ESTILS CRÍTICS (Abans de tocar res)
+  // Llegim els atributs del primer caràcter (índex 0)
+  // Si el paràgraf és buit, usem valors segurs per defecte.
+  let currentFontSize = 11;
+  let currentFontFamily = 'Arial';
+  let currentColor = '#000000';
+  let currentAlignment = null;
+  let currentHeading = null;
+
+  try {
+    // Intentem llegir els atributs existents
+    const attrs = textObj.getAttributes(0);
+
+    // Validem que no siguin nuls (això evita el text minúscul)
+    if (attrs[DocumentApp.Attribute.FONT_SIZE]) {
+      currentFontSize = attrs[DocumentApp.Attribute.FONT_SIZE];
+    }
+    if (attrs[DocumentApp.Attribute.FONT_FAMILY]) {
+      currentFontFamily = attrs[DocumentApp.Attribute.FONT_FAMILY];
+    }
+    if (attrs[DocumentApp.Attribute.FOREGROUND_COLOR]) {
+      currentColor = attrs[DocumentApp.Attribute.FOREGROUND_COLOR];
+    }
+
+    // L'alineació i heading pertanyen al paràgraf, no al text
+    if (element.getAlignment) {
+      currentAlignment = element.getAlignment();
+    }
+    if (element.getHeading) {
+      currentHeading = element.getHeading();
+    }
+  } catch (e) {
+    console.log("No s'han pogut llegir estils originals, usant defectes.");
+  }
+
+  // 2. NETEJA I SUBSTITUCIÓ
+  // Treiem els asteriscos del markdown per no ensuciar el text
+  const cleanText = cleanMarkdown(newMarkdownText);
+
+  // Aquesta és l'acció destructiva:
+  textObj.setText(cleanText);
+
+  // 3. RE-APLICACIÓ FORÇADA D'ESTILS (Resurrecció)
+  // Apliquem els estils capturats a tot el nou rang de text
+  const end = cleanText.length - 1;
+
+  if (end >= 0) {
+    try {
+      // Imposem la font i el tamany originals
+      textObj.setFontSize(0, end, currentFontSize);
+      textObj.setFontFamily(0, end, currentFontFamily);
+      textObj.setForegroundColor(0, end, currentColor);
+
+      // Imposem l'alineació i heading
+      if (currentAlignment && element.setAlignment) {
+        element.setAlignment(currentAlignment);
+      }
+      if (currentHeading && element.setHeading) {
+        element.setHeading(currentHeading);
+      }
+    } catch (e) {
+      console.log("Error re-aplicant estils: " + e.message);
+    }
+  }
+
+  // 4. FINALMENT, APLIQUEM LES NOVES NEGRETES/CURSIVES DE LA IA
+  applyInlineMarkdown(element, newMarkdownText);
 }
 
 /**
