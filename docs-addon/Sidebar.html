@@ -31,6 +31,33 @@
         margin-bottom: 6px; border: 1px solid #ceead6;
       }
 
+      /* INDICADOR PENSANT */
+      .msg.thinking {
+        align-self: flex-start;
+        background: white;
+        border: 1px solid #dadce0;
+        border-bottom-left-radius: 4px;
+        padding: 12px 18px;
+      }
+      .thinking-dots {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .thinking-dots span {
+        width: 8px;
+        height: 8px;
+        background: #1a73e8;
+        border-radius: 50%;
+        animation: pulse 1.4s ease-in-out infinite;
+      }
+      .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+      .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes pulse {
+        0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+        40% { transform: scale(1); opacity: 1; }
+      }
+
       /* Controls Cervell */
       .form-group { margin-bottom: 15px; }
       label { display: block; font-weight: bold; font-size: 12px; margin-bottom: 5px; color: #3c4043; }
@@ -190,6 +217,21 @@
         }).saveSettings(JSON.stringify(newSettings));
       }
 
+      function showThinking() {
+        var h = document.getElementById('chatHistory');
+        var d = document.createElement('div');
+        d.className = 'msg thinking';
+        d.id = 'thinkingIndicator';
+        d.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
+        h.appendChild(d);
+        h.scrollTop = h.scrollHeight;
+      }
+
+      function hideThinking() {
+        var indicator = document.getElementById('thinkingIndicator');
+        if (indicator) indicator.remove();
+      }
+
       function sendMessage() {
         var input = document.getElementById('userInput');
         var text = input.value.trim();
@@ -199,10 +241,12 @@
         var btn = document.getElementById('sendBtn');
         btn.disabled = true;
 
+        showThinking();
+
         google.script.run
           .withSuccessHandler(function(res) {
+            hideThinking();
             btn.disabled = false;
-            // BADGE: res.mode ve del Code.gs ('chat' o 'edit')
             addBubble('ai', res.ai_response, res.mode === 'edit');
 
             if (res.credits !== undefined) {
@@ -210,6 +254,7 @@
             }
           })
           .withFailureHandler(function(err) {
+            hideThinking();
             btn.disabled = false;
             addBubble('error', "Error: " + err.message);
           })
