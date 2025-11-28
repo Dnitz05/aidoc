@@ -1,38 +1,25 @@
 /**
- * SideCar API Worker - Chat Mode (Fase 6 + Format Híbrid)
- * Gestiona peticions, descompta crèdits i retorna text + explicació.
- * - Selecció parcial: text pla
- * - Document sencer: Markdown per preservar estructura
+ * SideCar API Worker - Block-Based Architecture (JSON Protocol)
  */
 export default {
   async fetch(request, env) {
-    // 1. CORS Headers
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
     };
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
-    }
-
-    if (request.method !== "POST") {
-      return new Response("Method not allowed", { status: 405, headers: corsHeaders });
-    }
+    if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+    if (request.method !== "POST") return new Response("Method not allowed", { status: 405, headers: corsHeaders });
 
     try {
-      // 2. Llegir cos de la petició
       const body = await request.json();
-      const { license_key, mode, text, doc_metadata, user_instruction } = body;
+      const { license_key, text, user_instruction, doc_metadata } = body;
 
       if (!license_key) throw new Error("missing_license");
       if (!text) throw new Error("missing_text");
 
-      // Detectar si és document sencer
-      const isFullDocument = doc_metadata?.is_full_document || false;
-
-      // 3. Validació de Llicència i Crèdits (Supabase RPC)
+      // 1. Validació de Llicència i Crèdits
       const msgBuffer = new TextEncoder().encode(license_key);
       const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -48,7 +35,7 @@ export default {
         body: JSON.stringify({
           p_license_key_hash: licenseHash,
           p_cost: 1,
-          p_operation: mode || 'custom',
+          p_operation: 'custom_blocks',
           p_metadata: doc_metadata || {}
         })
       });
@@ -56,91 +43,62 @@ export default {
       if (!supabaseResp.ok) throw new Error("supabase_error");
       const supabaseData = await supabaseResp.json();
 
-      // 4. Preparar Prompt per a Gemini (DIFERENT segons mode)
-      let systemInstruction;
+      // 2. Prompt "Block-Based" per a Gemini 2.0 Flash
+      const systemInstruction = `Ets SideCar, un editor professional d'IA.
+      La teva missió és editar, resumir o reescriure el text seguint les instruccions de l'usuari.
 
-      if (isFullDocument) {
-        // MODE DOCUMENT SENCER: Demanem Markdown per reconstruir estructura
-        systemInstruction = `Ets SideCar, un assistent editorial expert.
-La teva tasca és editar el text COMPLET d'un document seguint les instruccions de l'usuari.
+      FORMAT DE RESPOSTA (ESTRICTE JSON):
+      Retorna ÚNICAMENT un objecte JSON amb aquesta estructura exacta. NO usis Markdown.
 
-INSTRUCCIONS DE FORMAT (CRÍTIC):
-1. Respon ÚNICAMENT amb un objecte JSON vàlid.
-2. NO facis servir blocs de codi markdown (\`\`\`json).
-3. El JSON ha de tenir exactament aquests camps:
-   - "result_text": El text complet reescrit AMB FORMAT MARKDOWN:
-     * Usa # per títols principals, ## per subtítols, ### per seccions
-     * Usa **text** per negreta
-     * Usa *text* per cursiva
-     * Usa - o * per llistes amb vinyetes
-     * Usa 1. 2. 3. per llistes numerades
-   - "change_summary": Una explicació molt breu (màxim 1 frase, to amable) del que has fet, en català.
-
-IMPORTANT: Preserva l'estructura del document (títols, llistes, paràgrafs) usant Markdown.`;
-      } else {
-        // MODE SELECCIÓ PARCIAL: Text pla sense markdown
-        systemInstruction = `Ets SideCar, un assistent editorial expert.
-La teva tasca és editar el FRAGMENT de text proporcionat seguint les instruccions de l'usuari.
-
-INSTRUCCIONS DE FORMAT (CRÍTIC):
-1. Respon ÚNICAMENT amb un objecte JSON vàlid.
-2. NO facis servir blocs de codi markdown (\`\`\`json).
-3. El JSON ha de tenir exactament aquests camps:
-   - "result_text": El text modificat. SENSE format markdown, només text pla.
-   - "change_summary": Una explicació molt breu (màxim 1 frase, to amable) del que has fet, en català.
-
-IMPORTANT: Retorna NOMÉS text pla, sense asteriscs ni símbols de format.`;
+      {
+        "change_summary": "Explicació molt breu (1 frase) del que has fet, en català",
+        "blocks": [
+          {
+            "type": "HEADING_1" | "HEADING_2" | "HEADING_3" | "PARAGRAPH" | "BULLET_LIST" | "NUMBERED_LIST",
+            "text": "El contingut textual del bloc",
+            "formatting": [
+              { "style": "BOLD" | "ITALIC", "start": 0, "length": 5 }
+            ]
+          }
+        ]
       }
 
-      const userPrompt = `TEXT ORIGINAL:\n"${text}"\n\nINSTRUCCIÓ DE L'USUARI: "${user_instruction || "Millora aquest text"}"`;
+      REGLES:
+      1. El camp "formatting" és una llista de rangs per aplicar estils (start és l'índex dins del string "text").
+      2. Si l'usuari demana resumir, estructura bé el resultat amb títols i llistes.
+      3. Mantén la coherència visual.`;
 
-      // 5. Crida a Gemini API
+      const userPrompt = `TEXT ORIGINAL: "${text}"\n\nINSTRUCCIÓ: "${user_instruction || "Millora el text"}"`;
+
+      // 3. Crida a Gemini
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`;
       const geminiResp = await fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: userPrompt }] }],
-          system_instruction: { parts: [{ text: systemInstruction }] }
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          generationConfig: { responseMimeType: "application/json" }
         })
       });
 
-      if (!geminiResp.ok) {
-        const errText = await geminiResp.text();
-        throw new Error("gemini_error: " + errText);
-      }
+      if (!geminiResp.ok) throw new Error("gemini_error: " + await geminiResp.text());
 
       const geminiData = await geminiResp.json();
       const rawContent = geminiData.candidates[0].content.parts[0].text;
 
-      // 6. Neteja i Parsing de la resposta (JSON segur)
-      let parsedResponse;
-      try {
-        const cleanJson = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
-        parsedResponse = JSON.parse(cleanJson);
-      } catch (e) {
-        // Fallback si la IA falla el format JSON
-        parsedResponse = {
-          result_text: rawContent,
-          change_summary: "He processat el text, però no he pogut generar el resum."
-        };
-      }
+      // Intentem parsejar per assegurar que és JSON vàlid abans d'enviar
+      const parsedResponse = JSON.parse(rawContent);
 
-      // 7. Retornar al Client
       return new Response(JSON.stringify({
         status: "ok",
-        result_text: parsedResponse.result_text,
-        change_summary: parsedResponse.change_summary,
+        data: parsedResponse,
         credits_remaining: supabaseData.credits_remaining || 0
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (err) {
-      return new Response(JSON.stringify({
-        status: "error",
-        error_code: err.message
-      }), { status: 500, headers: corsHeaders });
+      return new Response(JSON.stringify({ status: "error", error_code: err.message }),
+        { status: 500, headers: corsHeaders });
     }
   }
 };

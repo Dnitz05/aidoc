@@ -2,19 +2,14 @@
 const API_URL = 'https://sidecar-api.conteucontes.workers.dev';
 
 function onOpen() {
-  DocumentApp.getUi().createMenu('SideCar')
-      .addItem('Obrir Xatbot', 'showSidebar')
-      .addToUi();
+  DocumentApp.getUi().createMenu('SideCar').addItem('Obrir Xatbot', 'showSidebar').addToUi();
 }
 
 function showSidebar() {
-  const html = HtmlService.createTemplateFromFile('Sidebar')
-      .evaluate()
-      .setTitle('SideCar AI');
+  const html = HtmlService.createTemplateFromFile('Sidebar').evaluate().setTitle('SideCar AI');
   DocumentApp.getUi().showSidebar(html);
 }
 
-// --- Gestió de Claus ---
 function setLicenseKey(key) {
   PropertiesService.getUserProperties().setProperty('SIDECAR_LICENSE_KEY', key);
   return "OK";
@@ -24,108 +19,60 @@ function getLicenseKey() {
   return PropertiesService.getUserProperties().getProperty('SIDECAR_LICENSE_KEY') || "";
 }
 
-// --- Funció Principal (Mode Xat) ---
+// --- NUCLI DEL PROCESSAMENT ---
 function processUserCommand(instruction) {
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
   let textToProcess = "";
-  let targetElement = null;
-  let startOffset = null;
-  let endOffset = null;
-  let isPartialSelection = false;
   let isFullDocument = false;
 
-  // 1. Validar llicència
   const licenseKey = getLicenseKey();
-  if (!licenseKey) throw new Error("Configura la llicència primer (⚙️).");
+  if (!licenseKey) throw new Error("Configura la llicència (⚙️).");
 
-  // 2. LÒGICA INTEL·LIGENT DE SELECCIÓ
+  // 1. Extracció de Text
   if (selection) {
     const elements = selection.getRangeElements();
-    const rangeElement = elements[0];
-    const element = rangeElement.getElement();
-
-    // Verificar si és un element de text
-    if (element.getType() === DocumentApp.ElementType.TEXT) {
-      targetElement = element.asText();
-      const fullText = targetElement.getText();
-
-      if (rangeElement.isPartial()) {
-        // SELECCIÓ PARCIAL - Només el fragment seleccionat
-        startOffset = rangeElement.getStartOffset();
-        endOffset = rangeElement.getEndOffsetInclusive();
-        textToProcess = fullText.substring(startOffset, endOffset + 1);
-        isPartialSelection = true;
-      } else {
-        // Element sencer seleccionat
-        textToProcess = fullText;
-        startOffset = 0;
-        endOffset = fullText.length - 1;
-      }
-    } else if (element.editAsText) {
-      // Altres elements editables (paràgrafs, etc.)
-      targetElement = element.editAsText();
-      textToProcess = targetElement.getText();
-      startOffset = 0;
-      endOffset = textToProcess.length - 1;
-    }
+    textToProcess = elements[0].getElement().asText().getText();
   }
 
-  // 3. NO HI HA SELECCIÓ -> Document sencer (Mode Markdown)
   if (!textToProcess) {
-    const body = doc.getBody();
-    textToProcess = body.getText();
+    textToProcess = doc.getBody().getText();
     isFullDocument = true;
   }
 
   if (!textToProcess.trim()) throw new Error("El document està buit.");
 
-  // 4. Preparar Payload
-  const payload = {
-    license_key: licenseKey,
-    mode: 'custom',
-    user_instruction: instruction,
-    text: textToProcess,
-    doc_metadata: {
-      doc_id: doc.getId(),
-      is_full_document: isFullDocument  // Informem al worker
-    }
-  };
-
+  // 2. Crida al Worker (JSON Protocol)
   const options = {
     'method': 'post',
     'contentType': 'application/json',
-    'payload': JSON.stringify(payload),
+    'payload': JSON.stringify({
+      license_key: licenseKey,
+      user_instruction: instruction,
+      text: textToProcess,
+      doc_metadata: { doc_id: doc.getId() }
+    }),
     'muteHttpExceptions': true
   };
 
-  // 5. Crida al Worker
   try {
     const response = UrlFetchApp.fetch(API_URL, options);
     const json = JSON.parse(response.getContentText());
 
     if (response.getResponseCode() !== 200 || json.status !== 'ok') {
-      throw new Error(json.error_code || "Error API desconegut");
+      throw new Error(json.error_code || "Error API");
     }
 
-    // 6. APLICAR CANVIS SEGONS EL MODE
+    // 3. Renderitzat Intel·ligent
     if (isFullDocument) {
-      // MODE DOCUMENT SENCER: Reconstrucció amb Markdown
-      const body = doc.getBody();
-      applyMarkdown(body, json.result_text);
-    } else if (isPartialSelection) {
-      // MODE SELECCIÓ PARCIAL: deleteText + insertText (preserva format circumdant)
-      targetElement.deleteText(startOffset, endOffset);
-      targetElement.insertText(startOffset, json.result_text);
+      renderFullDocument(doc.getBody(), json.data.blocks);
     } else {
-      // MODE ELEMENT SENCER: setText simple
-      targetElement.setText(json.result_text);
+      renderSelection(selection, json.data.blocks);
     }
 
-    // 7. Retornar info per al xat
     return {
       ok: true,
-      ai_response: json.change_summary,
+      ai_response: json.data.change_summary,
       credits: json.credits_remaining
     };
 
@@ -134,108 +81,75 @@ function processUserCommand(instruction) {
   }
 }
 
-// --- Funció per aplicar Markdown al document ---
-function applyMarkdown(body, markdownText) {
-  // 1. Netejar el document
+// --- MOTOR DE RENDERITZAT (Block Engine) ---
+
+function renderFullDocument(body, blocks) {
   body.clear();
-
-  // 2. Processar línia per línia
-  const lines = markdownText.split('\n');
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Saltar línies buides (però afegir paràgraf buit per espaiat)
-    if (line.trim() === '') {
-      // No afegim paràgrafs buits consecutius
-      continue;
+  blocks.forEach(block => {
+    let element;
+    switch (block.type) {
+      case 'HEADING_1': element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.HEADING1); break;
+      case 'HEADING_2': element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.HEADING2); break;
+      case 'HEADING_3': element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.HEADING3); break;
+      case 'BULLET_LIST': element = body.appendListItem(block.text).setGlyphType(DocumentApp.GlyphType.BULLET); break;
+      case 'NUMBERED_LIST': element = body.appendListItem(block.text).setGlyphType(DocumentApp.GlyphType.NUMBER); break;
+      default: element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.NORMAL);
     }
-
-    // Detectar títols (# ## ###)
-    if (line.startsWith('### ')) {
-      const text = line.substring(4);
-      const para = body.appendParagraph(text);
-      para.setHeading(DocumentApp.ParagraphHeading.HEADING3);
-    } else if (line.startsWith('## ')) {
-      const text = line.substring(3);
-      const para = body.appendParagraph(text);
-      para.setHeading(DocumentApp.ParagraphHeading.HEADING2);
-    } else if (line.startsWith('# ')) {
-      const text = line.substring(2);
-      const para = body.appendParagraph(text);
-      para.setHeading(DocumentApp.ParagraphHeading.HEADING1);
-    }
-    // Detectar llistes amb guió o asterisc
-    else if (line.match(/^[\*\-]\s+/)) {
-      const text = line.replace(/^[\*\-]\s+/, '');
-      const listItem = body.appendListItem(text);
-      listItem.setGlyphType(DocumentApp.GlyphType.BULLET);
-    }
-    // Detectar llistes numerades
-    else if (line.match(/^\d+\.\s+/)) {
-      const text = line.replace(/^\d+\.\s+/, '');
-      const listItem = body.appendListItem(text);
-      listItem.setGlyphType(DocumentApp.GlyphType.NUMBER);
-    }
-    // Text normal
-    else {
-      const para = body.appendParagraph(line);
-      para.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    }
-  }
-
-  // 3. Aplicar format inline (negreta i cursiva) a tot el document
-  applyInlineFormatting(body);
+    if (block.formatting) applyFormatting(element, block.formatting);
+  });
 }
 
-// --- Funció per aplicar format inline (negreta, cursiva) ---
-function applyInlineFormatting(body) {
-  const text = body.editAsText();
-  const content = text.getText();
+function renderSelection(selection, blocks) {
+  const elements = selection.getRangeElements();
+  const targetElement = elements[0].getElement().asText();
 
-  // Processar **negreta**
-  const boldPattern = /\*\*(.+?)\*\*/g;
-  let match;
-  let offset = 0;
+  // Concatenem blocs per inserció inline (fallback per seleccions parcials)
+  let combinedText = "";
+  let combinedFormatting = [];
 
-  // Necessitem fer múltiples passades perquè els índexs canvien
-  let processedText = content;
-
-  // Primer passem per negreta
-  while ((match = boldPattern.exec(content)) !== null) {
-    const fullMatch = match[0];      // **text**
-    const innerText = match[1];       // text
-    const startIndex = match.index;
-
-    // Buscar la posició actual en el document
-    const currentText = body.editAsText().getText();
-    const pos = currentText.indexOf(fullMatch);
-
-    if (pos !== -1) {
-      // Substituir **text** per text i aplicar negreta
-      const textElement = body.editAsText();
-      textElement.deleteText(pos, pos + fullMatch.length - 1);
-      textElement.insertText(pos, innerText);
-      textElement.setBold(pos, pos + innerText.length - 1, true);
+  blocks.forEach(block => {
+    const baseIndex = combinedText.length;
+    combinedText += block.text + "\n";
+    if (block.formatting) {
+      block.formatting.forEach(fmt => {
+        combinedFormatting.push({ style: fmt.style, start: baseIndex + fmt.start, length: fmt.length });
+      });
     }
+  });
+
+  combinedText = combinedText.trim();
+
+  if (elements[0].isPartial()) {
+    const start = elements[0].getStartOffset();
+    const end = elements[0].getEndOffsetInclusive();
+    targetElement.deleteText(start, end);
+    targetElement.insertText(start, combinedText);
+    applyFormattingWithOffset(targetElement, combinedFormatting, start);
+  } else {
+    targetElement.setText(combinedText);
+    applyFormatting(targetElement, combinedFormatting);
   }
+}
 
-  // Després passem per cursiva (*text* o _text_)
-  const italicPattern = /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)|_(.+?)_/g;
-  const currentContent = body.editAsText().getText();
-
-  while ((match = italicPattern.exec(currentContent)) !== null) {
-    const fullMatch = match[0];
-    const innerText = match[1] || match[2];
-
-    const currentText = body.editAsText().getText();
-    const pos = currentText.indexOf(fullMatch);
-
-    if (pos !== -1) {
-      const textElement = body.editAsText();
-      textElement.deleteText(pos, pos + fullMatch.length - 1);
-      textElement.insertText(pos, innerText);
-      textElement.setItalic(pos, pos + innerText.length - 1, true);
+function applyFormatting(element, rules) {
+  const textObj = element.editAsText();
+  rules.forEach(fmt => {
+    const end = fmt.start + fmt.length - 1;
+    if (end < element.getText().length) {
+      if (fmt.style === 'BOLD') textObj.setBold(fmt.start, end, true);
+      if (fmt.style === 'ITALIC') textObj.setItalic(fmt.start, end, true);
     }
-  }
+  });
+}
+
+function applyFormattingWithOffset(element, rules, baseOffset) {
+  const textObj = element.editAsText();
+  rules.forEach(fmt => {
+    const absStart = baseOffset + fmt.start;
+    const absEnd = absStart + fmt.length - 1;
+    if (absEnd < element.getText().length) {
+      if (fmt.style === 'BOLD') textObj.setBold(absStart, absEnd, true);
+      if (fmt.style === 'ITALIC') textObj.setItalic(absStart, absEnd, true);
+    }
+  });
 }
