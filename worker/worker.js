@@ -60,7 +60,8 @@ export default {
  * Handler per pujar fitxers a Google File API
  */
 async function handleFileUpload(body, env, corsHeaders) {
-  const { file_data, mime_type, filename, license_key } = body;
+  const { file_data, mime_type, file_name, filename, license_key } = body;
+  const finalFileName = file_name || filename; // Acceptar ambdós formats
 
   if (!license_key) throw new Error("missing_license");
   if (!file_data) throw new Error("missing_file_data");
@@ -74,7 +75,7 @@ async function handleFileUpload(body, env, corsHeaders) {
   }
 
   const numBytes = bytes.length;
-  const displayName = filename || `sidecar_file_${Date.now()}`;
+  const displayName = finalFileName || `sidecar_file_${Date.now()}`;
 
   // ─── STEP 1: Iniciar upload resumable ───
   const startUploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${env.GEMINI_API_KEY}`;

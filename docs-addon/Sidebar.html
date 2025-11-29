@@ -2,349 +2,1141 @@
 <html>
   <head>
     <base target="_top">
-    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-      /* Estils Base */
-      body { padding: 0; margin: 0; font-family: 'Google Sans', Roboto, Arial; background: #f8f9fa; height: 100vh; display: flex; flex-direction: column; }
+      /* ═══════════════════════════════════════════════════════════
+         SIDECAR UI - Refined Dark Theme
+         ═══════════════════════════════════════════════════════════ */
 
-      /* Tabs */
-      .tabs { display: flex; background: white; border-bottom: 1px solid #ddd; }
-      .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: #5f6368; font-weight: 500; font-size: 14px; border-bottom: 2px solid transparent; }
-      .tab.active { color: #1a73e8; border-bottom: 2px solid #1a73e8; }
+      :root {
+        /* Base (Dark Theme) */
+        --bg-primary: #0f0f0f;
+        --bg-secondary: #1a1a1a;
+        --bg-tertiary: #252525;
+        --bg-elevated: #2a2a2a;
 
-      /* Panels */
-      .content-panel { flex-grow: 1; display: none; overflow-y: auto; padding: 15px; }
-      .content-panel.active { display: flex; flex-direction: column; }
+        /* Text */
+        --text-primary: #fafafa;
+        --text-secondary: #a1a1a1;
+        --text-muted: #666666;
 
-      /* Xat */
-      #chatHistory { flex-grow: 1; display: flex; flex-direction: column; gap: 12px; margin-bottom: 10px; }
-      .msg { padding: 10px 14px; border-radius: 18px; font-size: 13px; line-height: 1.4; max-width: 85%; }
-      .msg.user { align-self: flex-end; background: #d2e3fc; color: #174ea6; border-bottom-right-radius: 4px; }
-      .msg.ai { align-self: flex-start; background: white; border: 1px solid #dadce0; border-bottom-left-radius: 4px; }
-      .msg.system { align-self: center; font-size: 11px; color: #666; width: 100%; text-align: center; margin-top: 10px; }
-      .msg.error { align-self: center; background: #fce8e6; color: #c5221f; border: 1px solid #f5c6cb; }
+        /* Accent (Emerald) */
+        --accent: #10b981;
+        --accent-hover: #34d399;
+        --accent-muted: rgba(16, 185, 129, 0.15);
+        --accent-glow: rgba(16, 185, 129, 0.3);
 
-      /* BADGE D'EDICIÓ */
-      .edit-badge {
-        display: inline-block; font-size: 10px; font-weight: bold; color: #137333;
-        background-color: #e6f4ea; padding: 2px 6px; border-radius: 4px;
-        margin-bottom: 6px; border: 1px solid #ceead6;
+        /* Semantic */
+        --success: #22c55e;
+        --error: #ef4444;
+        --error-muted: rgba(239, 68, 68, 0.15);
+        --warning: #f59e0b;
+
+        /* Borders & Shadows */
+        --border: rgba(255, 255, 255, 0.08);
+        --border-hover: rgba(255, 255, 255, 0.15);
+        --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+        /* Spacing */
+        --space-xs: 4px;
+        --space-sm: 8px;
+        --space-md: 12px;
+        --space-lg: 16px;
+        --space-xl: 24px;
+
+        /* Radius */
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+        --radius-full: 9999px;
+
+        /* Typography */
+        --font-display: 'Plus Jakarta Sans', -apple-system, sans-serif;
+        --font-mono: 'JetBrains Mono', monospace;
       }
 
-      /* INDICADOR PENSANT */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-display);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         NAVIGATION - Icon Tabs
+         ═══════════════════════════════════════════════════════════ */
+
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-xs);
+        padding: var(--space-md);
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        position: relative;
+      }
+
+      .nav-tabs {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+        background: var(--bg-tertiary);
+        padding: var(--space-xs);
+        border-radius: var(--radius-lg);
+        position: relative;
+      }
+
+      .nav-pill {
+        position: absolute;
+        height: calc(100% - 8px);
+        background: var(--bg-elevated);
+        border-radius: var(--radius-md);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .tab {
+        position: relative;
+        z-index: 1;
+        width: 40px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border-radius: var(--radius-md);
+        color: var(--text-muted);
+        font-size: 18px;
+        transition: color 0.2s ease;
+        border: none;
+        background: none;
+      }
+
+      .tab:hover {
+        color: var(--text-secondary);
+      }
+
+      .tab.active {
+        color: var(--accent);
+      }
+
+      .tab svg {
+        width: 20px;
+        height: 20px;
+        stroke: currentColor;
+        stroke-width: 2;
+        fill: none;
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         PANELS
+         ═══════════════════════════════════════════════════════════ */
+
+      .panel {
+        flex: 1;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+        animation: fadeIn 0.2s ease;
+      }
+
+      .panel.active {
+        display: flex;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         CHAT PANEL
+         ═══════════════════════════════════════════════════════════ */
+
+      #chatPanel {
+        padding: 0;
+      }
+
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: var(--space-lg);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+
+      .chat-messages::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .chat-messages::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .chat-messages::-webkit-scrollbar-thumb {
+        background: var(--border-hover);
+        border-radius: var(--radius-full);
+      }
+
+      /* Message Bubbles */
+      .msg {
+        max-width: 85%;
+        padding: var(--space-md) var(--space-lg);
+        border-radius: var(--radius-lg);
+        font-size: 13px;
+        line-height: 1.5;
+        animation: msgAppear 0.25s ease-out;
+      }
+
+      @keyframes msgAppear {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .msg.user {
+        align-self: flex-end;
+        background: linear-gradient(135deg, var(--accent) 0%, #059669 100%);
+        color: white;
+        border-bottom-right-radius: var(--space-xs);
+      }
+
+      .msg.ai {
+        align-self: flex-start;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-bottom-left-radius: var(--space-xs);
+        color: var(--text-primary);
+      }
+
+      .msg.system {
+        align-self: center;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 11px;
+        padding: var(--space-sm);
+      }
+
+      .msg.error {
+        align-self: flex-start;
+        background: var(--error-muted);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+      }
+
+      /* Edit Badge */
+      .edit-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-xs);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--success);
+        background: rgba(34, 197, 94, 0.15);
+        padding: 2px 8px;
+        border-radius: var(--radius-sm);
+        margin-bottom: var(--space-sm);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+      }
+
+      .edit-badge::before {
+        content: '';
+      }
+
+      /* Thinking Indicator */
       .msg.thinking {
         align-self: flex-start;
-        background: white;
-        border: 1px solid #dadce0;
-        border-bottom-left-radius: 4px;
-        padding: 12px 18px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        padding: var(--space-md) var(--space-lg);
+        border-bottom-left-radius: var(--space-xs);
       }
-      .thinking-dots {
-        display: flex;
-        gap: 4px;
-        align-items: center;
-      }
-      .thinking-dots span {
-        width: 8px;
+
+      .thinking-shimmer {
+        width: 100px;
         height: 8px;
-        background: #1a73e8;
-        border-radius: 50%;
-        animation: pulse 1.4s ease-in-out infinite;
+        background: linear-gradient(
+          90deg,
+          var(--bg-elevated) 0%,
+          var(--accent-muted) 50%,
+          var(--bg-elevated) 100%
+        );
+        background-size: 200% 100%;
+        border-radius: var(--radius-full);
+        animation: shimmer 1.5s ease-in-out infinite;
       }
-      .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
-      .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
-      @keyframes pulse {
-        0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-        40% { transform: scale(1); opacity: 1; }
+
+      @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
       }
 
-      /* Controls Cervell */
-      .form-group { margin-bottom: 15px; }
-      label { display: block; font-weight: bold; font-size: 12px; margin-bottom: 5px; color: #3c4043; }
-      textarea, input[type="text"] { width: 100%; padding: 8px; border: 1px solid #dadce0; border-radius: 4px; box-sizing: border-box; }
-      .file-box { border: 1px dashed #dadce0; padding: 15px; text-align: center; border-radius: 4px; background: white; }
-      .checkbox-group { display: flex; align-items: center; gap: 8px; background: #fff; padding: 10px; border: 1px solid #dadce0; border-radius: 4px; }
+      /* ═══════════════════════════════════════════════════════════
+         INPUT AREA
+         ═══════════════════════════════════════════════════════════ */
 
-      /* Footer */
-      .footer { padding: 10px; background: white; border-top: 1px solid #ddd; }
-      .input-wrapper { display: flex; gap: 8px; }
-      textarea#userInput { height: 38px; border-radius: 20px; resize: none; }
-      button.send-btn { background: #1a73e8; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
-      button.action-btn { background: #1a73e8; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: 500; }
-      button.secondary { background: #f1f3f4; color: #3c4043; margin-top: 5px; }
+      .input-area {
+        padding: var(--space-md);
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border);
+      }
 
-      .hidden { display: none !important; }
-
-      /* RECEIPTS (Custom Macros) */
-      .receipts-grid {
+      .input-wrapper {
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 15px;
+        align-items: flex-end;
+        gap: var(--space-sm);
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-sm);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
       }
-      .receipt-btn {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+
+      .input-wrapper:focus-within {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-muted);
+      }
+
+      .input-wrapper textarea {
+        flex: 1;
+        background: transparent;
         border: none;
-        padding: 10px 14px;
-        border-radius: 20px;
+        color: var(--text-primary);
+        font-family: var(--font-display);
+        font-size: 13px;
+        resize: none;
+        outline: none;
+        min-height: 24px;
+        max-height: 120px;
+        padding: var(--space-xs) var(--space-sm);
+      }
+
+      .input-wrapper textarea::placeholder {
+        color: var(--text-muted);
+      }
+
+      .send-btn {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--accent);
+        border: none;
+        border-radius: var(--radius-md);
+        color: white;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+      }
+
+      .send-btn:hover:not(:disabled) {
+        background: var(--accent-hover);
+        transform: scale(1.05);
+      }
+
+      .send-btn:active:not(:disabled) {
+        transform: scale(0.95);
+      }
+
+      .send-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .send-btn svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        stroke-width: 2;
+        fill: none;
+      }
+
+      .credits-display {
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: var(--space-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-xs);
+      }
+
+      .credits-display .icon {
+        color: var(--accent);
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         TOOLS PANEL (RECEIPTS)
+         ═══════════════════════════════════════════════════════════ */
+
+      #toolsPanel {
+        padding: var(--space-lg);
+        overflow-y: auto;
+      }
+
+      .section-title {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        margin-bottom: var(--space-md);
+      }
+
+      .receipts-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-sm);
+        margin-bottom: var(--space-lg);
+      }
+
+      .receipt-card {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        overflow: hidden;
+      }
+
+      .receipt-card:hover {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent), 0 0 20px var(--accent-muted);
+        transform: translateY(-2px);
+      }
+
+      .receipt-card:active {
+        transform: translateY(0) scale(0.98);
+      }
+
+      .receipt-card .icon {
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+
+      .receipt-card .label {
         font-size: 12px;
         font-weight: 500;
-        cursor: pointer;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .receipt-card .delete-btn {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 20px;
+        height: 20px;
         display: flex;
         align-items: center;
-        gap: 6px;
-        transition: transform 0.1s, box-shadow 0.1s;
-      }
-      .receipt-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-      }
-      .receipt-btn:active { transform: translateY(0); }
-      .receipt-btn .icon { font-size: 14px; }
-      .receipt-btn .delete-x {
-        margin-left: 4px;
-        opacity: 0.7;
-        font-size: 10px;
-      }
-      .receipt-btn .delete-x:hover { opacity: 1; }
-
-      .add-receipt-btn {
-        background: #f1f3f4;
-        color: #5f6368;
-        border: 2px dashed #dadce0;
-        padding: 10px 14px;
-        border-radius: 20px;
+        justify-content: center;
+        background: var(--error-muted);
+        border: none;
+        border-radius: var(--radius-sm);
+        color: var(--error);
         font-size: 12px;
         cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s ease;
       }
-      .add-receipt-btn:hover { background: #e8eaed; border-color: #1a73e8; color: #1a73e8; }
 
-      #newReceiptForm {
-        background: white;
-        border: 1px solid #dadce0;
-        border-radius: 8px;
-        padding: 12px;
-        margin-top: 10px;
+      .receipt-card:hover .delete-btn {
+        opacity: 1;
       }
-      #newReceiptForm input, #newReceiptForm textarea {
-        margin-bottom: 8px;
+
+      .add-receipt-card {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+        background: transparent;
+        border: 1px dashed var(--border);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 12px;
+        transition: all 0.2s ease;
       }
+
+      .add-receipt-card:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-muted);
+      }
+
+      /* New Receipt Form */
+      .receipt-form {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-lg);
+        margin-top: var(--space-md);
+        animation: slideDown 0.2s ease;
+      }
+
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .receipt-form.hidden {
+        display: none;
+      }
+
+      .form-group {
+        margin-bottom: var(--space-md);
+      }
+
+      .form-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: var(--space-sm);
+      }
+
       .emoji-picker {
         display: flex;
-        gap: 6px;
-        margin-bottom: 10px;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
       }
-      .emoji-picker span {
-        cursor: pointer;
-        font-size: 18px;
-        padding: 4px;
-        border-radius: 4px;
+
+      .emoji-picker button {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-elevated);
         border: 2px solid transparent;
+        border-radius: var(--radius-sm);
+        font-size: 18px;
+        cursor: pointer;
+        transition: all 0.15s ease;
       }
-      .emoji-picker span:hover { background: #f1f3f4; }
-      .emoji-picker span.selected { border-color: #1a73e8; background: #e8f0fe; }
+
+      .emoji-picker button:hover {
+        background: var(--bg-primary);
+        transform: scale(1.1);
+      }
+
+      .emoji-picker button.selected {
+        border-color: var(--accent);
+        background: var(--accent-muted);
+      }
+
+      .form-input {
+        width: 100%;
+        padding: var(--space-sm) var(--space-md);
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text-primary);
+        font-family: var(--font-display);
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .form-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-muted);
+      }
+
+      .form-input::placeholder {
+        color: var(--text-muted);
+      }
+
+      textarea.form-input {
+        resize: vertical;
+        min-height: 80px;
+      }
+
+      .form-actions {
+        display: flex;
+        gap: var(--space-sm);
+        margin-top: var(--space-md);
+      }
+
+      .btn {
+        flex: 1;
+        padding: var(--space-sm) var(--space-md);
+        border-radius: var(--radius-sm);
+        font-family: var(--font-display);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: none;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn-secondary {
+        background: var(--bg-elevated);
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+      }
+
+      .btn-secondary:hover {
+        background: var(--bg-primary);
+        border-color: var(--border-hover);
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         SETTINGS PANEL (CERVELL)
+         ═══════════════════════════════════════════════════════════ */
+
+      #brainPanel {
+        padding: var(--space-lg);
+        overflow-y: auto;
+      }
+
+      .settings-card {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-lg);
+        margin-bottom: var(--space-md);
+      }
+
+      .settings-card-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        margin-bottom: var(--space-md);
+      }
+
+      .settings-card-header .icon {
+        font-size: 16px;
+      }
+
+      .settings-card-header .title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .settings-card-header .subtitle {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+
+      /* Toggle Switch */
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-md);
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        margin-bottom: var(--space-md);
+      }
+
+      .toggle-label {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+      }
+
+      .toggle-label .icon {
+        font-size: 16px;
+      }
+
+      .toggle-label .text {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+
+      .toggle-label .hint {
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+
+      .toggle-switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+      }
+
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-full);
+        transition: all 0.2s ease;
+      }
+
+      .toggle-slider::before {
+        content: '';
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        left: 2px;
+        bottom: 2px;
+        background: var(--text-muted);
+        border-radius: 50%;
+        transition: all 0.2s ease;
+      }
+
+      .toggle-switch input:checked + .toggle-slider {
+        background: var(--accent-muted);
+        border-color: var(--accent);
+      }
+
+      .toggle-switch input:checked + .toggle-slider::before {
+        background: var(--accent);
+        transform: translateX(20px);
+      }
+
+      /* File Upload */
+      .file-upload {
+        border: 1px dashed var(--border);
+        border-radius: var(--radius-sm);
+        padding: var(--space-md);
+        text-align: center;
+        transition: all 0.2s ease;
+      }
+
+      .file-upload:hover {
+        border-color: var(--accent);
+        background: var(--accent-muted);
+      }
+
+      .file-upload input[type="file"] {
+        display: none;
+      }
+
+      .file-upload-label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-sm);
+        cursor: pointer;
+      }
+
+      .file-upload-label .icon {
+        font-size: 24px;
+        color: var(--text-muted);
+      }
+
+      .file-upload-label .text {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      .file-status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-sm) var(--space-md);
+        background: var(--accent-muted);
+        border: 1px solid var(--accent);
+        border-radius: var(--radius-sm);
+        margin-top: var(--space-sm);
+      }
+
+      .file-status .name {
+        font-size: 12px;
+        color: var(--accent);
+        font-weight: 500;
+      }
+
+      .file-status .actions {
+        display: flex;
+        gap: var(--space-xs);
+      }
+
+      .file-status .actions button {
+        padding: 4px 8px;
+        font-size: 10px;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .file-status .actions button:hover {
+        background: var(--bg-elevated);
+      }
+
+      .file-status .actions button.danger {
+        color: var(--error);
+        border-color: var(--error);
+      }
+
+      .file-status .actions button.danger:hover {
+        background: var(--error-muted);
+      }
+
+      .save-btn {
+        width: 100%;
+        padding: var(--space-md);
+        background: var(--accent);
+        border: none;
+        border-radius: var(--radius-md);
+        color: white;
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-sm);
+      }
+
+      .save-btn:hover:not(:disabled) {
+        background: var(--accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px var(--accent-glow);
+      }
+
+      .save-btn:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      .save-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .save-status {
+        text-align: center;
+        font-size: 12px;
+        color: var(--success);
+        margin-top: var(--space-sm);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .save-status.visible {
+        opacity: 1;
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         UTILITIES
+         ═══════════════════════════════════════════════════════════ */
+
+      .hidden {
+        display: none !important;
+      }
+
+      .loading-text {
+        color: var(--text-muted);
+        font-size: 11px;
+        text-align: center;
+        padding: var(--space-lg);
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: var(--space-xl);
+        color: var(--text-muted);
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
 
-    <div class="tabs">
-      <div class="tab active" onclick="switchTab('chat')">Xat</div>
-      <div class="tab" onclick="switchTab('tools')">Eines</div>
-      <div class="tab" onclick="switchTab('brain')">Cervell</div>
-    </div>
+    <!-- Navigation -->
+    <nav class="nav">
+      <div class="nav-tabs">
+        <div class="nav-pill" id="navPill"></div>
+        <button class="tab active" data-tab="chat" onclick="switchTab('chat')" title="Xat">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button class="tab" data-tab="tools" onclick="switchTab('tools')" title="Eines">
+          <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </button>
+        <button class="tab" data-tab="brain" onclick="switchTab('brain')" title="Configuracio">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </nav>
 
-    <div id="chatPanel" class="content-panel active">
-      <div id="chatHistory">
-        <div class="msg system">Hola! Soc SideCar.</div>
+    <!-- Chat Panel -->
+    <div id="chatPanel" class="panel active">
+      <div class="chat-messages" id="chatHistory">
+        <div class="msg system">Hola! Soc SideCar, el teu assistent d'escriptura.</div>
       </div>
     </div>
 
-    <div id="toolsPanel" class="content-panel">
-      <label style="margin-bottom:10px;">Les Teves Receptes</label>
-      <div id="receiptsList" class="receipts-grid">
-        <!-- Receptes es carreguen dinàmicament -->
+    <!-- Tools Panel -->
+    <div id="toolsPanel" class="panel">
+      <div class="section-title">Les Teves Receptes</div>
+      <div class="receipts-grid" id="receiptsList">
+        <!-- Dynamic content -->
       </div>
-      <button class="add-receipt-btn" onclick="toggleNewReceiptForm()">+ Nova Recepta</button>
+      <button class="add-receipt-card" onclick="toggleNewReceiptForm()">
+        <span>+</span> Nova Recepta
+      </button>
 
-      <div id="newReceiptForm" class="hidden">
-        <label>Icona</label>
-        <div class="emoji-picker" id="emojiPicker">
-          <span onclick="selectEmoji('⚡')">⚡</span>
-          <span onclick="selectEmoji('🚀')">🚀</span>
-          <span onclick="selectEmoji('✨')">✨</span>
-          <span onclick="selectEmoji('📝')">📝</span>
-          <span onclick="selectEmoji('🎯')">🎯</span>
-          <span onclick="selectEmoji('💡')">💡</span>
-          <span onclick="selectEmoji('🔥')">🔥</span>
-          <span onclick="selectEmoji('💎')">💎</span>
-        </div>
-        <label>Nom del Botó</label>
-        <input type="text" id="receiptLabel" placeholder="Ex: Fes-ho Èpic">
-        <label>Instrucció per la IA</label>
-        <textarea id="receiptInstruction" rows="3" placeholder="Ex: Reescriu el text amb un to èpic i dramatic..."></textarea>
-        <button class="action-btn" onclick="saveNewReceipt()">Guardar Recepta</button>
-        <button class="action-btn secondary" onclick="toggleNewReceiptForm()">Cancel·lar</button>
-      </div>
-    </div>
-
-    <div id="brainPanel" class="content-panel">
-      <div class="form-group">
-        <label>Llicencia API</label>
-        <input type="text" id="licenseKey" placeholder="SIDECAR-...">
-      </div>
-
-      <div class="form-group">
-        <label>Guia d'Estil</label>
-        <textarea id="styleGuide" placeholder="Ex: Sigues formal, no usis emojis..."></textarea>
-      </div>
-
-      <div class="form-group">
-        <label>Fitxer de Coneixement (PDF/TXT)</label>
-        <div class="file-box">
-          <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md">
-          <div id="fileStatus" style="margin-top:5px; font-size:11px; color:#666;">Cap fitxer seleccionat</div>
-          <button class="action-btn secondary" style="margin-top:10px;" onclick="uploadFile()">Pujar Fitxer</button>
-          <button class="action-btn secondary" style="margin-top:5px; color:red;" onclick="clearFile()">Esborrar</button>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <div class="checkbox-group">
-          <input type="checkbox" id="strictMode">
-          <div>
-            <label style="margin:0">Mode Estricte</label>
-            <div style="font-size:10px; color:#666;">Nomes respon amb info del Fitxer/Context.</div>
+      <div id="newReceiptForm" class="receipt-form hidden">
+        <div class="form-group">
+          <label class="form-label">Icona</label>
+          <div class="emoji-picker" id="emojiPicker">
+            <button type="button" onclick="selectEmoji('⚡')">⚡</button>
+            <button type="button" onclick="selectEmoji('🚀')">🚀</button>
+            <button type="button" onclick="selectEmoji('✨')">✨</button>
+            <button type="button" onclick="selectEmoji('📝')">📝</button>
+            <button type="button" onclick="selectEmoji('🎯')">🎯</button>
+            <button type="button" onclick="selectEmoji('💡')">💡</button>
+            <button type="button" onclick="selectEmoji('🔥')">🔥</button>
+            <button type="button" onclick="selectEmoji('💎')">💎</button>
           </div>
         </div>
+        <div class="form-group">
+          <label class="form-label">Nom del Boto</label>
+          <input type="text" class="form-input" id="receiptLabel" placeholder="Ex: Fes-ho Epic">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Instruccio per la IA</label>
+          <textarea class="form-input" id="receiptInstruction" rows="3" placeholder="Ex: Reescriu el text amb un to epic i dramatic..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" onclick="toggleNewReceiptForm()">Cancel·lar</button>
+          <button class="btn btn-primary" onclick="saveNewReceipt()">Guardar</button>
+        </div>
       </div>
-
-      <button class="action-btn" onclick="saveSettings()">Desar Configuracio</button>
-      <div id="saveStatus" style="text-align:center; font-size:12px; margin-top:5px; color:#188038;"></div>
     </div>
 
-    <div id="footerBar" class="footer">
-      <div class="input-wrapper">
-        <textarea id="userInput" placeholder="Escriu aqui..."></textarea>
-        <button class="send-btn" id="sendBtn" onclick="sendMessage()">&#10148;</button>
+    <!-- Brain Panel (Settings) -->
+    <div id="brainPanel" class="panel">
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <span class="icon">🔑</span>
+          <div>
+            <div class="title">Llicencia API</div>
+            <div class="subtitle">La teva clau d'acces a SideCar</div>
+          </div>
+        </div>
+        <input type="text" class="form-input" id="licenseKey" placeholder="SIDECAR-XXXX-XXXX">
       </div>
-      <div id="creditsDisplay" style="text-align:center; font-size:10px; color:#999; margin-top:5px;"></div>
+
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <span class="icon">📝</span>
+          <div>
+            <div class="title">Guia d'Estil</div>
+            <div class="subtitle">Personalitza com escriu la IA</div>
+          </div>
+        </div>
+        <textarea class="form-input" id="styleGuide" rows="3" placeholder="Ex: Sigues formal, utilitza catala correcte..."></textarea>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <span class="icon">📎</span>
+          <div>
+            <div class="title">Fitxer de Coneixement</div>
+            <div class="subtitle">PDF o TXT com a referencia</div>
+          </div>
+        </div>
+        <div class="file-upload" id="fileUploadArea">
+          <label class="file-upload-label">
+            <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md" onchange="handleFileSelect()">
+            <span class="icon">📄</span>
+            <span class="text">Clica per seleccionar un fitxer</span>
+          </label>
+        </div>
+        <div id="fileStatusContainer"></div>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span class="icon">🔒</span>
+          <div>
+            <div class="text">Mode Estricte</div>
+            <div class="hint">Nomes usa info del fitxer/context</div>
+          </div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="strictMode">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <button class="save-btn" id="saveBtn" onclick="saveSettings()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        Desar Configuracio
+      </button>
+      <div id="saveStatus" class="save-status">Guardat correctament!</div>
+    </div>
+
+    <!-- Input Area (Footer) -->
+    <div id="inputArea" class="input-area">
+      <div class="input-wrapper">
+        <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="1"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <div class="credits-display" id="creditsDisplay"></div>
     </div>
 
     <script>
+      // ═══════════════════════════════════════════════════════════
+      // STATE & INIT
+      // ═══════════════════════════════════════════════════════════
+
       let currentSettings = {};
+      let selectedEmoji = '⚡';
+      let currentTab = 'chat';
 
       window.onload = function() {
+        // Position nav pill
+        updateNavPill();
+
+        // Load settings
         google.script.run.withSuccessHandler(function(jsonStr) {
           currentSettings = JSON.parse(jsonStr);
-          document.getElementById('licenseKey').value = currentSettings.license_key || "";
-          document.getElementById('styleGuide').value = currentSettings.style_guide || "";
+          document.getElementById('licenseKey').value = currentSettings.license_key || '';
+          document.getElementById('styleGuide').value = currentSettings.style_guide || '';
           document.getElementById('strictMode').checked = currentSettings.strict_mode || false;
           if (!currentSettings.license_key) switchTab('brain');
         }).getSettings();
 
+        // Load file info
         google.script.run.withSuccessHandler(function(info) {
-          if (info.hasFile) document.getElementById('fileStatus').innerText = "Actiu: " + info.name;
+          if (info.hasFile) showFileStatus(info.name);
         }).getKnowledgeFileInfo();
 
-        document.getElementById('userInput').addEventListener("keydown", function(e) {
-          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        // Enter key handler
+        document.getElementById('userInput').addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+          }
         });
+
+        // Auto-resize textarea
+        document.getElementById('userInput').addEventListener('input', function() {
+          this.style.height = 'auto';
+          this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // Select first emoji
+        selectEmoji('⚡');
       };
 
-      function switchTab(tabName) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.content-panel').forEach(p => p.classList.remove('active'));
+      // ═══════════════════════════════════════════════════════════
+      // NAVIGATION
+      // ═══════════════════════════════════════════════════════════
 
-        const tabs = document.querySelectorAll('.tab');
-        if (tabName === 'chat') {
-          tabs[0].classList.add('active');
-          document.getElementById('chatPanel').classList.add('active');
-          document.getElementById('footerBar').classList.remove('hidden');
-        } else if (tabName === 'tools') {
-          tabs[1].classList.add('active');
-          document.getElementById('toolsPanel').classList.add('active');
-          document.getElementById('footerBar').classList.remove('hidden');
-          loadReceipts();
+      function switchTab(tabName) {
+        currentTab = tabName;
+
+        // Update tabs
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
+
+        // Update panels
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(tabName + 'Panel').classList.add('active');
+
+        // Update pill position
+        updateNavPill();
+
+        // Show/hide input area
+        const inputArea = document.getElementById('inputArea');
+        if (tabName === 'brain') {
+          inputArea.classList.add('hidden');
         } else {
-          tabs[2].classList.add('active');
-          document.getElementById('brainPanel').classList.add('active');
-          document.getElementById('footerBar').classList.add('hidden');
+          inputArea.classList.remove('hidden');
+        }
+
+        // Load receipts when switching to tools
+        if (tabName === 'tools') loadReceipts();
+      }
+
+      function updateNavPill() {
+        const activeTab = document.querySelector('.tab.active');
+        const pill = document.getElementById('navPill');
+        if (activeTab && pill) {
+          pill.style.width = activeTab.offsetWidth + 'px';
+          pill.style.left = activeTab.offsetLeft + 'px';
         }
       }
 
-      function uploadFile() {
-        const fileInput = document.getElementById('fileInput');
-        if (fileInput.files.length === 0) return alert("Selecciona un fitxer primer.");
-
-        const file = fileInput.files[0];
-        if (file.size > 10 * 1024 * 1024) return alert("Maxim 10MB per ara.");
-
-        document.getElementById('fileStatus').innerText = "Pujant " + file.name + "...";
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const base64 = e.target.result.split(',')[1];
-          google.script.run
-            .withSuccessHandler(function(res) {
-              document.getElementById('fileStatus').innerText = "Actiu: " + res.name;
-              alert("Fitxer connectat al cervell!");
-            })
-            .withFailureHandler(function(err) {
-              document.getElementById('fileStatus').innerText = "Error en pujada";
-              alert("Error: " + err.message);
-            })
-            .uploadFileToWorker(base64, file.type, file.name);
-        };
-        reader.readAsDataURL(file);
-      }
-
-      function clearFile() {
-        google.script.run.withSuccessHandler(() => {
-          document.getElementById('fileStatus').innerText = "Cap fitxer seleccionat";
-        }).clearKnowledgeFile();
-      }
-
-      function saveSettings() {
-        const btn = document.querySelector('.action-btn');
-        btn.disabled = true;
-        btn.innerText = "Desant...";
-        const newSettings = {
-          license_key: document.getElementById('licenseKey').value,
-          style_guide: document.getElementById('styleGuide').value,
-          strict_mode: document.getElementById('strictMode').checked
-        };
-        google.script.run.withSuccessHandler(function() {
-          btn.disabled = false;
-          btn.innerText = "Desar Configuracio";
-          document.getElementById('saveStatus').innerText = "Guardat!";
-          setTimeout(() => { document.getElementById('saveStatus').innerText = ""; }, 2000);
-          currentSettings = newSettings;
-        }).saveSettings(JSON.stringify(newSettings));
-      }
-
-      function showThinking() {
-        var h = document.getElementById('chatHistory');
-        var d = document.createElement('div');
-        d.className = 'msg thinking';
-        d.id = 'thinkingIndicator';
-        d.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
-        h.appendChild(d);
-        h.scrollTop = h.scrollHeight;
-      }
-
-      function hideThinking() {
-        var indicator = document.getElementById('thinkingIndicator');
-        if (indicator) indicator.remove();
-      }
+      // ═══════════════════════════════════════════════════════════
+      // CHAT
+      // ═══════════════════════════════════════════════════════════
 
       function sendMessage() {
-        var input = document.getElementById('userInput');
-        var text = input.value.trim();
+        const input = document.getElementById('userInput');
+        const text = input.value.trim();
         if (!text) return;
+
         addBubble('user', text);
         input.value = '';
-        var btn = document.getElementById('sendBtn');
+        input.style.height = 'auto';
+
+        const btn = document.getElementById('sendBtn');
         btn.disabled = true;
 
         showThinking();
@@ -354,63 +1146,78 @@
             hideThinking();
             btn.disabled = false;
             addBubble('ai', res.ai_response, res.mode === 'edit');
-
             if (res.credits !== undefined) {
-              document.getElementById('creditsDisplay').innerText = 'Credits: ' + res.credits;
+              document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
             }
           })
           .withFailureHandler(function(err) {
             hideThinking();
             btn.disabled = false;
-            addBubble('error', "Error: " + err.message);
+            addBubble('error', 'Error: ' + err.message);
           })
           .processUserCommand(text);
       }
 
       function addBubble(type, text, isEdit) {
-        var h = document.getElementById('chatHistory');
-        var d = document.createElement('div');
-        d.className = 'msg ' + type;
+        const container = document.getElementById('chatHistory');
+        const bubble = document.createElement('div');
+        bubble.className = 'msg ' + type;
 
-        // Si es resposta de la IA i es EDICIO, posem el badge
         if (type === 'ai' && isEdit) {
-          d.innerHTML = '<div class="edit-badge">MODIFICACIO APLICADA</div>' + text;
+          bubble.innerHTML = '<div class="edit-badge">Document modificat</div>' + text;
         } else {
-          d.innerText = text;
+          bubble.innerText = text;
         }
 
-        h.appendChild(d);
-        h.scrollTop = h.scrollHeight;
+        container.appendChild(bubble);
+        container.scrollTop = container.scrollHeight;
+      }
+
+      function showThinking() {
+        const container = document.getElementById('chatHistory');
+        const thinking = document.createElement('div');
+        thinking.className = 'msg thinking';
+        thinking.id = 'thinkingIndicator';
+        thinking.innerHTML = '<div class="thinking-shimmer"></div>';
+        container.appendChild(thinking);
+        container.scrollTop = container.scrollHeight;
+      }
+
+      function hideThinking() {
+        const indicator = document.getElementById('thinkingIndicator');
+        if (indicator) indicator.remove();
       }
 
       // ═══════════════════════════════════════════════════════════
-      // RECEIPTS (Custom Macros)
+      // RECEIPTS
       // ═══════════════════════════════════════════════════════════
-
-      let selectedEmoji = '⚡';
 
       function loadReceipts() {
         const container = document.getElementById('receiptsList');
-        container.innerHTML = '<div style="color:#999;font-size:11px;">Carregant...</div>';
+        container.innerHTML = '<div class="loading-text">Carregant receptes...</div>';
 
         google.script.run
           .withSuccessHandler(function(result) {
             container.innerHTML = '';
             if (result.receipts && result.receipts.length > 0) {
-              result.receipts.forEach(function(r) {
-                const btn = document.createElement('button');
-                btn.className = 'receipt-btn';
-                btn.innerHTML = '<span class="icon">' + r.icon + '</span>' + r.label +
-                  '<span class="delete-x" onclick="event.stopPropagation(); deleteReceipt(\'' + r.id + '\')">✕</span>';
-                btn.onclick = function() { runReceipt(r.instruction, r.label); };
-                container.appendChild(btn);
+              result.receipts.forEach(function(r, index) {
+                const card = document.createElement('div');
+                card.className = 'receipt-card';
+                card.style.animationDelay = (index * 50) + 'ms';
+                card.innerHTML = `
+                  <span class="icon">${r.icon}</span>
+                  <span class="label">${r.label}</span>
+                  <button class="delete-btn" onclick="event.stopPropagation(); deleteReceipt('${r.id}')">✕</button>
+                `;
+                card.onclick = function() { runReceipt(r.instruction, r.label); };
+                container.appendChild(card);
               });
             } else {
-              container.innerHTML = '<div style="color:#999;font-size:11px;">Cap recepta encara. Crea la primera!</div>';
+              container.innerHTML = '<div class="empty-state">Cap recepta encara.<br>Crea la primera!</div>';
             }
           })
           .withFailureHandler(function(err) {
-            container.innerHTML = '<div style="color:#c5221f;font-size:11px;">Error carregant receptes</div>';
+            container.innerHTML = '<div class="empty-state" style="color: var(--error);">Error carregant receptes</div>';
           })
           .getReceiptsFromWorker();
       }
@@ -427,9 +1234,9 @@
 
       function selectEmoji(emoji) {
         selectedEmoji = emoji;
-        document.querySelectorAll('.emoji-picker span').forEach(function(s) {
-          s.classList.remove('selected');
-          if (s.innerText === emoji) s.classList.add('selected');
+        document.querySelectorAll('.emoji-picker button').forEach(function(btn) {
+          btn.classList.remove('selected');
+          if (btn.innerText === emoji) btn.classList.add('selected');
         });
       }
 
@@ -437,11 +1244,11 @@
         const label = document.getElementById('receiptLabel').value.trim();
         const instruction = document.getElementById('receiptInstruction').value.trim();
 
-        if (!label) return alert('Posa un nom al botó');
-        if (!instruction) return alert('Escriu la instrucció per la IA');
+        if (!label) return alert('Posa un nom al boto');
+        if (!instruction) return alert('Escriu la instruccio per la IA');
 
         google.script.run
-          .withSuccessHandler(function(result) {
+          .withSuccessHandler(function() {
             toggleNewReceiptForm();
             loadReceipts();
           })
@@ -465,10 +1272,7 @@
       }
 
       function runReceipt(instruction, label) {
-        // Canviar a pestanya Xat
         switchTab('chat');
-
-        // Mostrar que s'executa la recepta
         addBubble('user', '🎯 ' + label);
         showThinking();
 
@@ -479,9 +1283,8 @@
             hideThinking();
             document.getElementById('sendBtn').disabled = false;
             addBubble('ai', res.ai_response, res.mode === 'edit');
-
             if (res.credits !== undefined) {
-              document.getElementById('creditsDisplay').innerText = 'Credits: ' + res.credits;
+              document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
             }
           })
           .withFailureHandler(function(err) {
@@ -490,6 +1293,85 @@
             addBubble('error', 'Error: ' + err.message);
           })
           .processUserCommand(instruction);
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // SETTINGS
+      // ═══════════════════════════════════════════════════════════
+
+      function saveSettings() {
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="spinner" width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/></svg> Desant...';
+
+        const newSettings = {
+          license_key: document.getElementById('licenseKey').value,
+          style_guide: document.getElementById('styleGuide').value,
+          strict_mode: document.getElementById('strictMode').checked
+        };
+
+        google.script.run.withSuccessHandler(function() {
+          btn.disabled = false;
+          btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Desar Configuracio';
+          currentSettings = newSettings;
+
+          const status = document.getElementById('saveStatus');
+          status.classList.add('visible');
+          setTimeout(function() { status.classList.remove('visible'); }, 2000);
+        }).saveSettings(JSON.stringify(newSettings));
+      }
+
+      function handleFileSelect() {
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput.files.length === 0) return;
+
+        const file = fileInput.files[0];
+        if (file.size > 10 * 1024 * 1024) {
+          alert('Maxim 10MB');
+          return;
+        }
+
+        showFileStatus(file.name, true);
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const base64 = e.target.result.split(',')[1];
+          google.script.run
+            .withSuccessHandler(function(res) {
+              showFileStatus(res.name);
+            })
+            .withFailureHandler(function(err) {
+              showFileStatus(null);
+              alert('Error: ' + err.message);
+            })
+            .uploadFileToWorker(base64, file.type, file.name);
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function showFileStatus(name, uploading) {
+        const container = document.getElementById('fileStatusContainer');
+        if (!name) {
+          container.innerHTML = '';
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="file-status">
+            <span class="name">${uploading ? 'Pujant... ' : ''}${name}</span>
+            ${!uploading ? `
+              <div class="actions">
+                <button class="danger" onclick="clearFile()">Esborrar</button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      function clearFile() {
+        google.script.run.withSuccessHandler(function() {
+          showFileStatus(null);
+        }).clearKnowledgeFile();
       }
     </script>
   </body>

@@ -2,12 +2,16 @@
 const API_URL = 'https://sidecar-api.conteucontes.workers.dev';
 
 function onOpen() {
-  DocumentApp.getUi().createMenu('SideCar').addItem('Obrir SideCar', 'showSidebar').addToUi();
+  showSidebar();
 }
 
 function showSidebar() {
-  const html = HtmlService.createTemplateFromFile('Sidebar').evaluate().setTitle('SideCar AI');
-  DocumentApp.getUi().showSidebar(html);
+  try {
+    const html = HtmlService.createTemplateFromFile('Sidebar').evaluate().setTitle('SideCar AI');
+    DocumentApp.getUi().showSidebar(html);
+  } catch (e) {
+    DocumentApp.getUi().alert('ERROR: ' + e.message);
+  }
 }
 
 // --- GESTIÓ DE MEMÒRIA I FITXERS ---
