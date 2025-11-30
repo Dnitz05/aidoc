@@ -173,6 +173,73 @@ function revertLastEdit() {
   }
 }
 
+// --- OPTIMISTIC UNDO (v2.6 Sprint) ---
+
+/**
+ * Restaura el text original d'un paràgraf específic (Optimistic UI Undo)
+ * @param {string} targetId - L'ID del paràgraf a restaurar
+ * @param {string} originalText - El text original a restaurar
+ * @returns {Object} { status: 'restored' } o { status: 'error', error: string }
+ */
+function restoreText(targetId, originalText) {
+  try {
+    if (targetId === null || targetId === undefined) {
+      return { status: 'error', error: 'No hi ha targetId' };
+    }
+    if (!originalText) {
+      return { status: 'error', error: 'No hi ha text original' };
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const numericId = parseInt(targetId, 10);
+
+    // Reconstruir el mapa d'elements (igual que a processUserCommand)
+    let elementsToProcess = [];
+    const numChildren = body.getNumChildren();
+    for (let i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
+          child.getType() === DocumentApp.ElementType.LIST_ITEM) {
+        elementsToProcess.push(child);
+      }
+    }
+
+    // Trobar l'element per ID (comptant només els que tenen text)
+    let targetElement = null;
+    let currentIndex = 0;
+    for (let i = 0; i < elementsToProcess.length; i++) {
+      const el = elementsToProcess[i];
+      const text = el.asText().getText();
+      if (text.trim().length > 0) {
+        if (currentIndex === numericId) {
+          targetElement = el;
+          break;
+        }
+        currentIndex++;
+      }
+    }
+
+    if (!targetElement) {
+      return { status: 'error', error: 'No s\'ha trobat el paràgraf (ID: ' + numericId + ')' };
+    }
+
+    // Restaurar el text original
+    targetElement.asText().setText(originalText);
+
+    // Actualitzar lastEdit per mantenir coherència
+    const lastEdit = loadLastEdit();
+    if (lastEdit && String(lastEdit.targetId) === String(targetId)) {
+      lastEdit.currentText = originalText;
+      saveLastEdit(lastEdit);
+    }
+
+    return { status: 'restored' };
+  } catch (e) {
+    return { status: 'error', error: e.message };
+  }
+}
+
 // --- BANNED WORDS (v2.8) ---
 
 /**
@@ -352,6 +419,9 @@ function processUserCommand(instruction, chatHistory, userMode) {
 
     let lastEditWord = null; // v2.8: Paraula per al botó "Prohibir"
 
+    // v2.6 Snapshot for Optimistic UI Undo
+    let undoSnapshot = null;
+
     if (aiData.mode === 'UPDATE_BY_ID') {
       let capturedLastEdit = null;
       const existingLastEdit = loadLastEdit(); // v2.6.1: Carregar ABANS del loop
@@ -360,6 +430,13 @@ function processUserCommand(instruction, chatHistory, userMode) {
         const targetElement = mapIdToElement[id];
         if (targetElement) {
           const currentDocText = targetElement.asText().getText();
+
+          // v2.6 Snapshot: Capturar ABANS de modificar
+          undoSnapshot = {
+            targetId: id,
+            originalText: currentDocText
+          };
+
           updateParagraphPreservingAttributes(targetElement, newText);
 
           // v2.6.1: Preservar originalText si editem el MATEIX paràgraf (cadena d'alternatives)
@@ -406,7 +483,8 @@ function processUserCommand(instruction, chatHistory, userMode) {
       ai_response: aiData.change_summary,
       credits: json.credits_remaining,
       mode: 'edit',
-      last_edit_word: lastEditWord // v2.8: Per al botó "Prohibir"
+      last_edit_word: lastEditWord, // v2.8: Per al botó "Prohibir"
+      undo_snapshot: undoSnapshot   // v2.6: Per Optimistic UI Undo
     };
 
   } catch (e) {

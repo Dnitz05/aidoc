@@ -6,6 +6,24 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.2] - 2024-11-30
+
+### Added
+- **Optimistic UI & Undo** (Sprint 2.6) - Undo immediat des del Sidebar
+  - `undoSnapshot` capturada ABANS de modificar el document
+  - `restoreText(targetId, originalText)` - Nova funció per restaurar
+  - Barra d'undo flotant amb botons "Acceptar" i "Desfer"
+  - Feedback visual: animació slide-up, estat "Restaurant..."
+  - `pendingUndo` state variable per guardar snapshot
+
+### Technical
+- Patró "Snapshot/Restore": backend captura estat original i l'envia al client
+- Client guarda snapshot temporalment per undo sense cridar backend de nou
+- CSS amb gradients i animacions per la barra d'undo
+- Integració amb el sistema de missatges del chat
+
+---
+
 ## [3.1.1] - 2024-11-30
 
 ### Fixed

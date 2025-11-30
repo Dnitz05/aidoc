@@ -390,6 +390,117 @@
       }
 
       /* ═══════════════════════════════════════════════════════════
+         UNDO BAR (v2.6 Sprint - Optimistic UI)
+         ═══════════════════════════════════════════════════════════ */
+
+      .undo-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-md);
+        padding: var(--space-sm) var(--space-md);
+        background: linear-gradient(135deg, rgba(249, 171, 0, 0.15) 0%, rgba(249, 171, 0, 0.08) 100%);
+        border: 1px solid var(--warning);
+        border-radius: var(--radius-md);
+        margin: var(--space-sm) var(--space-lg);
+        animation: slideUp 0.25s ease-out;
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .undo-bar-text {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--warning);
+      }
+
+      .undo-bar-text .icon {
+        font-size: 14px;
+      }
+
+      .undo-bar-actions {
+        display: flex;
+        gap: var(--space-sm);
+      }
+
+      .undo-bar .btn-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--bg-primary);
+        color: var(--text-secondary);
+        font-family: var(--font-display);
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .undo-bar .btn-icon:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--border-hover);
+      }
+
+      .undo-bar .btn-icon.confirm {
+        background: var(--success-muted);
+        border-color: var(--success);
+        color: var(--success);
+      }
+
+      .undo-bar .btn-icon.confirm:hover {
+        background: var(--success);
+        color: white;
+      }
+
+      .undo-bar .btn-icon.undo {
+        background: var(--error-muted);
+        border-color: var(--error);
+        color: var(--error);
+      }
+
+      .undo-bar .btn-icon.undo:hover {
+        background: var(--error);
+        color: white;
+      }
+
+      .undo-bar .btn-icon:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .undo-bar.restoring {
+        opacity: 0.7;
+        pointer-events: none;
+      }
+
+      .undo-bar.restoring .undo-bar-text::after {
+        content: '...';
+        animation: dots 1s steps(3, end) infinite;
+      }
+
+      @keyframes dots {
+        0%, 20% { content: '.'; }
+        40% { content: '..'; }
+        60%, 100% { content: '...'; }
+      }
+
+      /* ═══════════════════════════════════════════════════════════
          INPUT AREA
          ═══════════════════════════════════════════════════════════ */
 
@@ -1704,6 +1815,7 @@
       let currentTab = 'chat';
       let currentMode = 'auto'; // auto | edit | chat
       let bannedWords = []; // v2.8: Banned expressions
+      let pendingUndo = null; // v2.6 Sprint: Snapshot per Optimistic UI Undo
 
       const MODES = {
         auto: { icon: '✨', label: 'Auto' },
@@ -1950,6 +2062,11 @@
             if (res.credits !== undefined) {
               document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
             }
+            // v2.6 Sprint: Show undo bar if edit was made
+            if (res.mode === 'edit' && res.undo_snapshot) {
+              pendingUndo = res.undo_snapshot;
+              showUndoBar();
+            }
             // v2.5: Check and show structure hint (one-time)
             checkAndShowStructureHint();
           })
@@ -2001,6 +2118,76 @@
       function hideThinking() {
         const indicator = document.getElementById('thinkingIndicator');
         if (indicator) indicator.remove();
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // OPTIMISTIC UI UNDO (v2.6 Sprint)
+      // ═══════════════════════════════════════════════════════════
+
+      function showUndoBar() {
+        // Remove existing undo bar if any
+        hideUndoBar();
+
+        const container = document.getElementById('chatHistory');
+        const undoBar = document.createElement('div');
+        undoBar.className = 'undo-bar';
+        undoBar.id = 'undoBar';
+        undoBar.innerHTML = `
+          <div class="undo-bar-text">
+            <span class="icon">⚡</span>
+            <span>Canvi aplicat</span>
+          </div>
+          <div class="undo-bar-actions">
+            <button class="btn-icon confirm" onclick="commitChange()">✓ Acceptar</button>
+            <button class="btn-icon undo" onclick="triggerUndo()">↩ Desfer</button>
+          </div>
+        `;
+        container.appendChild(undoBar);
+        container.scrollTop = container.scrollHeight;
+      }
+
+      function hideUndoBar() {
+        const existing = document.getElementById('undoBar');
+        if (existing) existing.remove();
+      }
+
+      function commitChange() {
+        // L'usuari accepta el canvi - simplement amaguem la barra
+        pendingUndo = null;
+        hideUndoBar();
+        addBubble('system', '✓ Canvi confirmat');
+      }
+
+      function triggerUndo() {
+        if (!pendingUndo) {
+          addBubble('error', 'No hi ha cap canvi per desfer');
+          hideUndoBar();
+          return;
+        }
+
+        // Bloquejar la UI
+        const undoBar = document.getElementById('undoBar');
+        if (undoBar) {
+          undoBar.classList.add('restoring');
+          const textEl = undoBar.querySelector('.undo-bar-text span:last-child');
+          if (textEl) textEl.textContent = 'Restaurant';
+        }
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            hideUndoBar();
+            if (res.status === 'restored') {
+              pendingUndo = null;
+              addBubble('system', '↩ Text original restaurat');
+            } else {
+              addBubble('error', 'Error: ' + (res.error || 'No s\'ha pogut restaurar'));
+            }
+          })
+          .withFailureHandler(function(err) {
+            hideUndoBar();
+            addBubble('error', 'Error: ' + err.message);
+          })
+          .restoreText(pendingUndo.targetId, pendingUndo.originalText);
       }
 
       // ═══════════════════════════════════════════════════════════
