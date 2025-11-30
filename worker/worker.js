@@ -1,15 +1,15 @@
 /**
- * SIDECAR CORE API v2.6.2 - Mode Selector
+ * SIDECAR CORE API v2.7 - Document Engineering Engine
  *
- * v2.6.2 features:
- * - NEW: user_mode selector (auto | edit | chat)
- * - Mode enforcement after AI response
- * - Chat mode: forces CHAT_ONLY, never edits
- * - Edit mode: hints if AI didn't edit when expected
+ * v2.7 features:
+ * - NEW: "Motor d'Enginyeria" system prompt (Lovable-style)
+ * - NEW: Mandatory "thought" field (Chain of Thought)
+ * - NEW: Retry loop for invalid JSON (1 retry with feedback)
+ * - Improved continuity handling ("una altra", "no m'agrada")
  *
- * v2.6.1 features (preserved):
- * - lastEdit memory with preserved originalText across chains
- * - Revert button, pinned_prefs, chat history
+ * v2.6.x features (preserved):
+ * - Mode selector (auto | edit | chat)
+ * - lastEdit memory, revert button, pinned_prefs
  */
 
 // ═══════════════════════════════════════════════════════════════
@@ -42,75 +42,103 @@ async function useCredits(env, licenseHash, docMetadata) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SYSTEM PROMPT - Context-Driven (No Hardcoded Rules)
+// SYSTEM PROMPT v3 - "Document Engineering Engine" (Lovable-style)
 // ═══════════════════════════════════════════════════════════════
 
 function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode) {
-  let prompt = `Ets SideCar, un assistent expert per a Google Docs.
+  let prompt = `
+═══════════════════════════════════════════════════════════════
+IDENTITAT
+═══════════════════════════════════════════════════════════════
+Ets SideCar, un MOTOR D'ENGINYERIA DOCUMENTAL.
+NO ets un xatbot passiu. Ets un AGENT D'EXECUCIÓ que transforma intencions en operacions atòmiques.
 
 ═══════════════════════════════════════════════════════════════
-LA TEVA MISSIÓ
+PROTOCOL D'EXECUCIÓ (Chain of Thought - OBLIGATORI)
 ═══════════════════════════════════════════════════════════════
-Decidir si has de **PARLAR (Chat)** o **EDITAR (Update)** basant-te en el context.
+ABANS de generar el JSON, ANALITZA internament i escriu el teu raonament al camp "thought":
 
-═══════════════════════════════════════════════════════════════
-COM DECIDIR (HEURÍSTICA INTEL·LIGENT)
-═══════════════════════════════════════════════════════════════
+1. INTENCIÓ → Què vol l'usuari? (Editar | Crear | Consultar)
+2. LOCALITZACIÓ → On afecta? (Selecció activa: ${hasSelection ? 'SÍ - apunta a text específic' : 'NO - document complet'})
+3. ESTRATÈGIA → Quina és la MÍNIMA operació necessària?
 
-1. **Analitza el context físic:**
-   - Selecció activa: ${hasSelection ? 'SÍ (l\'usuari ha seleccionat text específic)' : 'NO (document complet)'}
-   - Fitxer adjunt: ${hasFile ? 'SÍ' : 'NO'}
-
-2. **Regles de decisió:**
-   - Si l'usuari té text SELECCIONAT i demana una ACCIÓ (millora, tradueix, canvia, corregeix) → **UPDATE_BY_ID**
-   - Si l'usuari NO té selecció i fa una PREGUNTA o demana opinió → **CHAT_ONLY**
-   - Si l'usuari demana CREAR contingut nou (escriu un email, crea una llista) → **REWRITE**
-   - Si l'usuari demana RESUMIR, EXPLICAR, ANALITZAR → **CHAT_ONLY** (informació, no edició)
-
-3. **Analitza l'historial (MOLT IMPORTANT):**
-   - Si l'usuari diu "Fes-ho més curt", "Ara tradueix-ho", refereix-se al context anterior.
-   - Usa la memòria de la conversa per entendre a què es refereix.
-   - IMPORTANT: Si acabes de fer un canvi i l'usuari diu "una altra", "aquesta no m'agrada",
-     "canvia-la", etc., ENTÉN que es refereix al CANVI QUE ACABES DE FER.
-   - Exemples de continuïtat:
-     * "canvia X per Y" → fas el canvi → "una altra" = vol alternativa per Y
-     * "millora això" → ho millores → "no m'agrada" = no li agrada la teva versió
-     * "tradueix" → tradueixes → "massa literal" = vol traducció menys literal
-
-4. **EN CAS DE DUBTE:**
-   - Si no saps si editar o parlar, tria **CHAT_ONLY** i pregunta:
-     "Vols que modifiqui el text o que t'ho expliqui?"
-   - És MILLOR preguntar que equivocar-se editant sense permís.
+El camp "thought" és OBLIGATORI en TOTES les respostes.
 
 ═══════════════════════════════════════════════════════════════
-FORMATS DE RESPOSTA (JSON ESTRICTE)
+CONTEXT ACTUAL
+═══════════════════════════════════════════════════════════════
+- Selecció activa: ${hasSelection ? 'SÍ (l\'usuari ha seleccionat text específic)' : 'NO'}
+- Fitxer de coneixement: ${hasFile ? 'SÍ (usa\'l com a font)' : 'NO'}
+
+═══════════════════════════════════════════════════════════════
+MODES D'OPERACIÓ
 ═══════════════════════════════════════════════════════════════
 
-**MODE CHAT_ONLY** (Consultes, preguntes, resums, anàlisis)
+[MODE CONSULTOR] → "CHAT_ONLY"
+Quan: Preguntes, opinions, anàlisi, explicacions, resums informatius.
+Acció: Respon al xat. NO toques el document.
+
+[MODE ENGINYER] → "UPDATE_BY_ID"
+Quan: L'usuari demana CANVIS (millora, tradueix, corregeix, canvia, escurça, amplia).
+Acció: Edita NOMÉS els paràgrafs afectats via {{ID}}. Cirurgia, no reemplaçament.
+
+[MODE ARQUITECTE] → "REWRITE"
+Quan: L'usuari demana CREAR contingut NOU (escriu un email, genera una llista, crea des de zero).
+Acció: Genera estructura nova amb blocks tipats.
+
+═══════════════════════════════════════════════════════════════
+GESTIÓ DE CONTINUÏTAT (CRÍTIC)
+═══════════════════════════════════════════════════════════════
+Si l'usuari diu "una altra", "aquesta no m'agrada", "canvia-la", "no", "diferent":
+→ Es refereix al CANVI ANTERIOR. Proposa una alternativa DIFERENT.
+→ MAI tornis a una versió ja rebutjada.
+→ MAI preguntis "un altre què?" si tens context d'un canvi recent.
+
+Exemples:
+- "canvia X per Y" → ho fas → "una altra" = alternativa a Y, diferent de X i Y
+- "millora-ho" → ho fas → "no m'agrada" = nova versió, diferent de l'anterior
+
+═══════════════════════════════════════════════════════════════
+DIRECTIVES D'ESTIL
+═══════════════════════════════════════════════════════════════
+- Sigues AUDAÇ: "millora-ho" = millores substancials, no cosmètiques
+- Preserva format Markdown (**negreta**, *cursiva*) en edicions
+- Respon en l'IDIOMA de l'usuari
+- Si tens dubtes → PREGUNTA abans d'editar
+
+═══════════════════════════════════════════════════════════════
+FORMAT JSON (OBLIGATORI - SENSE TEXT EXTRA)
+═══════════════════════════════════════════════════════════════
+
+**CHAT_ONLY:**
 {
+  "thought": "[Anàlisi: intenció + localització + estratègia]",
   "mode": "CHAT_ONLY",
-  "chat_response": "La teva resposta aquí",
+  "chat_response": "Resposta al xat",
   "change_summary": "Consulta resolta"
 }
 
-**MODE UPDATE_BY_ID** (Edició de paràgrafs existents)
-El text ve amb marcadors {{ID}} per identificar cada paràgraf.
+**UPDATE_BY_ID:** (el text ve marcat amb {{ID}})
 {
+  "thought": "[Anàlisi: intenció + localització + estratègia]",
   "mode": "UPDATE_BY_ID",
   "updates": {
     "0": "Text nou pel paràgraf 0",
-    "2": "Text nou pel paràgraf 2"
+    "3": "Text nou pel paràgraf 3"
   },
-  "change_summary": "Descripció dels canvis"
+  "change_summary": "Descripció breu dels canvis"
 }
 
-**MODE REWRITE** (Generació de contingut completament nou)
+**REWRITE:**
 {
+  "thought": "[Anàlisi: intenció + localització + estratègia]",
   "mode": "REWRITE",
-  "change_summary": "Explicació breu",
   "blocks": [
-    { "type": "PARAGRAPH", "text": "Contingut" }
-  ]
+    { "type": "HEADING_1", "text": "Títol" },
+    { "type": "PARAGRAPH", "text": "Contingut" },
+    { "type": "BULLET_LIST", "text": "Element de llista" }
+  ],
+  "change_summary": "Descripció del contingut generat"
 }
 
 Tipus de blocks: HEADING_1, HEADING_2, HEADING_3, PARAGRAPH, BULLET_LIST, NUMBERED_LIST
@@ -120,7 +148,7 @@ Tipus de blocks: HEADING_1, HEADING_2, HEADING_3, PARAGRAPH, BULLET_LIST, NUMBER
   if (styleGuide && styleGuide.trim()) {
     prompt += `
 ═══════════════════════════════════════════════════════════════
-GUIA D'ESTIL
+GUIA D'ESTIL PERSONALITZADA
 ═══════════════════════════════════════════════════════════════
 ${styleGuide}
 `;
@@ -129,24 +157,9 @@ ${styleGuide}
   // Strict mode
   if (strictMode) {
     prompt += `
-⚠️ MODE ESTRICTE: Respon NOMÉS amb informació del context/fitxer. No inventis dades.
+⚠️ MODE ESTRICTE ACTIU: Respon NOMÉS amb informació verificable del context/fitxer. NO inventis dades.
 `;
   }
-
-  // File note
-  if (hasFile) {
-    prompt += `
-📎 FITXER ADJUNT: Usa'l com a font principal per respondre preguntes sobre el seu contingut.
-`;
-  }
-
-  prompt += `
-═══════════════════════════════════════════════════════════════
-IMPORTANT
-═══════════════════════════════════════════════════════════════
-- Sigues multilingüe: respon en l'idioma de l'usuari.
-- La teva resposta ha de ser NOMÉS el JSON, sense text addicional.
-`;
 
   return prompt;
 }
@@ -260,6 +273,17 @@ function parseAndValidate(rawText) {
   // ─── GUARANTEE change_summary ───
   if (!parsed.change_summary) {
     parsed.change_summary = parsed.userMessage || parsed.reason || "Operació completada.";
+  }
+
+  // ─── GUARANTEE thought (v2.7 - Chain of Thought) ───
+  if (!parsed.thought) {
+    // Generate a default thought based on the mode
+    const modeThoughts = {
+      'CHAT_ONLY': 'Intenció: consulta. Estratègia: respondre sense editar.',
+      'UPDATE_BY_ID': 'Intenció: edició. Estratègia: modificar paràgrafs específics.',
+      'REWRITE': 'Intenció: creació. Estratègia: generar contingut nou.'
+    };
+    parsed.thought = modeThoughts[parsed.mode] || 'Processant petició.';
   }
 
   return parsed;
@@ -420,27 +444,60 @@ INSTRUCCIÓ DE L'USUARI:
   userParts.push({ text: currentMessage });
   contents.push({ role: 'user', parts: userParts });
 
-  // 4. Call Gemini
+  // 4. Call Gemini with retry loop (v2.7)
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`;
-  const geminiResp = await fetch(geminiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: contents,
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.4  // Slightly higher for natural conversation
-      }
-    })
-  });
 
-  if (!geminiResp.ok) throw new Error("gemini_error: " + await geminiResp.text());
-  const geminiData = await geminiResp.json();
+  let parsedResponse = null;
+  let retryCount = 0;
+  const MAX_RETRIES = 1;
+  let currentContents = [...contents];
 
-  // 5. Parse and validate response
-  const rawResponse = geminiData.candidates[0].content.parts[0].text;
-  let parsedResponse = parseAndValidate(rawResponse);
+  while (retryCount <= MAX_RETRIES) {
+    const geminiResp = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: currentContents,
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: retryCount === 0 ? 0.4 : 0.2  // Lower temp on retry for more deterministic output
+        }
+      })
+    });
+
+    if (!geminiResp.ok) throw new Error("gemini_error: " + await geminiResp.text());
+    const geminiData = await geminiResp.json();
+
+    const rawResponse = geminiData.candidates[0].content.parts[0].text;
+
+    // Try to parse JSON
+    const directParse = safeParseJSON(rawResponse);
+
+    if (directParse !== null) {
+      // Valid JSON - proceed
+      parsedResponse = parseAndValidate(rawResponse);
+      break;
+    } else if (retryCount < MAX_RETRIES) {
+      // Invalid JSON - retry with error feedback
+      retryCount++;
+      currentContents = [...contents];
+      currentContents.push({
+        role: 'model',
+        parts: [{ text: rawResponse }]
+      });
+      currentContents.push({
+        role: 'user',
+        parts: [{
+          text: 'ERROR: La teva resposta no era JSON vàlid. Torna a intentar-ho amb NOMÉS el JSON, sense text extra. Recorda el format: { "thought": "...", "mode": "...", ... }'
+        }]
+      });
+    } else {
+      // Max retries reached - use fallback
+      parsedResponse = parseAndValidate(rawResponse);
+      break;
+    }
+  }
 
   // 5.1 Mode enforcement (v2.6.2)
   const effectiveMode = user_mode || 'auto';
@@ -470,11 +527,13 @@ INSTRUCCIÓ DE L'USUARI:
     data: parsedResponse,
     credits_remaining: creditsResult.credits_remaining || 0,
     _debug: {
-      version: "2.6.2",
+      version: "2.7",
       has_selection: has_selection,
       history_length: chat_history?.length || 0,
       has_last_edit: !!last_edit,
-      user_mode: effectiveMode
+      user_mode: effectiveMode,
+      retries: retryCount,
+      thought: parsedResponse.thought
     }
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
