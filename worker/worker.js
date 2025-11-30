@@ -1,11 +1,15 @@
 /**
- * SIDECAR CORE API v2.7 - Document Engineering Engine
+ * SIDECAR CORE API v2.8 - Banned Expressions & Hybrid Validator
  *
- * v2.7 features:
- * - NEW: "Motor d'Enginyeria" system prompt (Lovable-style)
- * - NEW: Mandatory "thought" field (Chain of Thought)
- * - NEW: Retry loop for invalid JSON (1 retry with feedback)
- * - Improved continuity handling ("una altra", "no m'agrada")
+ * v2.8 features:
+ * - NEW: Banned Expressions (negative_constraints)
+ * - NEW: Hybrid Validator (local regex + LLM retry)
+ * - NEW: Pre-validation warning for input containing banned words
+ *
+ * v2.7 features (preserved):
+ * - "Motor d'Enginyeria" system prompt (Lovable-style)
+ * - Mandatory "thought" field (Chain of Thought)
+ * - Retry loop for invalid JSON (1 retry with feedback)
  *
  * v2.6.x features (preserved):
  * - Mode selector (auto | edit | chat)
@@ -15,6 +19,77 @@
 // ═══════════════════════════════════════════════════════════════
 // UTILITY FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
+
+/**
+ * v2.8: Check if text contains any banned words
+ * Returns array of found banned words, or empty array if clean
+ */
+function findBannedWords(text, bannedWords) {
+  if (!bannedWords || !Array.isArray(bannedWords) || bannedWords.length === 0) {
+    return [];
+  }
+
+  const found = [];
+  const lowerText = text.toLowerCase();
+
+  for (const word of bannedWords) {
+    if (!word) continue;
+    const lowerWord = word.toLowerCase();
+    // Use word boundary matching to avoid partial matches
+    const regex = new RegExp('\\b' + escapeRegex(lowerWord) + '\\b', 'i');
+    if (regex.test(lowerText)) {
+      found.push(word);
+    }
+  }
+
+  return found;
+}
+
+/**
+ * Escape special regex characters
+ */
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * v2.8: Extract all text from a parsed response for validation
+ */
+function getOutputText(parsedResponse) {
+  if (!parsedResponse) return '';
+
+  let text = '';
+
+  // Chat response
+  if (parsedResponse.chat_response) {
+    text += ' ' + parsedResponse.chat_response;
+  }
+
+  // Change summary
+  if (parsedResponse.change_summary) {
+    text += ' ' + parsedResponse.change_summary;
+  }
+
+  // Updates (UPDATE_BY_ID mode)
+  if (parsedResponse.updates && typeof parsedResponse.updates === 'object') {
+    for (const value of Object.values(parsedResponse.updates)) {
+      if (typeof value === 'string') {
+        text += ' ' + value;
+      }
+    }
+  }
+
+  // Blocks (REWRITE mode)
+  if (parsedResponse.blocks && Array.isArray(parsedResponse.blocks)) {
+    for (const block of parsedResponse.blocks) {
+      if (block.text) {
+        text += ' ' + block.text;
+      }
+    }
+  }
+
+  return text;
+}
 
 async function hashKey(licenseKey) {
   const msgBuffer = new TextEncoder().encode(licenseKey);
@@ -45,7 +120,7 @@ async function useCredits(env, licenseHash, docMetadata) {
 // SYSTEM PROMPT v3 - "Document Engineering Engine" (Lovable-style)
 // ═══════════════════════════════════════════════════════════════
 
-function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode) {
+function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode, negativeConstraints) {
   let prompt = `
 ═══════════════════════════════════════════════════════════════
 IDENTITAT
@@ -158,6 +233,22 @@ ${styleGuide}
   if (strictMode) {
     prompt += `
 ⚠️ MODE ESTRICTE ACTIU: Respon NOMÉS amb informació verificable del context/fitxer. NO inventis dades.
+`;
+  }
+
+  // v2.8: Negative constraints (banned words)
+  if (negativeConstraints && Array.isArray(negativeConstraints) && negativeConstraints.length > 0) {
+    prompt += `
+═══════════════════════════════════════════════════════════════
+⛔ PARAULES PROHIBIDES (CRÍTIC - MAI USAR)
+═══════════════════════════════════════════════════════════════
+L'usuari ha prohibit EXPRESSAMENT les següents paraules/frases.
+NO les utilitzis MAI en cap circumstància, ni en edicions ni en respostes.
+Si el text original les conté, substitueix-les per sinònims adequats.
+
+LLISTA NEGRA: ${negativeConstraints.join(', ')}
+
+Si alguna d'aquestes paraules apareix al text que estàs editant, REEMPLAÇA-LA automàticament.
 `;
   }
 
@@ -348,7 +439,8 @@ async function handleChat(body, env, corsHeaders) {
     has_selection,
     chat_history,  // Conversational memory
     last_edit,     // v2.6: Last edit memory for "una altra" cases
-    user_mode      // v2.6.2: User-selected mode (auto | edit | chat)
+    user_mode,     // v2.6.2: User-selected mode (auto | edit | chat)
+    negative_constraints  // v2.8: Banned words/phrases
   } = body;
 
   if (!license_key) throw new Error("missing_license");
@@ -363,7 +455,8 @@ async function handleChat(body, env, corsHeaders) {
     has_selection || false,
     !!knowledge_file_uri,
     style_guide,
-    strict_mode
+    strict_mode,
+    negative_constraints  // v2.8: Banned words
   );
 
   // 3. Build contents array with chat history (MEMORY)
@@ -444,13 +537,14 @@ INSTRUCCIÓ DE L'USUARI:
   userParts.push({ text: currentMessage });
   contents.push({ role: 'user', parts: userParts });
 
-  // 4. Call Gemini with retry loop (v2.7)
+  // 4. Call Gemini with retry loop (v2.7 + v2.8 banned word validation)
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`;
 
   let parsedResponse = null;
   let retryCount = 0;
-  const MAX_RETRIES = 1;
+  const MAX_RETRIES = 2;  // v2.8: Increased to allow for banned word retry
   let currentContents = [...contents];
+  let bannedWordRetry = false;
 
   while (retryCount <= MAX_RETRIES) {
     const geminiResp = await fetch(geminiUrl, {
@@ -475,8 +569,36 @@ INSTRUCCIÓ DE L'USUARI:
     const directParse = safeParseJSON(rawResponse);
 
     if (directParse !== null) {
-      // Valid JSON - proceed
+      // Valid JSON - now check for banned words (v2.8)
       parsedResponse = parseAndValidate(rawResponse);
+
+      // v2.8: Validate output doesn't contain banned words
+      if (negative_constraints && negative_constraints.length > 0) {
+        const outputText = getOutputText(parsedResponse);
+        const foundBanned = findBannedWords(outputText, negative_constraints);
+
+        if (foundBanned.length > 0 && !bannedWordRetry && retryCount < MAX_RETRIES) {
+          // Banned words found - retry with specific feedback
+          bannedWordRetry = true;
+          retryCount++;
+          currentContents = [...contents];
+          currentContents.push({
+            role: 'model',
+            parts: [{ text: rawResponse }]
+          });
+          currentContents.push({
+            role: 'user',
+            parts: [{
+              text: `ERROR: La teva resposta conté paraules PROHIBIDES: "${foundBanned.join('", "')}".
+Aquestes paraules estan a la LLISTA NEGRA de l'usuari i MAI s'han d'usar.
+REESCRIU la resposta substituint aquestes paraules per sinònims acceptables.`
+            }]
+          });
+          continue;  // Retry
+        }
+      }
+
+      // All validations passed
       break;
     } else if (retryCount < MAX_RETRIES) {
       // Invalid JSON - retry with error feedback
@@ -527,12 +649,14 @@ INSTRUCCIÓ DE L'USUARI:
     data: parsedResponse,
     credits_remaining: creditsResult.credits_remaining || 0,
     _debug: {
-      version: "2.7",
+      version: "2.8",
       has_selection: has_selection,
       history_length: chat_history?.length || 0,
       has_last_edit: !!last_edit,
       user_mode: effectiveMode,
       retries: retryCount,
+      banned_word_retry: bannedWordRetry,
+      negative_constraints_count: negative_constraints?.length || 0,
       thought: parsedResponse.thought
     }
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

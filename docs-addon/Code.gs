@@ -90,6 +90,10 @@ function clearKnowledgeFile() {
 // Guarda l'últim fragment editat per permetre "una altra", "aquesta no m'agrada", etc.
 const LAST_EDIT_KEY = 'SIDECAR_LAST_EDIT';
 
+// --- BANNED WORDS (v2.8) ---
+// Paraules que la IA mai hauria d'usar
+const BANNED_WORDS_KEY = 'SIDECAR_BANNED_WORDS';
+
 function loadLastEdit() {
   const props = PropertiesService.getDocumentProperties();
   const json = props.getProperty(LAST_EDIT_KEY);
@@ -169,6 +173,35 @@ function revertLastEdit() {
   }
 }
 
+// --- BANNED WORDS (v2.8) ---
+
+/**
+ * Retorna la llista de paraules prohibides
+ */
+function getBannedWords() {
+  try {
+    const props = PropertiesService.getUserProperties();
+    const json = props.getProperty(BANNED_WORDS_KEY);
+    if (!json) return [];
+    return JSON.parse(json);
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Guarda la llista de paraules prohibides
+ */
+function saveBannedWords(words) {
+  const props = PropertiesService.getUserProperties();
+  if (words && Array.isArray(words) && words.length > 0) {
+    props.setProperty(BANNED_WORDS_KEY, JSON.stringify(words));
+  } else {
+    props.deleteProperty(BANNED_WORDS_KEY);
+  }
+  return { success: true };
+}
+
 // --- PUJADA DE FITXERS (PROXY VIA WORKER) ---
 function uploadFileToWorker(base64Data, mimeType, fileName) {
   const settingsStr = getSettings();
@@ -206,7 +239,7 @@ function uploadFileToWorker(base64Data, mimeType, fileName) {
   }
 }
 
-// --- NUCLI DEL PROCESSAMENT (v2.6.2 amb mode selector) ---
+// --- NUCLI DEL PROCESSAMENT (v2.8 amb banned words) ---
 function processUserCommand(instruction, chatHistory, userMode) {
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
@@ -218,6 +251,9 @@ function processUserCommand(instruction, chatHistory, userMode) {
 
   // v2.6: Carregar l'últim edit per contexte
   const lastEdit = loadLastEdit();
+
+  // v2.8: Carregar paraules prohibides
+  const bannedWords = getBannedWords();
 
   const settings = JSON.parse(getSettings());
   if (!settings.license_key) throw new Error("Falta llicència.");
@@ -269,6 +305,7 @@ function processUserCommand(instruction, chatHistory, userMode) {
     chat_history: chatHistory || [],
     last_edit: lastEdit,
     user_mode: userMode || 'auto',
+    negative_constraints: bannedWords, // v2.8: Paraules prohibides
     pinned_prefs: {
       language: 'ca',
       tone: 'tècnic però entenedor',
@@ -303,6 +340,8 @@ function processUserCommand(instruction, chatHistory, userMode) {
       };
     }
 
+    let lastEditWord = null; // v2.8: Paraula per al botó "Prohibir"
+
     if (aiData.mode === 'UPDATE_BY_ID') {
       let capturedLastEdit = null;
       const existingLastEdit = loadLastEdit(); // v2.6.1: Carregar ABANS del loop
@@ -321,11 +360,24 @@ function processUserCommand(instruction, chatHistory, userMode) {
                                     ? existingLastEdit.originalText
                                     : currentDocText;
 
+          const cleanNewText = newText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+
           capturedLastEdit = {
             targetId: id,
             originalText: preservedOriginal,
-            currentText: newText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1')
+            currentText: cleanNewText
           };
+
+          // v2.8: Extraure la primera paraula diferent per al botó "Prohibir"
+          // Comparem paraules i trobem la primera diferència significant
+          const oldWords = preservedOriginal.toLowerCase().split(/\s+/);
+          const newWords = cleanNewText.toLowerCase().split(/\s+/);
+          for (let i = 0; i < newWords.length; i++) {
+            if (!oldWords.includes(newWords[i]) && newWords[i].length > 3) {
+              lastEditWord = newWords[i];
+              break;
+            }
+          }
         }
       }
       if (capturedLastEdit) {
@@ -343,7 +395,8 @@ function processUserCommand(instruction, chatHistory, userMode) {
       ok: true,
       ai_response: aiData.change_summary,
       credits: json.credits_remaining,
-      mode: 'edit'
+      mode: 'edit',
+      last_edit_word: lastEditWord // v2.8: Per al botó "Prohibir"
     };
 
   } catch (e) {

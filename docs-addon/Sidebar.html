@@ -1099,6 +1099,84 @@
       }
 
       /* ═══════════════════════════════════════════════════════════
+         BANNED WORD BUTTON (v2.8)
+         ═══════════════════════════════════════════════════════════ */
+
+      .ban-word-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--text-muted);
+        background: var(--bg-elevated);
+        padding: 2px 6px;
+        border-radius: var(--radius-sm);
+        margin-left: var(--space-sm);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        vertical-align: middle;
+      }
+
+      .ban-word-btn:hover {
+        color: var(--error);
+        border-color: var(--error);
+        background: var(--error-muted);
+      }
+
+      .ban-word-btn:active {
+        transform: scale(0.95);
+      }
+
+      /* Banned Words List in Settings */
+      .banned-words-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+        margin-top: var(--space-sm);
+      }
+
+      .banned-word-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: var(--error-muted);
+        border: 1px solid var(--error);
+        border-radius: var(--radius-full);
+        font-size: 11px;
+        color: var(--error);
+      }
+
+      .banned-word-tag .remove-btn {
+        width: 14px;
+        height: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        color: var(--error);
+        cursor: pointer;
+        font-size: 10px;
+        opacity: 0.7;
+        transition: opacity 0.15s;
+      }
+
+      .banned-word-tag .remove-btn:hover {
+        opacity: 1;
+      }
+
+      .banned-words-empty {
+        font-size: 11px;
+        color: var(--text-muted);
+        font-style: italic;
+        padding: var(--space-sm) 0;
+      }
+
+      /* ═══════════════════════════════════════════════════════════
          UTILITIES
          ═══════════════════════════════════════════════════════════ */
 
@@ -1255,6 +1333,23 @@
         </label>
       </div>
 
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <span class="icon">🚫</span>
+          <div>
+            <div class="title">Paraules Prohibides</div>
+            <div class="subtitle">La IA mai usara aquestes paraules</div>
+          </div>
+        </div>
+        <div class="banned-words-list" id="bannedWordsList">
+          <div class="banned-words-empty">Cap paraula prohibida</div>
+        </div>
+        <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
+          <input type="text" class="form-input" id="newBannedWord" placeholder="Afegir paraula..." style="flex: 1;">
+          <button class="btn btn-secondary" onclick="addBannedWord()" style="flex: none; padding: 8px 12px;">+ Afegir</button>
+        </div>
+      </div>
+
       <button class="save-btn" id="saveBtn" onclick="saveSettings()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -1319,6 +1414,7 @@
       let selectedEmoji = '⚡';
       let currentTab = 'chat';
       let currentMode = 'auto'; // auto | edit | chat
+      let bannedWords = []; // v2.8: Banned expressions
 
       const MODES = {
         auto: { icon: '✨', label: 'Auto' },
@@ -1369,6 +1465,17 @@
           document.getElementById('strictMode').checked = currentSettings.strict_mode || false;
           if (!currentSettings.license_key) switchTab('brain');
         }).getSettings();
+
+        // v2.8: Load banned words
+        loadBannedWords();
+
+        // Enter key handler for banned word input
+        document.getElementById('newBannedWord').addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            addBannedWord();
+          }
+        });
 
         // Load file info
         google.script.run.withSuccessHandler(function(info) {
@@ -1539,7 +1646,8 @@
           .withSuccessHandler(function(res) {
             hideThinking();
             btn.disabled = false;
-            addBubble('ai', res.ai_response, res.mode === 'edit');
+            // v2.8: Pass last_edit_word for ban button
+            addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
             if (res.credits !== undefined) {
               document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
             }
@@ -1552,13 +1660,25 @@
           .processUserCommand(text, getRecentHistory(), getCurrentMode());
       }
 
-      function addBubble(type, text, isEdit) {
+      function addBubble(type, text, isEdit, lastEditWord) {
         const container = document.getElementById('chatHistory');
         const bubble = document.createElement('div');
         bubble.className = 'msg ' + type;
 
         if (type === 'ai' && isEdit) {
-          bubble.innerHTML = '<div class="edit-badge">Document modificat<button class="revert-btn" onclick="revertLastEdit(this)" title="Desfer canvi"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Desfer</button></div>' + text;
+          let badgeHtml = '<div class="edit-badge">Document modificat' +
+            '<button class="revert-btn" onclick="revertLastEdit(this)" title="Desfer canvi">' +
+            '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Desfer</button>';
+
+          // v2.8: Add "ban word" button if we have a recently changed word
+          if (lastEditWord) {
+            badgeHtml += '<button class="ban-word-btn" onclick="addToBannedFromChat(\'' +
+              lastEditWord.replace(/'/g, "\\'") + '\')" title="No usar mai aquesta paraula">' +
+              '🚫 Prohibir</button>';
+          }
+
+          badgeHtml += '</div>';
+          bubble.innerHTML = badgeHtml + text;
         } else {
           bubble.innerText = text;
         }
@@ -1676,7 +1796,8 @@
           .withSuccessHandler(function(res) {
             hideThinking();
             document.getElementById('sendBtn').disabled = false;
-            addBubble('ai', res.ai_response, res.mode === 'edit');
+            // v2.8: Pass last_edit_word for ban button
+            addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
             if (res.credits !== undefined) {
               document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
             }
@@ -1766,6 +1887,120 @@
         google.script.run.withSuccessHandler(function() {
           showFileStatus(null);
         }).clearKnowledgeFile();
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // BANNED WORDS (v2.8)
+      // ═══════════════════════════════════════════════════════════
+
+      function loadBannedWords() {
+        google.script.run
+          .withSuccessHandler(function(words) {
+            bannedWords = words || [];
+            renderBannedWordsList();
+          })
+          .withFailureHandler(function(err) {
+            console.error('Error loading banned words:', err);
+            bannedWords = [];
+          })
+          .getBannedWords();
+      }
+
+      function renderBannedWordsList() {
+        const container = document.getElementById('bannedWordsList');
+        if (!container) return;
+
+        if (bannedWords.length === 0) {
+          container.innerHTML = '<div class="banned-words-empty">Cap paraula prohibida</div>';
+          return;
+        }
+
+        container.innerHTML = bannedWords.map(function(word, index) {
+          return '<span class="banned-word-tag">' +
+            '<span>' + escapeHtml(word) + '</span>' +
+            '<button class="remove-btn" onclick="removeBannedWord(' + index + ')">✕</button>' +
+            '</span>';
+        }).join('');
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      function addBannedWord() {
+        const input = document.getElementById('newBannedWord');
+        const word = input.value.trim();
+
+        if (!word) return;
+        if (bannedWords.includes(word.toLowerCase())) {
+          alert('Aquesta paraula ja esta a la llista.');
+          return;
+        }
+
+        bannedWords.push(word.toLowerCase());
+        input.value = '';
+
+        google.script.run
+          .withSuccessHandler(function() {
+            renderBannedWordsList();
+            showToast('🚫 "' + word + '" afegit a prohibides');
+          })
+          .withFailureHandler(function(err) {
+            bannedWords.pop(); // Rollback
+            alert('Error: ' + err.message);
+          })
+          .saveBannedWords(bannedWords);
+      }
+
+      function removeBannedWord(index) {
+        const removed = bannedWords.splice(index, 1)[0];
+
+        google.script.run
+          .withSuccessHandler(function() {
+            renderBannedWordsList();
+            showToast('✓ "' + removed + '" eliminat de prohibides');
+          })
+          .withFailureHandler(function(err) {
+            bannedWords.splice(index, 0, removed); // Rollback
+            alert('Error: ' + err.message);
+          })
+          .saveBannedWords(bannedWords);
+      }
+
+      function addToBannedFromChat(word) {
+        if (!word || bannedWords.includes(word.toLowerCase())) return;
+
+        bannedWords.push(word.toLowerCase());
+
+        google.script.run
+          .withSuccessHandler(function() {
+            renderBannedWordsList();
+            showToast('🚫 "' + word + '" afegit a prohibides');
+          })
+          .withFailureHandler(function(err) {
+            bannedWords.pop(); // Rollback
+            console.error('Error adding banned word:', err);
+          })
+          .saveBannedWords(bannedWords);
+      }
+
+      function showToast(message) {
+        // Create a simple toast notification
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); ' +
+          'background: var(--bg-tertiary); color: var(--text-primary); padding: 8px 16px; ' +
+          'border-radius: var(--radius-md); font-size: 12px; box-shadow: var(--shadow-md); ' +
+          'z-index: 1000; animation: msgAppear 0.3s ease;';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(function() {
+          toast.style.opacity = '0';
+          toast.style.transition = 'opacity 0.3s';
+          setTimeout(function() { toast.remove(); }, 300);
+        }, 2000);
       }
 
       // ═══════════════════════════════════════════════════════════
