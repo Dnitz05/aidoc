@@ -2,7 +2,7 @@
 
 **"Lovable for Google Docs"** - Motor d'Enginyeria Documental amb IA
 
-[![Version](https://img.shields.io/badge/version-2.8-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-3.1-blue.svg)]()
 [![Platform](https://img.shields.io/badge/platform-Google%20Docs-green.svg)]()
 [![AI](https://img.shields.io/badge/AI-Gemini%202.0-orange.svg)]()
 
@@ -25,18 +25,19 @@ SideCar         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 
 ## Features
 
-### Core (v2.8)
+### Core (v3.1)
 
 | Feature | Descripció |
 |---------|------------|
-| **Banned Expressions** | Paraules/frases que la IA mai usarà (Memòria Negativa) |
+| **Shadow Validator** | Sistema immunitari: valida i auto-corregeix respostes |
+| **Context Engine** | Entén l'estructura del document (headings, seccions, entitats) |
+| **Event Sourcing** | Historial complet d'edicions, revert qualsevol canvi |
+| **Auto-Structure** | Converteix títols visuals (negreta) a H2 reals |
+| **Banned Expressions** | Paraules/frases que la IA mai usarà |
 | **Mode Selector** | Auto / Edit / Xat - control total sobre el comportament |
 | **Chain of Thought** | La IA raona abans d'actuar (`thought` obligatori) |
-| **Atomic Operations** | `UPDATE_BY_ID` - edita paràgrafs específics, no reescriu tot |
-| **LastEdit Memory** | Recorda l'últim canvi per "una altra", "no m'agrada" |
-| **Revert Button** | Desfer l'últim canvi amb un clic |
-| **Retry Loop** | Auto-correcció si el JSON és invàlid |
-| **Hybrid Validator** | Validació local + LLM per paraules prohibides |
+| **Atomic Operations** | `UPDATE_BY_ID` - edita paràgrafs específics |
+| **Time Budget** | Safety cutoff de 25s per evitar timeouts |
 | **Receipts** | Macros personalitzades (Custom Actions) |
 | **Knowledge Files** | Adjunta PDFs/TXT com a context |
 
@@ -44,6 +45,8 @@ SideCar         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 
 - Sidebar integrat a Google Docs
 - Temes Light/Dark
+- Skeleton Preview amb badges de color
+- Historial d'edicions navegable
 - Indicador de "pensant"
 - Historial de xat (12 missatges)
 
@@ -57,24 +60,28 @@ SideCar         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │                   SIDEBAR (HTML)                     │    │
 │  │  • Chat UI          • Mode Selector                  │    │
+│  │  • Skeleton Preview • Edit History                   │    │
 │  │  • Receipts         • Settings                       │    │
 │  └──────────────────────┬──────────────────────────────┘    │
 │                         │                                    │
 │  ┌──────────────────────▼──────────────────────────────┐    │
-│  │                   CODE.GS                            │    │
-│  │  • processUserCommand()   • lastEdit Memory          │    │
-│  │  • revertLastEdit()       • Receipts CRUD            │    │
+│  │              CODE.GS + DOCSCANNER.GS                 │    │
+│  │  • processUserCommand()   • getDocSkeleton()         │    │
+│  │  • Event Sourcing         • applyAutoStructure()     │    │
 │  └──────────────────────┬──────────────────────────────┘    │
 └─────────────────────────┼───────────────────────────────────┘
                           │ HTTPS
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                 CLOUDFLARE WORKER                            │
+│                 CLOUDFLARE WORKER (v3.1)                     │
 │  ┌─────────────────────────────────────────────────────┐    │
+│  │  ┌─────────────────────────────────────────────┐    │    │
+│  │  │           SHADOW VALIDATOR                   │    │    │
+│  │  │  • validateResponse()  • Time Budget (25s)   │    │    │
+│  │  │  • buildRetryFeedback() • Graceful Degrad.   │    │    │
+│  │  └─────────────────────────────────────────────┘    │    │
 │  │  • System Prompt v3 ("Motor d'Enginyeria")          │    │
-│  │  • Mode Enforcement (auto/edit/chat)                 │    │
-│  │  • Retry Loop (JSON validation)                      │    │
-│  │  • safeParseJSON + modeMap (robustness)              │    │
+│  │  • Event Sourcing (edit_events)                      │    │
 │  └──────────────────────┬──────────────────────────────┘    │
 │                         │                                    │
 │            ┌────────────┴────────────┐                      │

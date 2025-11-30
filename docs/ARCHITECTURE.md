@@ -1,4 +1,4 @@
-# Arquitectura Tècnica - SideCar
+# Arquitectura Tècnica - SideCar v3.1
 
 ## Visió General
 
@@ -176,37 +176,56 @@ Backend serverless que processa les peticions i comunica amb Gemini.
 
 ```sql
 -- Llicències
-license_keys (
-  key_hash TEXT PRIMARY KEY,
-  email TEXT,
-  credits INTEGER DEFAULT 100,
+licenses (
+  id UUID PRIMARY KEY,
+  license_key_hash TEXT UNIQUE,
+  credits_remaining INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ,
-  valid_until TIMESTAMPTZ
+  updated_at TIMESTAMPTZ
+)
+
+-- Ús de llicències
+license_usages (
+  id BIGINT PRIMARY KEY,
+  license_id UUID REFERENCES licenses(id),
+  cost INTEGER,
+  operation TEXT,
+  metadata JSONB,
+  used_at TIMESTAMPTZ
 )
 
 -- Receptes d'usuari
 user_receipts (
   id UUID PRIMARY KEY,
   license_key_hash TEXT,
-  emoji TEXT,
-  name TEXT,
+  label TEXT,
   instruction TEXT,
+  icon TEXT DEFAULT '?',
   created_at TIMESTAMPTZ
 )
 
--- [Futur v2.9] Historial d'events
+-- Historial d'edicions (v3.0 Event Sourcing)
 edit_events (
-  id UUID PRIMARY KEY,
-  doc_id TEXT,
-  license_key_hash TEXT,
-  event_type TEXT,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  license_key_hash TEXT NOT NULL,
+  doc_id TEXT NOT NULL,
+  event_type TEXT NOT NULL CHECK (event_type IN ('UPDATE_BY_ID', 'REWRITE', 'REVERT', 'AUTO_STRUCTURE')),
   target_id INTEGER,
   before_text TEXT,
-  after_text TEXT,
+  after_text TEXT NOT NULL,
   user_instruction TEXT,
   thought TEXT,
-  created_at TIMESTAMPTZ
+  ai_mode TEXT,
+  reverted_at TIMESTAMPTZ,
+  reverted_by UUID REFERENCES edit_events(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
 )
+
+-- Índexs per edit_events
+CREATE INDEX idx_edit_events_doc ON edit_events(doc_id, created_at DESC);
+CREATE INDEX idx_edit_events_license ON edit_events(license_key_hash, created_at DESC);
+CREATE INDEX idx_edit_events_active ON edit_events(doc_id, created_at DESC) WHERE reverted_at IS NULL;
 ```
 
 ---
@@ -307,14 +326,18 @@ USING (license_key_hash = current_user_hash());
 ```
 sidecar/
 ├── docs-addon/
-│   ├── Code.gs              # Backend Apps Script
+│   ├── Code.gs              # Backend Apps Script principal
+│   ├── DocScanner.gs        # Context Engine (v2.9)
 │   ├── Sidebar.html         # Frontend HTML/CSS/JS
 │   └── appsscript.json      # Manifest
 │
 ├── worker/
-│   ├── worker.js            # Cloudflare Worker
+│   ├── worker.js            # Cloudflare Worker (v3.1 Shadow Validator)
 │   ├── package.json         # Dependencies
 │   └── wrangler.toml        # Config deployment
+│
+├── supabase/
+│   └── edit_events.sql      # Schema Event Sourcing (v3.0)
 │
 ├── docs/
 │   ├── ARCHITECTURE.md      # Aquest fitxer
@@ -354,14 +377,27 @@ sidecar/
 **Response (èxit):**
 ```json
 {
-  "mode": "UPDATE_BY_ID",
-  "id": 3,
-  "text": "Texto traducido...",
-  "message": "He traduït el paràgraf.",
-  "thought": "Raonament de la IA...",
-  "_debug": {
+  "status": "ok",
+  "data": {
+    "mode": "UPDATE_BY_ID",
+    "updates": { "3": "Texto traducido..." },
+    "change_summary": "He traduït el paràgraf.",
+    "thought": "Raonament de la IA..."
+  },
+  "credits_remaining": 95,
+  "event_id": "uuid-del-event",
+  "_meta": {
+    "validation_passed": true,
     "retries": 0,
-    "thought": "..."
+    "timeout_aborted": false,
+    "elapsed_ms": 1234
+  },
+  "_debug": {
+    "version": "3.1",
+    "has_selection": false,
+    "user_mode": "auto",
+    "validation_passed": true,
+    "retries": 0
   }
 }
 ```
@@ -386,13 +422,40 @@ Camp `thought` obligatori en cada resposta. La IA raona abans d'actuar, seguint 
 2. Localització → On afecta?
 3. Estratègia → Mínima operació necessària?
 
-### 3. Retry Loop
-Auto-correcció per respostes JSON invàlides:
+### 3. Shadow Validator (v3.1)
+Sistema immunitari que valida i auto-corregeix respostes:
 ```
-Petició → Gemini → JSON invàlid? → Feedback → Retry (1x) → Resposta
+Petició → Gemini → validateResponse() → Vàlid? → Retorna
+                         ↓ No
+                  buildRetryFeedback() → Retry (màx 2)
+                         ↓ Timeout?
+                  Graceful Degradation → _meta.warning
 ```
 
-### 4. Mode Enforcement
+Components:
+- `validateResponse()`: JSON + Banned Words + Length + Fields
+- `buildRetryFeedback()`: Feedback específic per tipus d'error
+- `TIMEOUT_CUTOFF`: 25s (GAS timeout = 30s)
+- `_meta`: Metadades de qualitat a cada resposta
+
+### 4. Context Engine (v2.9)
+Anàlisi estructural del document:
+```
+Document → DocScanner.gs → Skeleton {
+  structure: [H1, H2, BOLD_H, SECTION...],
+  entities: [dates, €, %],
+  stats: { chars, paragraphs, scan_time }
+}
+```
+
+### 5. Event Sourcing (v3.0)
+Historial complet d'edicions:
+```
+Edit → saveEditEvent() → Supabase → getEditHistory() → UI
+                                  → revertEdit() → Restore
+```
+
+### 6. Mode Enforcement
 El mode seleccionat per l'usuari s'aplica al prompt:
 - `auto`: IA decideix
 - `edit`: Força edició
@@ -423,10 +486,9 @@ El mode seleccionat per l'usuari s'aplica al prompt:
 ## Evolució Futura
 
 Veure [ROADMAP.md](../ROADMAP.md) per plans de:
-- v2.8: Document Map (context engine)
-- v2.9: Event Sourcing (historial complet)
-- v3.0: Preview Mode (shadow state)
+- v3.2: Preview Mode (visual diff abans d'aplicar)
+- v4.0: GCP Productization (OAuth, Marketplace)
 
 ---
 
-*Última actualització: 2024-11-30*
+*Última actualització: 2024-11-30 (v3.1)*

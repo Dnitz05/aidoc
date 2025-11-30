@@ -18,7 +18,7 @@ Construir el **motor d'enginyeria documental** més potent, aplicant els mateixo
 
 ---
 
-## Estat Actual: v2.8
+## Estat Actual: v3.1
 
 ```
 ████████████████████████████████████████ 100%
@@ -33,13 +33,17 @@ Construir el **motor d'enginyeria documental** més potent, aplicant els mateixo
 ✅ Dark/Light Theme
 ✅ Banned Expressions (Memòria Negativa)
 ✅ Hybrid Validator (Local + LLM)
+✅ Context Engine (DocScanner + Skeleton)
+✅ Auto-Structure (Visual → H2)
+✅ Event Sourcing (edit_events)
+✅ Shadow Validator (Time Budget + Graceful Degradation)
 ```
 
 ---
 
 ## Pròximes Versions
 
-### v2.9 - Context Engine (Document Map)
+### v2.9 - Context Engine (Document Map) ✅ COMPLETAT
 
 **Objectiu:** Entendre l'ESTRUCTURA del document, no només el text.
 
@@ -49,17 +53,18 @@ Construir el **motor d'enginyeria documental** més potent, aplicant els mateixo
 Prioritat: 🔴 ALTA
 Complexitat: Mitjana
 Impacte: Alt (docs llargs, context efficiency)
+Estat: ✅ COMPLETAT (2024-11-30)
 ```
 
 #### Features
 
 | Feature | Descripció | Estat |
 |---------|------------|-------|
-| Document Structure Extraction | Extreure H1, H2, H3, paràgrafs | ⏳ Pendent |
-| Section Hierarchy | Arbre de seccions amb fills | ⏳ Pendent |
-| Entity Extraction | Noms, dates, llocs, conceptes | ⏳ Pendent |
-| Context Pruning | Resum per docs > 5000 paraules | ⏳ Pendent |
-| Active Section Focus | Enviar només secció activa + mapa | ⏳ Pendent |
+| Document Structure Extraction | Extreure H1, H2, H3, paràgrafs | ✅ Fet |
+| Section Hierarchy | Arbre de seccions amb fills | ✅ Fet |
+| Entity Extraction | Dates, imports (€/$), percentatges | ✅ Fet |
+| Visual Heading Detection | Negreta, majúscules, numeració | ✅ Fet |
+| Auto-Structure | Convertir BOLD_H → H2 | ✅ Fet |
 
 #### Format proposat
 
@@ -93,7 +98,7 @@ Impacte: Alt (docs llargs, context efficiency)
 
 ---
 
-### v3.0 - Event Sourcing (Edit History)
+### v3.0 - Event Sourcing (Edit History) ✅ COMPLETAT
 
 **Objectiu:** Historial complet de canvis, no només l'últim.
 
@@ -103,17 +108,18 @@ Impacte: Alt (docs llargs, context efficiency)
 Prioritat: 🟡 MITJANA
 Complexitat: Mitjana
 Impacte: Alt (undo chain, analytics, debug)
+Estat: ✅ COMPLETAT (2024-11-30)
 ```
 
 #### Features
 
 | Feature | Descripció | Estat |
 |---------|------------|-------|
-| Edit Events Table | `edit_events` a Supabase | ⏳ Pendent |
-| Full History | Guardar tots els canvis, no només lastEdit | ⏳ Pendent |
-| Undo Any Change | Desfer qualsevol canvi de l'historial | ⏳ Pendent |
-| Replay/Debug | Reproduir seqüència de canvis | ⏳ Pendent |
-| Analytics | Estadístiques d'ús per usuari/doc | ⏳ Pendent |
+| Edit Events Table | `edit_events` a Supabase | ✅ Fet |
+| Full History | Guardar tots els canvis, no només lastEdit | ✅ Fet |
+| Undo Any Change | Desfer qualsevol canvi de l'historial | ✅ Fet |
+| Replay/Debug | Reproduir seqüència de canvis | ⏳ Futur |
+| Analytics | Estadístiques d'ús per usuari/doc | ⏳ Futur |
 
 #### Schema proposat
 
@@ -161,7 +167,32 @@ CREATE TABLE edit_events (
 
 ---
 
-### v3.1 - Preview Mode (Shadow State)
+### v3.1 - Shadow Validator ✅ COMPLETAT
+
+**Objectiu:** Sistema immunitari que valida i auto-corregeix respostes.
+
+**Inspiració:** "Mai preguntis a una IA el que puguis saber amb un `if`"
+
+```
+Prioritat: 🔴 ALTA
+Complexitat: Mitjana
+Impacte: Alt (qualitat, robustesa, timeouts)
+Estat: ✅ COMPLETAT (2024-11-30)
+```
+
+#### Features
+
+| Feature | Descripció | Estat |
+|---------|------------|-------|
+| Unified Validation | `validateResponse()` centralitzada | ✅ Fet |
+| Time Budget | 25s safety cutoff (GAS timeout = 30s) | ✅ Fet |
+| Graceful Degradation | `_meta` amb warnings/errors | ✅ Fet |
+| Retry Feedback | `buildRetryFeedback()` específic per error | ✅ Fet |
+| Deterministic First | Regex abans de gastar tokens | ✅ Fet |
+
+---
+
+### v3.2 - Preview Mode (Shadow State) ⏳ PENDENT
 
 **Objectiu:** Mostrar canvis abans d'aplicar.
 
@@ -208,7 +239,7 @@ Impacte: Alt (user confidence, control)
 
 ---
 
-### v3.2+ - Futures Direccions
+### v3.3+ - Futures Direccions
 
 #### Synonym Memory (Enhanced)
 ```
@@ -242,20 +273,22 @@ Descripció: Múltiples usuaris editant amb IA simultàniament
 
 ---
 
-## Timeline Estimat
+## Timeline
 
 ```
 2024-Q4 (Nov-Dec)
 ├── v2.7  ✅ Document Engineering Engine
 ├── v2.8  ✅ Banned Expressions + Hybrid Validator
-└── v2.9  ⏳ Document Map / Context Engine
+├── v2.9  ✅ Context Engine (DocScanner + Skeleton)
+├── v3.0  ✅ Event Sourcing (edit_events)
+└── v3.1  ✅ Shadow Validator (Time Budget + Graceful Degradation)
 
 2025-Q1 (Jan-Mar)
-├── v3.0  ⏳ Event Sourcing
-└── v3.1  ⏳ Preview Mode
+├── v3.2  ⏳ Preview Mode (Visual Diff)
+└── v4.0  ⏳ GCP Productization (OAuth, Marketplace)
 
 2025-Q2+
-└── v3.x  ⏳ Advanced features
+└── v4.x  ⏳ Advanced features (MCP, Voice, Collab)
 ```
 
 ---
@@ -283,4 +316,4 @@ Si tens idees o prioritats diferents:
 
 ---
 
-*Última actualització: 2024-11-30 (v2.8)*
+*Última actualització: 2024-11-30 (v3.1)*

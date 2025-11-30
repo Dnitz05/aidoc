@@ -6,6 +6,82 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.1] - 2024-11-30
+
+### Added
+- **Shadow Validator** - Sistema de validació unificat amb auto-correcció
+  - `validateResponse()` - Funció única per validar respostes (JSON, banned words, length)
+  - `buildRetryFeedback()` - Genera feedback específic per cada tipus d'error
+  - Time Budget de 25s (safety margin per evitar timeout de GAS)
+  - Graceful degradation amb `_meta` field
+- **Response Metadata** - Camp `_meta` a cada resposta API
+  - `validation_passed`: boolean
+  - `retries`: número d'intents
+  - `timeout_aborted`: si s'ha avortat per temps
+  - `elapsed_ms`: temps total de processament
+  - `errors` / `warnings`: detalls de validació
+
+### Changed
+- Retry loop refactoritzat amb validació centralitzada
+- Constants globals: `TIMEOUT_CUTOFF`, `MAX_RETRIES`
+- `_debug.version` actualitzat a "3.1"
+
+### Technical
+- Arquitectura "Loop of Truth": Genera → Valida → Retry/Return
+- Validació determinista (regex) abans de gastar tokens en retries
+
+---
+
+## [3.0] - 2024-11-30
+
+### Added
+- **Event Sourcing** - Historial complet d'edicions per document
+  - Taula `edit_events` a Supabase
+  - `saveEditEvent()` - Guarda cada edició
+  - `getEditHistory()` - Recupera historial
+  - `markEventReverted()` - Marca events com a revertits
+- **Revert Any Edit** - Desfer qualsevol canvi de l'historial (no només l'últim)
+  - `handleGetEditHistory()` endpoint
+  - `handleRevertEdit()` endpoint
+  - UI amb llista d'edicions i botons de revert
+- **Edit Event Fields**:
+  - `event_type`: UPDATE_BY_ID, REWRITE, REVERT, AUTO_STRUCTURE
+  - `target_id`, `before_text`, `after_text`
+  - `user_instruction`, `thought`, `ai_mode`
+  - `reverted_at`, `reverted_by` (self-referencing FK)
+
+### Changed
+- Response inclou `event_id` per tracking
+- `_debug` inclou `event_saved` boolean
+
+---
+
+## [2.9] - 2024-11-30
+
+### Added
+- **Context Engine** - Anàlisi estructural del document
+  - `DocScanner.gs` - Nou fitxer amb lògica d'escaneig
+  - `getDocSkeleton()` - Extreu estructura (headings, seccions, entitats)
+  - Detecció de "Visual Headings" (negreta, majúscules, numeració)
+  - Extracció d'entitats: dates, imports (€/$), percentatges
+- **Auto-Structure** - Converteix visual headings a H2 reals
+  - `applyAutoStructure()` - Aplica estils automàticament
+  - Detecció de patrons: `BOLD_H`, `VISUAL_H`
+- **Skeleton Preview UI** (Sprint 2.5)
+  - Badges de color per tipus (heading=blau, visual=taronja, section=gris)
+  - Indentació jeràrquica
+  - Banner de suggeriment: "Detectats X títols sense format"
+  - `getContextSummary()` - Versió lleugera per UI
+- **Structure Hints** - Tip one-time al chat quan hi ha visual headings
+
+### Technical
+- `doc_skeleton` enviat al worker com a context
+- System prompt inclou secció "ESTRUCTURA DEL DOCUMENT"
+- Safety cutoff de 800ms per escaneig
+- `SCAN_CONFIG` amb paràmetres configurables
+
+---
+
 ## [2.8] - 2024-11-30
 
 ### Added
