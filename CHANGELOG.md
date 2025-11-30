@@ -6,6 +6,20 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.1.1] - 2024-11-30
+
+### Fixed
+- **La Guillotina Suau** - Hotfix per banned words que escapaven del retry loop
+  - `sanitizeBannedWords()` - Sanitització final que substitueix paraules prohibides per "document"
+  - S'aplica SEMPRE després del retry loop, independentment de si la validació ha passat
+  - Afegit `sanitization_applied` a `_meta` i `_debug` per tracking
+
+### Technical
+- Root cause: graceful degradation (lines 873-877) retornava text "dirty" quan MAX_RETRIES s'exhaurien
+- Solució: última línia de defensa que força la substitució de qualsevol paraula prohibida
+
+---
+
 ## [3.1] - 2024-11-30
 
 ### Added

@@ -2,7 +2,7 @@
 
 **"Lovable for Google Docs"** - Motor d'Enginyeria Documental amb IA
 
-[![Version](https://img.shields.io/badge/version-3.1-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-3.1.1-blue.svg)]()
 [![Platform](https://img.shields.io/badge/platform-Google%20Docs-green.svg)]()
 [![AI](https://img.shields.io/badge/AI-Gemini%202.0-orange.svg)]()
 

@@ -509,6 +509,63 @@ function validateResponse(rawText, constraints = {}) {
 }
 
 /**
+ * La Guillotina Suau - Final sanitization to forcibly remove banned words
+ * Replaces banned words with generic synonyms when all retries are exhausted
+ * @param {Object} parsedResponse - The parsed AI response
+ * @param {string[]} bannedWords - List of words that must not appear
+ * @returns {Object} Sanitized response with banned words replaced
+ */
+function sanitizeBannedWords(parsedResponse, bannedWords) {
+  if (!bannedWords || bannedWords.length === 0) {
+    return parsedResponse;
+  }
+
+  const genericReplacements = {
+    // Default: replace with "document" or context-appropriate synonym
+    default: 'document'
+  };
+
+  // Create regex for all banned words (case-insensitive, word boundaries)
+  const bannedPattern = new RegExp(
+    `\\b(${bannedWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`,
+    'gi'
+  );
+
+  // Function to sanitize a single string
+  const sanitizeText = (text) => {
+    if (!text || typeof text !== 'string') return text;
+    return text.replace(bannedPattern, genericReplacements.default);
+  };
+
+  // Deep clone to avoid mutation
+  const sanitized = JSON.parse(JSON.stringify(parsedResponse));
+
+  // Sanitize all text fields
+  if (sanitized.updates && typeof sanitized.updates === 'object') {
+    for (const key of Object.keys(sanitized.updates)) {
+      sanitized.updates[key] = sanitizeText(sanitized.updates[key]);
+    }
+  }
+
+  if (sanitized.blocks && Array.isArray(sanitized.blocks)) {
+    sanitized.blocks = sanitized.blocks.map(block => ({
+      ...block,
+      content: sanitizeText(block.content)
+    }));
+  }
+
+  if (sanitized.chat_response) {
+    sanitized.chat_response = sanitizeText(sanitized.chat_response);
+  }
+
+  if (sanitized.change_summary) {
+    sanitized.change_summary = sanitizeText(sanitized.change_summary);
+  }
+
+  return sanitized;
+}
+
+/**
  * Build error feedback message for retry prompt
  * @param {Object} validation - Result from validateResponse()
  * @returns {string} Feedback message for Gemini
@@ -888,11 +945,26 @@ INSTRUCCIÓ DE L'USUARI:
     };
   }
 
+  // ─── LA GUILLOTINA SUAU (v3.1 Hotfix) ───
+  // Final sanitization: ALWAYS remove banned words before returning
+  // This is the last line of defense when retries are exhausted
+  let sanitizationApplied = false;
+  if (negative_constraints && negative_constraints.length > 0) {
+    const beforeSanitize = JSON.stringify(parsedResponse);
+    parsedResponse = sanitizeBannedWords(parsedResponse, negative_constraints);
+    sanitizationApplied = JSON.stringify(parsedResponse) !== beforeSanitize;
+
+    if (sanitizationApplied) {
+      console.log(`[La Guillotina] Banned words forcibly removed from output`);
+    }
+  }
+
   // Build _meta for response quality tracking
   const _meta = {
     validation_passed: lastValidation?.isValid ?? false,
     retries: retryCount,
     timeout_aborted: timeoutAborted,
+    sanitization_applied: sanitizationApplied,
     elapsed_ms: Date.now() - startTime
   };
 
@@ -983,7 +1055,7 @@ INSTRUCCIÓ DE L'USUARI:
     event_id: savedEventId,  // v3.0: Include event ID for tracking
     _meta: _meta,  // v3.1: Shadow Validator metadata
     _debug: {
-      version: "3.1",
+      version: "3.1.1",
       has_selection: has_selection,
       history_length: chat_history?.length || 0,
       has_last_edit: !!last_edit,
@@ -992,6 +1064,7 @@ INSTRUCCIÓ DE L'USUARI:
       timeout_aborted: timeoutAborted,
       validation_passed: lastValidation?.isValid ?? false,
       negative_constraints_count: negative_constraints?.length || 0,
+      sanitization_applied: sanitizationApplied,
       has_skeleton: !!doc_skeleton,
       skeleton_items: doc_skeleton?.structure?.length || 0,
       thought: parsedResponse.thought,
