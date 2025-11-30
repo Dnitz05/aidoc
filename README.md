@@ -2,7 +2,7 @@
 
 **"Lovable for Google Docs"** - Motor d'Enginyeria Documental amb IA
 
-[![Version](https://img.shields.io/badge/version-2.7-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-2.8-blue.svg)]()
 [![Platform](https://img.shields.io/badge/platform-Google%20Docs-green.svg)]()
 [![AI](https://img.shields.io/badge/AI-Gemini%202.0-orange.svg)]()
 
@@ -25,16 +25,18 @@ SideCar         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 
 ## Features
 
-### Core (v2.7)
+### Core (v2.8)
 
 | Feature | Descripció |
 |---------|------------|
+| **Banned Expressions** | Paraules/frases que la IA mai usarà (Memòria Negativa) |
 | **Mode Selector** | Auto / Edit / Xat - control total sobre el comportament |
 | **Chain of Thought** | La IA raona abans d'actuar (`thought` obligatori) |
 | **Atomic Operations** | `UPDATE_BY_ID` - edita paràgrafs específics, no reescriu tot |
 | **LastEdit Memory** | Recorda l'últim canvi per "una altra", "no m'agrada" |
 | **Revert Button** | Desfer l'últim canvi amb un clic |
 | **Retry Loop** | Auto-correcció si el JSON és invàlid |
+| **Hybrid Validator** | Validació local + LLM per paraules prohibides |
 | **Receipts** | Macros personalitzades (Custom Actions) |
 | **Knowledge Files** | Adjunta PDFs/TXT com a context |
 

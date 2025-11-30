@@ -18,7 +18,7 @@ Construir el **motor d'enginyeria documental** més potent, aplicant els mateixo
 
 ---
 
-## Estat Actual: v2.7
+## Estat Actual: v2.8
 
 ```
 ████████████████████████████████████████ 100%
@@ -31,13 +31,15 @@ Construir el **motor d'enginyeria documental** més potent, aplicant els mateixo
 ✅ Atomic Operations (UPDATE_BY_ID)
 ✅ Receipts (Custom Macros)
 ✅ Dark/Light Theme
+✅ Banned Expressions (Memòria Negativa)
+✅ Hybrid Validator (Local + LLM)
 ```
 
 ---
 
 ## Pròximes Versions
 
-### v2.8 - Context Engine (Document Map)
+### v2.9 - Context Engine (Document Map)
 
 **Objectiu:** Entendre l'ESTRUCTURA del document, no només el text.
 
@@ -91,7 +93,7 @@ Impacte: Alt (docs llargs, context efficiency)
 
 ---
 
-### v2.9 - Event Sourcing (Edit History)
+### v3.0 - Event Sourcing (Edit History)
 
 **Objectiu:** Historial complet de canvis, no només l'últim.
 
@@ -159,7 +161,7 @@ CREATE TABLE edit_events (
 
 ---
 
-### v3.0 - Preview Mode (Shadow State)
+### v3.1 - Preview Mode (Shadow State)
 
 **Objectiu:** Mostrar canvis abans d'aplicar.
 
@@ -206,9 +208,9 @@ Impacte: Alt (user confidence, control)
 
 ---
 
-### v3.1+ - Futures Direccions
+### v3.2+ - Futures Direccions
 
-#### bannedExpressions (Synonym Memory)
+#### Synonym Memory (Enhanced)
 ```
 Prioritat: 🟡 MITJANA
 Descripció: Recordar paraules rebutjades per no tornar-les a proposar
@@ -245,12 +247,12 @@ Descripció: Múltiples usuaris editant amb IA simultàniament
 ```
 2024-Q4 (Nov-Dec)
 ├── v2.7  ✅ Document Engineering Engine
-├── v2.8  ⏳ Document Map / Context Engine
-└── v2.9  ⏳ Event Sourcing
+├── v2.8  ✅ Banned Expressions + Hybrid Validator
+└── v2.9  ⏳ Document Map / Context Engine
 
 2025-Q1 (Jan-Mar)
-├── v3.0  ⏳ Preview Mode
-└── v3.1  ⏳ bannedExpressions + Polish
+├── v3.0  ⏳ Event Sourcing
+└── v3.1  ⏳ Preview Mode
 
 2025-Q2+
 └── v3.x  ⏳ Advanced features
@@ -281,4 +283,4 @@ Si tens idees o prioritats diferents:
 
 ---
 
-*Última actualització: 2024-11-30*
+*Última actualització: 2024-11-30 (v2.8)*

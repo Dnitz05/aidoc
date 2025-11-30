@@ -6,6 +6,30 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.8] - 2024-11-30
+
+### Added
+- **Banned Expressions** - Paraules/frases que la IA mai usarà
+  - UI: Secció "Paraules Prohibides" a Configuració
+  - UI: Botó "Prohibir" després d'edicions
+  - Persistència a `PropertiesService`
+- **Hybrid Validator** - Validació local (regex) + LLM retry
+  - Pre-check sense cost de tokens
+  - Retry automàtic si resposta conté paraules prohibides
+- **Toast Notifications** - Feedback visual per accions de banned words
+
+### Changed
+- `MAX_RETRIES` incrementat a 2 (per permetre retry de banned words)
+- System Prompt inclou secció "PARAULES PROHIBIDES" quan n'hi ha
+- Debug info inclou `banned_word_retry` i `negative_constraints_count`
+
+### Technical
+- `findBannedWords()` - Validació local amb word boundaries
+- `getOutputText()` - Extracció de text de resposta per validació
+- `negative_constraints` al payload GAS → Worker
+
+---
+
 ## [2.7] - 2024-11-30
 
 ### Added
