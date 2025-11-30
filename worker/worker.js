@@ -1,17 +1,15 @@
 /**
- * SIDECAR CORE API v2.6.1 - LastEdit Memory (Bugfix)
+ * SIDECAR CORE API v2.6.2 - Mode Selector
  *
- * v2.6.1 fixes:
- * - FIX: originalText now preserved across alternative chains ("una altra" x3)
- * - FIX: After revert, currentText=originalText (enables "una altra" post-undo)
+ * v2.6.2 features:
+ * - NEW: user_mode selector (auto | edit | chat)
+ * - Mode enforcement after AI response
+ * - Chat mode: forces CHAT_ONLY, never edits
+ * - Edit mode: hints if AI didn't edit when expected
  *
- * v2.6 features:
- * - last_edit memory - stores {targetId, originalText, currentText}
- * - lastEdit block in prompt for "una altra", "canvia-la", etc.
- * - Revert button in UI
- *
- * v2.5 features (preserved):
- * - pinned_prefs, extended chat history (12 msgs), robustness
+ * v2.6.1 features (preserved):
+ * - lastEdit memory with preserved originalText across chains
+ * - Revert button, pinned_prefs, chat history
  */
 
 // ═══════════════════════════════════════════════════════════════
@@ -325,7 +323,8 @@ async function handleChat(body, env, corsHeaders) {
     knowledge_file_mime,
     has_selection,
     chat_history,  // Conversational memory
-    last_edit      // v2.6: Last edit memory for "una altra" cases
+    last_edit,     // v2.6: Last edit memory for "una altra" cases
+    user_mode      // v2.6.2: User-selected mode (auto | edit | chat)
   } = body;
 
   if (!license_key) throw new Error("missing_license");
@@ -441,7 +440,29 @@ INSTRUCCIÓ DE L'USUARI:
 
   // 5. Parse and validate response
   const rawResponse = geminiData.candidates[0].content.parts[0].text;
-  const parsedResponse = parseAndValidate(rawResponse);
+  let parsedResponse = parseAndValidate(rawResponse);
+
+  // 5.1 Mode enforcement (v2.6.2)
+  const effectiveMode = user_mode || 'auto';
+  if (effectiveMode === 'chat') {
+    // Force CHAT_ONLY: Never edit, convert any edit response to chat
+    if (parsedResponse.mode !== 'CHAT_ONLY') {
+      parsedResponse = {
+        mode: 'CHAT_ONLY',
+        chat_response: parsedResponse.change_summary || parsedResponse.chat_response || "Entesos.",
+        change_summary: "Mode xat actiu - no s'ha editat el document"
+      };
+    }
+  } else if (effectiveMode === 'edit') {
+    // Force EDIT: If AI chose CHAT_ONLY but user wants edit, keep as-is but flag it
+    // (We can't force an edit if AI didn't provide one, so we just note it)
+    if (parsedResponse.mode === 'CHAT_ONLY' && has_selection) {
+      // AI chose chat but user has selection and wants edit - add hint
+      parsedResponse.chat_response = (parsedResponse.chat_response || "") +
+        "\n\n💡 Tip: Si vols que editi el text seleccionat, reformula la instrucció.";
+    }
+  }
+  // 'auto' mode: no override, AI decides
 
   // 6. Return response
   return new Response(JSON.stringify({
@@ -449,10 +470,11 @@ INSTRUCCIÓ DE L'USUARI:
     data: parsedResponse,
     credits_remaining: creditsResult.credits_remaining || 0,
     _debug: {
-      version: "2.6.1",
+      version: "2.6.2",
       has_selection: has_selection,
       history_length: chat_history?.length || 0,
-      has_last_edit: !!last_edit
+      has_last_edit: !!last_edit,
+      user_mode: effectiveMode
     }
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }

@@ -493,6 +493,126 @@
       }
 
       /* ═══════════════════════════════════════════════════════════
+         MODE SELECTOR (Cursor-style)
+         ═══════════════════════════════════════════════════════════ */
+
+      .mode-selector {
+        position: relative;
+        flex-shrink: 0;
+      }
+
+      .mode-btn {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 8px;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text-secondary);
+        font-family: var(--font-display);
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+      }
+
+      .mode-btn:hover {
+        border-color: var(--accent);
+        color: var(--text-primary);
+      }
+
+      .mode-btn .mode-icon {
+        font-size: 12px;
+      }
+
+      .mode-btn .mode-arrow {
+        width: 10px;
+        height: 10px;
+        stroke: currentColor;
+        stroke-width: 2;
+        fill: none;
+        transition: transform 0.2s ease;
+      }
+
+      .mode-selector.open .mode-arrow {
+        transform: rotate(180deg);
+      }
+
+      .mode-dropdown {
+        position: absolute;
+        bottom: calc(100% + 6px);
+        right: 0;
+        min-width: 160px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-md);
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(8px);
+        transition: all 0.2s ease;
+        z-index: 100;
+        overflow: hidden;
+      }
+
+      .mode-selector.open .mode-dropdown {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+      }
+
+      .mode-option {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+        cursor: pointer;
+        transition: background 0.15s ease;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+      }
+
+      .mode-option:hover {
+        background: var(--bg-tertiary);
+      }
+
+      .mode-option.selected {
+        background: var(--accent-muted);
+      }
+
+      .mode-option .icon {
+        font-size: 14px;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+
+      .mode-option .details {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .mode-option .name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 2px;
+      }
+
+      .mode-option .desc {
+        font-size: 10px;
+        color: var(--text-muted);
+        line-height: 1.3;
+      }
+
+      .mode-option.selected .name {
+        color: var(--accent);
+      }
+
+      /* ═══════════════════════════════════════════════════════════
          TOOLS PANEL (RECEIPTS)
          ═══════════════════════════════════════════════════════════ */
 
@@ -1150,6 +1270,39 @@
     <div id="inputArea" class="input-area">
       <div class="input-wrapper">
         <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="1"></textarea>
+
+        <!-- Mode Selector -->
+        <div class="mode-selector" id="modeSelector">
+          <button class="mode-btn" onclick="toggleModeDropdown()" type="button">
+            <span class="mode-icon" id="modeIcon">✨</span>
+            <span id="modeLabel">Auto</span>
+            <svg class="mode-arrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="mode-dropdown">
+            <button class="mode-option selected" data-mode="auto" onclick="selectMode('auto')">
+              <span class="icon">✨</span>
+              <div class="details">
+                <div class="name">Auto</div>
+                <div class="desc">La IA decideix si editar o xatejar</div>
+              </div>
+            </button>
+            <button class="mode-option" data-mode="edit" onclick="selectMode('edit')">
+              <span class="icon">✏️</span>
+              <div class="details">
+                <div class="name">Edit</div>
+                <div class="desc">Sempre edita el document</div>
+              </div>
+            </button>
+            <button class="mode-option" data-mode="chat" onclick="selectMode('chat')">
+              <span class="icon">💬</span>
+              <div class="details">
+                <div class="name">Xat</div>
+                <div class="desc">Només conversa, mai edita</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
         <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Enviar">
           <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
         </button>
@@ -1165,6 +1318,13 @@
       let currentSettings = {};
       let selectedEmoji = '⚡';
       let currentTab = 'chat';
+      let currentMode = 'auto'; // auto | edit | chat
+
+      const MODES = {
+        auto: { icon: '✨', label: 'Auto' },
+        edit: { icon: '✏️', label: 'Edit' },
+        chat: { icon: '💬', label: 'Xat' }
+      };
 
       // ═══════════════════════════════════════════════════════════
       // THEME MANAGEMENT
@@ -1194,6 +1354,9 @@
       window.onload = function() {
         // Initialize theme
         initTheme();
+
+        // Initialize mode selector
+        initModeSelector();
 
         // Position nav pill
         updateNavPill();
@@ -1229,6 +1392,56 @@
         // Select first emoji
         selectEmoji('⚡');
       };
+
+      // ═══════════════════════════════════════════════════════════
+      // MODE SELECTOR
+      // ═══════════════════════════════════════════════════════════
+
+      function initModeSelector() {
+        const savedMode = localStorage.getItem('sidecar-mode') || 'auto';
+        selectMode(savedMode, false);
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+          const selector = document.getElementById('modeSelector');
+          if (selector && !selector.contains(e.target)) {
+            selector.classList.remove('open');
+          }
+        });
+      }
+
+      function toggleModeDropdown() {
+        const selector = document.getElementById('modeSelector');
+        selector.classList.toggle('open');
+      }
+
+      function selectMode(mode, save = true) {
+        currentMode = mode;
+
+        // Update button display
+        document.getElementById('modeIcon').textContent = MODES[mode].icon;
+        document.getElementById('modeLabel').textContent = MODES[mode].label;
+
+        // Update selected state in dropdown
+        document.querySelectorAll('.mode-option').forEach(function(opt) {
+          opt.classList.remove('selected');
+          if (opt.dataset.mode === mode) {
+            opt.classList.add('selected');
+          }
+        });
+
+        // Close dropdown
+        document.getElementById('modeSelector').classList.remove('open');
+
+        // Persist
+        if (save) {
+          localStorage.setItem('sidecar-mode', mode);
+        }
+      }
+
+      function getCurrentMode() {
+        return currentMode;
+      }
 
       // ═══════════════════════════════════════════════════════════
       // NAVIGATION
@@ -1336,7 +1549,7 @@
             btn.disabled = false;
             addBubble('error', 'Error: ' + err.message);
           })
-          .processUserCommand(text, getRecentHistory());
+          .processUserCommand(text, getRecentHistory(), getCurrentMode());
       }
 
       function addBubble(type, text, isEdit) {
@@ -1473,7 +1686,7 @@
             document.getElementById('sendBtn').disabled = false;
             addBubble('error', 'Error: ' + err.message);
           })
-          .processUserCommand(instruction, getRecentHistory());
+          .processUserCommand(instruction, getRecentHistory(), getCurrentMode());
       }
 
       // ═══════════════════════════════════════════════════════════

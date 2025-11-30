@@ -206,8 +206,8 @@ function uploadFileToWorker(base64Data, mimeType, fileName) {
   }
 }
 
-// --- NUCLI DEL PROCESSAMENT (v2.6 amb lastEdit Memory) ---
-function processUserCommand(instruction, chatHistory) {
+// --- NUCLI DEL PROCESSAMENT (v2.6.2 amb mode selector) ---
+function processUserCommand(instruction, chatHistory, userMode) {
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
   const body = doc.getBody();
@@ -268,6 +268,7 @@ function processUserCommand(instruction, chatHistory) {
     has_selection: isSelection,
     chat_history: chatHistory || [],
     last_edit: lastEdit,
+    user_mode: userMode || 'auto',
     pinned_prefs: {
       language: 'ca',
       tone: 'tècnic però entenedor',
