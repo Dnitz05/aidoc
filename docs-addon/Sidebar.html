@@ -892,6 +892,251 @@
         margin-top: 2px;
       }
 
+      /* Tool Card (Skeleton, Auto-Structure) */
+      .tool-card {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        margin-bottom: var(--space-md);
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+      }
+
+      .tool-card-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        margin-bottom: var(--space-sm);
+      }
+
+      .tool-card-header .icon {
+        font-size: 18px;
+      }
+
+      .tool-card-header .title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .tool-card-header .subtitle {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .tool-actions {
+        display: flex;
+        gap: var(--space-sm);
+        margin-top: var(--space-sm);
+      }
+
+      .btn-sm {
+        padding: 6px 12px;
+        font-size: 11px;
+      }
+
+      .skeleton-preview {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: var(--space-sm);
+        margin: var(--space-sm) 0;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        line-height: 1.4;
+      }
+
+      .skeleton-preview .skeleton-item {
+        padding: 2px 0;
+        color: var(--text-secondary);
+      }
+
+      .skeleton-preview .skeleton-item.heading {
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .skeleton-preview .skeleton-item.section {
+        color: var(--text-muted);
+        padding-left: 12px;
+      }
+
+      .skeleton-preview .skeleton-entities {
+        color: var(--success);
+        font-size: 9px;
+        padding-left: 20px;
+      }
+
+      /* Skeleton Badges (v2.5) */
+      .skeleton-badge {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: var(--radius-sm);
+        font-size: 9px;
+        font-weight: 600;
+        margin-right: 4px;
+        text-transform: uppercase;
+      }
+      .skeleton-badge.heading { background: var(--accent-muted); color: var(--accent); }
+      .skeleton-badge.visual { background: rgba(249,171,0,0.15); color: var(--warning); }
+      .skeleton-badge.section { background: var(--bg-elevated); color: var(--text-muted); }
+
+      .skeleton-suggestion {
+        background: var(--accent-muted);
+        border: 1px solid var(--accent);
+        border-radius: var(--radius-md);
+        padding: var(--space-sm) var(--space-md);
+        margin-bottom: var(--space-md);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+        gap: var(--space-sm);
+      }
+
+      .skeleton-suggestion .suggestion-text {
+        flex: 1;
+        color: var(--accent);
+      }
+
+      .skeleton-suggestion .suggestion-btn {
+        padding: 4px 10px;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.15s ease;
+      }
+
+      .skeleton-suggestion .suggestion-btn:hover {
+        background: var(--accent-hover);
+        transform: scale(1.02);
+      }
+
+      .skeleton-item.indent-1 { padding-left: 12px; }
+      .skeleton-item.indent-2 { padding-left: 24px; }
+      .skeleton-item.indent-3 { padding-left: 36px; }
+
+      /* History List (v3.0) */
+      .history-list {
+        max-height: 300px;
+        overflow-y: auto;
+        margin: var(--space-sm) 0;
+      }
+
+      .history-list::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .history-list::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .history-list::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: var(--radius-full);
+      }
+
+      .history-item {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-sm);
+        padding: var(--space-sm);
+        border-radius: var(--radius-sm);
+        margin-bottom: var(--space-xs);
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        transition: all 0.15s ease;
+        cursor: pointer;
+      }
+
+      .history-item:hover {
+        border-color: var(--accent);
+        background: var(--bg-tertiary);
+      }
+
+      .history-item.reverted {
+        opacity: 0.5;
+        text-decoration: line-through;
+      }
+
+      .history-item .icon {
+        font-size: 14px;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+
+      .history-item .content {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .history-item .instruction {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .history-item .meta {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+
+      .history-item .type-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        background: var(--accent-muted);
+        color: var(--accent);
+        border-radius: var(--radius-sm);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 500;
+      }
+
+      .history-item .revert-action {
+        flex-shrink: 0;
+        padding: 4px 8px;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text-muted);
+        font-size: 10px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        opacity: 0;
+      }
+
+      .history-item:hover .revert-action {
+        opacity: 1;
+      }
+
+      .history-item .revert-action:hover {
+        border-color: var(--warning);
+        color: var(--warning);
+        background: rgba(249, 171, 0, 0.1);
+      }
+
+      .history-empty {
+        text-align: center;
+        padding: var(--space-lg);
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+
       /* Toggle Switch */
       .toggle-row {
         display: flex;
@@ -1226,7 +1471,51 @@
 
     <!-- Tools Panel -->
     <div id="toolsPanel" class="panel">
-      <div class="section-title">Les Teves Receptes</div>
+      <!-- Auto-Structure Section -->
+      <div class="section-title">Estructura del Document</div>
+      <div class="tool-card" id="skeletonCard">
+        <div class="tool-card-header">
+          <span class="icon">🗂️</span>
+          <div>
+            <div class="title">Document Skeleton</div>
+            <div class="subtitle" id="skeletonStatus">Carregant...</div>
+          </div>
+        </div>
+        <div id="skeletonSuggestion" class="skeleton-suggestion hidden"></div>
+        <div id="skeletonPreview" class="skeleton-preview hidden">
+          <!-- Dynamic skeleton content -->
+        </div>
+        <div class="tool-actions">
+          <button class="btn btn-secondary btn-sm" onclick="refreshSkeleton()">
+            🔄 Escanejar
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="runAutoStructure()">
+            ✨ Auto-Structure
+          </button>
+        </div>
+      </div>
+
+      <!-- Edit History Section (v3.0) -->
+      <div class="section-title" style="margin-top: var(--space-lg);">Historial d'Edicions</div>
+      <div class="tool-card" id="historyCard">
+        <div class="tool-card-header">
+          <span class="icon">📜</span>
+          <div>
+            <div class="title">Últimes Edicions</div>
+            <div class="subtitle" id="historyStatus">Carregant...</div>
+          </div>
+        </div>
+        <div id="historyList" class="history-list">
+          <!-- Dynamic history content -->
+        </div>
+        <div class="tool-actions">
+          <button class="btn btn-secondary btn-sm" onclick="refreshHistory()">
+            🔄 Actualitzar
+          </button>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top: var(--space-lg);">Les Teves Receptes</div>
       <div class="receipts-grid" id="receiptsList">
         <!-- Dynamic content -->
       </div>
@@ -1576,8 +1865,18 @@
           inputArea.classList.remove('hidden');
         }
 
-        // Load receipts when switching to tools
-        if (tabName === 'tools') loadReceipts();
+        // v2.9: Auto-refresh skeleton when opening tools panel
+        if (tabName === 'tools') {
+          if (typeof refreshSkeleton === 'function') {
+            refreshSkeleton();
+          }
+          // v3.0: Auto-refresh history when opening tools panel
+          if (typeof refreshHistory === 'function') {
+            refreshHistory();
+          }
+          // Load receipts
+          loadReceipts();
+        }
       }
 
       function updateNavPill() {
@@ -1651,6 +1950,8 @@
             if (res.credits !== undefined) {
               document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
             }
+            // v2.5: Check and show structure hint (one-time)
+            checkAndShowStructureHint();
           })
           .withFailureHandler(function(err) {
             hideThinking();
@@ -2004,6 +2305,166 @@
       }
 
       // ═══════════════════════════════════════════════════════════
+      // DOCUMENT SKELETON (v2.9) + CONTEXT HINTS (v2.5)
+      // ═══════════════════════════════════════════════════════════
+
+      let currentSkeleton = null;
+      const HINT_SHOWN_KEY = 'sidecar-structure-hint-shown';
+
+      /**
+       * Check and show one-time structure hint in chat (v2.5)
+       */
+      function checkAndShowStructureHint() {
+        // Only show once per session
+        if (sessionStorage.getItem(HINT_SHOWN_KEY)) return;
+
+        google.script.run
+          .withSuccessHandler(function(summary) {
+            if (summary && summary.has_suggestions && summary.visual_headings > 0) {
+              // Mark as shown
+              sessionStorage.setItem(HINT_SHOWN_KEY, 'true');
+              // Show hint in chat
+              addBubble('system', '💡 Tip: El document té ' + summary.visual_headings +
+                ' títols visuals sense format. Ves a Eines > Auto-Structure per millorar-lo.');
+            }
+          })
+          .getContextSummary();
+      }
+
+      function refreshSkeleton() {
+        const statusEl = document.getElementById('skeletonStatus');
+        const previewEl = document.getElementById('skeletonPreview');
+
+        statusEl.textContent = 'Escanejant...';
+        previewEl.classList.add('hidden');
+
+        google.script.run
+          .withSuccessHandler(function(skeleton) {
+            currentSkeleton = skeleton;
+            if (skeleton && skeleton.stats) {
+              const headings = skeleton.structure.filter(function(item) {
+                return item.type !== 'SECTION' && item.type !== 'WARNING';
+              }).length;
+              const sections = skeleton.structure.filter(function(item) {
+                return item.type === 'SECTION';
+              }).length;
+              statusEl.textContent = headings + ' headings, ' + sections + ' seccions (' + skeleton.stats.scan_time_ms + 'ms)';
+              renderSkeletonPreview(skeleton);
+            } else if (skeleton && skeleton.error) {
+              statusEl.textContent = 'Error: ' + skeleton.error;
+            } else {
+              statusEl.textContent = 'Document buit';
+            }
+          })
+          .withFailureHandler(function(err) {
+            statusEl.textContent = 'Error: ' + err.message;
+          })
+          .getDocSkeleton();
+      }
+
+      function renderSkeletonPreview(skeleton) {
+        const previewEl = document.getElementById('skeletonPreview');
+        const suggestionEl = document.getElementById('skeletonSuggestion');
+
+        if (!skeleton || !skeleton.structure || skeleton.structure.length === 0) {
+          previewEl.innerHTML = '<div class="skeleton-item">Cap estructura detectada</div>';
+          previewEl.classList.remove('hidden');
+          if (suggestionEl) suggestionEl.classList.add('hidden');
+          return;
+        }
+
+        // Count types for suggestions
+        let nativeHeadings = 0;
+        let visualHeadings = 0;
+        let sections = 0;
+
+        let html = '';
+        let currentIndent = 0;
+
+        skeleton.structure.forEach(function(item, idx) {
+          if (item.type === 'SECTION') {
+            sections++;
+            const indentClass = currentIndent > 0 ? ' indent-' + Math.min(currentIndent, 3) : '';
+            html += '<div class="skeleton-item section' + indentClass + '">';
+            html += '<span class="skeleton-badge section">§</span>';
+            html += item.preview.substring(0, 45) + (item.preview.length > 45 ? '...' : '');
+            html += '</div>';
+            if (item.entities && item.entities.length > 0) {
+              html += '<div class="skeleton-entities">└─ ' + item.entities.slice(0, 3).join(', ') + '</div>';
+            }
+          } else if (item.type === 'WARNING') {
+            html += '<div class="skeleton-item" style="color: var(--warning);">⚠️ ' + item.text + '</div>';
+          } else {
+            // Heading types
+            const isVisual = (item.type === 'VISUAL_H' || item.type === 'BOLD_H');
+            if (isVisual) {
+              visualHeadings++;
+            } else {
+              nativeHeadings++;
+            }
+
+            // Calculate indent based on heading level
+            if (item.type === 'H1' || item.type === 'TITLE') currentIndent = 1;
+            else if (item.type === 'H2' || item.type === 'SUBTITLE') currentIndent = 2;
+            else if (item.type === 'H3') currentIndent = 3;
+            else if (isVisual) currentIndent = Math.min(currentIndent + 1, 3);
+
+            const indentClass = currentIndent > 1 ? ' indent-' + (currentIndent - 1) : '';
+            const badgeClass = isVisual ? 'visual' : 'heading';
+            const icon = isVisual ? '⚡' : '📌';
+            const badgeText = item.type.replace('_H', '').replace('HEADING', 'H');
+
+            html += '<div class="skeleton-item heading' + indentClass + '">';
+            html += '<span class="skeleton-badge ' + badgeClass + '">' + badgeText + '</span>';
+            html += icon + ' ' + item.text.substring(0, 40) + (item.text.length > 40 ? '...' : '');
+            html += '</div>';
+          }
+        });
+
+        previewEl.innerHTML = html;
+        previewEl.classList.remove('hidden');
+
+        // Show suggestion if visual headings but no native
+        if (suggestionEl) {
+          if (nativeHeadings === 0 && visualHeadings > 0) {
+            suggestionEl.innerHTML =
+              '<span class="suggestion-text">⚡ Detectats ' + visualHeadings + ' títols sense format natiu</span>' +
+              '<button class="suggestion-btn" onclick="runAutoStructure()">Auto-Structure</button>';
+            suggestionEl.classList.remove('hidden');
+          } else {
+            suggestionEl.classList.add('hidden');
+          }
+        }
+      }
+
+      function runAutoStructure() {
+        const statusEl = document.getElementById('skeletonStatus');
+        statusEl.textContent = 'Aplicant Auto-Structure...';
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              if (result.converted > 0) {
+                showToast('✨ ' + result.converted + ' títols convertits a H2');
+                statusEl.textContent = result.converted + ' convertits!';
+                // Refresh skeleton to show new structure
+                setTimeout(refreshSkeleton, 500);
+              } else {
+                showToast('ℹ️ Cap canvi necessari');
+                statusEl.textContent = 'Estructura correcta';
+              }
+            } else {
+              statusEl.textContent = 'Error: ' + (result ? result.error : 'Unknown');
+            }
+          })
+          .withFailureHandler(function(err) {
+            statusEl.textContent = 'Error: ' + err.message;
+            showToast('❌ Error: ' + err.message);
+          })
+          .applyAutoStructure();
+      }
+
+      // ═══════════════════════════════════════════════════════════
       // REVERT LAST EDIT (v2.6)
       // ═══════════════════════════════════════════════════════════
 
@@ -2036,6 +2497,143 @@
             alert('Error: ' + err.message);
           })
           .revertLastEdit();
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // EDIT HISTORY (v3.0 Event Sourcing)
+      // ═══════════════════════════════════════════════════════════
+
+      let editHistory = [];
+
+      function refreshHistory() {
+        const statusEl = document.getElementById('historyStatus');
+        const listEl = document.getElementById('historyList');
+
+        statusEl.textContent = 'Carregant...';
+        listEl.innerHTML = '<div class="history-empty">Carregant historial...</div>';
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success && result.history) {
+              editHistory = result.history;
+              const activeCount = editHistory.filter(function(e) { return !e.is_reverted; }).length;
+              statusEl.textContent = activeCount + ' edicions actives';
+              renderHistoryList();
+            } else if (result && result.error) {
+              statusEl.textContent = 'Error';
+              listEl.innerHTML = '<div class="history-empty" style="color: var(--error);">' + result.error + '</div>';
+            } else {
+              statusEl.textContent = 'Sense historial';
+              listEl.innerHTML = '<div class="history-empty">Cap edició registrada</div>';
+            }
+          })
+          .withFailureHandler(function(err) {
+            statusEl.textContent = 'Error';
+            listEl.innerHTML = '<div class="history-empty" style="color: var(--error);">Error: ' + err.message + '</div>';
+          })
+          .getEditHistory(10);
+      }
+
+      function renderHistoryList() {
+        const listEl = document.getElementById('historyList');
+
+        if (!editHistory || editHistory.length === 0) {
+          listEl.innerHTML = '<div class="history-empty">Cap edició registrada</div>';
+          return;
+        }
+
+        const typeIcons = {
+          'UPDATE_BY_ID': '✏️',
+          'REWRITE': '📝',
+          'REVERT': '↩️',
+          'AUTO_STRUCTURE': '✨'
+        };
+
+        const typeLabels = {
+          'UPDATE_BY_ID': 'Edit',
+          'REWRITE': 'Rewrite',
+          'REVERT': 'Revert',
+          'AUTO_STRUCTURE': 'Auto'
+        };
+
+        let html = '';
+        editHistory.forEach(function(event) {
+          const icon = typeIcons[event.event_type] || '📄';
+          const typeLabel = typeLabels[event.event_type] || event.event_type;
+          const instruction = event.user_instruction || '(Sense instrucció)';
+          const timeAgo = formatTimeAgo(new Date(event.created_at));
+          const isReverted = event.is_reverted;
+
+          html += '<div class="history-item' + (isReverted ? ' reverted' : '') + '" data-id="' + event.id + '">';
+          html += '<span class="icon">' + icon + '</span>';
+          html += '<div class="content">';
+          html += '<div class="instruction" title="' + escapeHtml(instruction) + '">' + escapeHtml(instruction.substring(0, 50)) + (instruction.length > 50 ? '...' : '') + '</div>';
+          html += '<div class="meta">';
+          html += '<span class="type-badge">' + typeLabel + '</span>';
+          html += '<span>' + timeAgo + '</span>';
+          if (event.target_id !== null && event.target_id !== undefined) {
+            html += '<span>¶' + event.target_id + '</span>';
+          }
+          html += '</div></div>';
+
+          if (!isReverted && event.event_type !== 'REVERT') {
+            html += '<button class="revert-action" onclick="event.stopPropagation(); revertHistoryItem(\'' + event.id + '\')">↩ Desfer</button>';
+          }
+
+          html += '</div>';
+        });
+
+        listEl.innerHTML = html;
+      }
+
+      function formatTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Ara';
+        if (diffMins < 60) return diffMins + ' min';
+        if (diffHours < 24) return diffHours + 'h';
+        if (diffDays < 7) return diffDays + 'd';
+        return date.toLocaleDateString('ca-ES', { day: 'numeric', month: 'short' });
+      }
+
+      function revertHistoryItem(eventId) {
+        const item = document.querySelector('.history-item[data-id="' + eventId + '"]');
+        if (!item) return;
+
+        const btn = item.querySelector('.revert-action');
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = '...';
+        }
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.success) {
+              showToast('↩ Edició desfeta');
+              // Refresh the history list
+              refreshHistory();
+              // Add system message to chat
+              addBubble('system', 'S\'ha desfet una edició de l\'historial.');
+            } else {
+              if (btn) {
+                btn.disabled = false;
+                btn.textContent = '↩ Desfer';
+              }
+              showToast('❌ ' + (res ? res.error : 'Error desconegut'));
+            }
+          })
+          .withFailureHandler(function(err) {
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = '↩ Desfer';
+            }
+            showToast('❌ Error: ' + err.message);
+          })
+          .revertEditById(eventId);
       }
     </script>
   </body>

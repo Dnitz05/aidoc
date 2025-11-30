@@ -239,7 +239,7 @@ function uploadFileToWorker(base64Data, mimeType, fileName) {
   }
 }
 
-// --- NUCLI DEL PROCESSAMENT (v2.8 amb banned words) ---
+// --- NUCLI DEL PROCESSAMENT (v2.9 amb skeleton) ---
 function processUserCommand(instruction, chatHistory, userMode) {
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
@@ -254,6 +254,15 @@ function processUserCommand(instruction, chatHistory, userMode) {
 
   // v2.8: Carregar paraules prohibides
   const bannedWords = getBannedWords();
+
+  // v2.9: Obtenir skeleton del document (estructura + entitats)
+  let docSkeleton = null;
+  try {
+    docSkeleton = getDocSkeleton();
+  } catch (e) {
+    // Si falla el skeleton, continuar sense (graceful degradation)
+    docSkeleton = null;
+  }
 
   const settings = JSON.parse(getSettings());
   if (!settings.license_key) throw new Error("Falta llicència.");
@@ -306,6 +315,7 @@ function processUserCommand(instruction, chatHistory, userMode) {
     last_edit: lastEdit,
     user_mode: userMode || 'auto',
     negative_constraints: bannedWords, // v2.8: Paraules prohibides
+    doc_skeleton: docSkeleton, // v2.9: Estructura del document
     pinned_prefs: {
       language: 'ca',
       tone: 'tècnic però entenedor',
@@ -558,5 +568,180 @@ function deleteReceiptFromWorker(receiptId) {
     return { success: true };
   } catch (e) {
     throw new Error("Error: " + e.message);
+  }
+}
+
+// --- CONTEXT SUMMARY (v2.5) ---
+
+/**
+ * Retorna un resum lleuger del context del document
+ * Més ràpid que getDocSkeleton() per UI inicial
+ */
+function getContextSummary() {
+  try {
+    const skeleton = getDocSkeleton();
+    if (!skeleton || skeleton.error) {
+      return {
+        headings: 0,
+        sections: 0,
+        visual_headings: 0,
+        has_suggestions: false,
+        suggestion_text: null
+      };
+    }
+
+    let headings = 0;
+    let visualHeadings = 0;
+    let sections = 0;
+
+    skeleton.structure.forEach(function(item) {
+      if (item.type === 'SECTION') {
+        sections++;
+      } else if (item.type === 'VISUAL_H' || item.type === 'BOLD_H') {
+        visualHeadings++;
+      } else if (item.type !== 'WARNING') {
+        headings++;
+      }
+    });
+
+    const hasSuggestions = (headings === 0 && visualHeadings > 0);
+    const suggestionText = hasSuggestions
+      ? 'Detectats ' + visualHeadings + ' títols sense format. Usa Auto-Structure!'
+      : null;
+
+    return {
+      headings: headings,
+      sections: sections,
+      visual_headings: visualHeadings,
+      has_suggestions: hasSuggestions,
+      suggestion_text: suggestionText,
+      scan_time_ms: skeleton.stats ? skeleton.stats.scan_time_ms : 0
+    };
+  } catch (e) {
+    return {
+      headings: 0,
+      sections: 0,
+      visual_headings: 0,
+      has_suggestions: false,
+      suggestion_text: null,
+      error: e.message
+    };
+  }
+}
+
+// --- EVENT SOURCING (v3.0) ---
+
+/**
+ * Obté l'historial d'edicions del document actual
+ */
+function getEditHistory(limit) {
+  const doc = DocumentApp.getActiveDocument();
+  if (!doc) return { events: [], error: "No hi ha document actiu" };
+
+  const settings = JSON.parse(getSettings());
+  if (!settings.license_key) return { events: [], error: "Falta llicència" };
+
+  const payload = {
+    action: 'get_edit_history',
+    license_key: settings.license_key,
+    doc_id: doc.getId(),
+    limit: limit || 20
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const json = JSON.parse(response.getContentText());
+
+    if (response.getResponseCode() !== 200 || json.status !== 'ok') {
+      return { events: [], error: json.error_code || "Error obtenint historial" };
+    }
+
+    return { events: json.events || [], count: json.count || 0 };
+  } catch (e) {
+    return { events: [], error: e.message };
+  }
+}
+
+/**
+ * Reverteix una edició específica per ID d'event
+ */
+function revertEditById(eventId) {
+  const doc = DocumentApp.getActiveDocument();
+  if (!doc) return { success: false, error: "No hi ha document actiu" };
+
+  const settings = JSON.parse(getSettings());
+  if (!settings.license_key) return { success: false, error: "Falta llicència" };
+
+  const payload = {
+    action: 'revert_edit',
+    license_key: settings.license_key,
+    doc_id: doc.getId(),
+    event_id: eventId
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const json = JSON.parse(response.getContentText());
+
+    if (response.getResponseCode() !== 200 || json.status !== 'ok') {
+      return { success: false, error: json.error_code || "Error revertint edició" };
+    }
+
+    // Apply the revert to the document
+    if (json.restore_text !== null && json.target_id !== null) {
+      const body = doc.getBody();
+      const targetId = parseInt(json.target_id, 10);
+
+      // Rebuild element map (same logic as processUserCommand)
+      let elementsToProcess = [];
+      const numChildren = body.getNumChildren();
+      for (let i = 0; i < numChildren; i++) {
+        const child = body.getChild(i);
+        if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
+            child.getType() === DocumentApp.ElementType.LIST_ITEM) {
+          elementsToProcess.push(child);
+        }
+      }
+
+      // Find target element by ID
+      let targetElement = null;
+      let currentIndex = 0;
+      for (let i = 0; i < elementsToProcess.length; i++) {
+        const el = elementsToProcess[i];
+        const text = el.asText().getText();
+        if (text.trim().length > 0) {
+          if (currentIndex === targetId) {
+            targetElement = el;
+            break;
+          }
+          currentIndex++;
+        }
+      }
+
+      if (targetElement) {
+        targetElement.asText().setText(json.restore_text);
+        return { success: true, restored: true };
+      } else {
+        return { success: false, error: "No s'ha trobat el paràgraf" };
+      }
+    }
+
+    return { success: true, restored: false };
+  } catch (e) {
+    return { success: false, error: e.message };
   }
 }

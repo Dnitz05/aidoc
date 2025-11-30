@@ -1,10 +1,18 @@
 /**
- * SIDECAR CORE API v2.8 - Banned Expressions & Hybrid Validator
+ * SIDECAR CORE API v3.0 - Event Sourcing
  *
- * v2.8 features:
- * - NEW: Banned Expressions (negative_constraints)
- * - NEW: Hybrid Validator (local regex + LLM retry)
- * - NEW: Pre-validation warning for input containing banned words
+ * v3.0 features:
+ * - NEW: Event Sourcing (edit_events table)
+ * - NEW: Edit history per document
+ * - NEW: Revert any edit (not just last one)
+ *
+ * v2.9 features (preserved):
+ * - Document Skeleton (doc_skeleton) - estructura + entitats
+ * - Context-aware prompting with document structure
+ *
+ * v2.8 features (preserved):
+ * - Banned Expressions (negative_constraints)
+ * - Hybrid Validator (local regex + LLM retry)
  *
  * v2.7 features (preserved):
  * - "Motor d'Enginyeria" system prompt (Lovable-style)
@@ -117,10 +125,106 @@ async function useCredits(env, licenseHash, docMetadata) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// EVENT SOURCING (v3.0)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Save an edit event to the database
+ */
+async function saveEditEvent(env, eventData) {
+  try {
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/edit_events`,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(eventData)
+      }
+    );
+
+    if (!response.ok) {
+      console.error('Failed to save edit event:', await response.text());
+      return null;
+    }
+
+    const [savedEvent] = await response.json();
+    return savedEvent;
+  } catch (e) {
+    console.error('Error saving edit event:', e);
+    return null;
+  }
+}
+
+/**
+ * Get edit history for a document
+ */
+async function getEditHistory(env, licenseHash, docId, limit = 20) {
+  try {
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/edit_events?` +
+      `license_key_hash=eq.${licenseHash}&` +
+      `doc_id=eq.${docId}&` +
+      `order=created_at.desc&` +
+      `limit=${limit}`,
+      {
+        method: 'GET',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      return [];
+    }
+
+    return await response.json();
+  } catch (e) {
+    console.error('Error getting edit history:', e);
+    return [];
+  }
+}
+
+/**
+ * Mark an event as reverted
+ */
+async function markEventReverted(env, eventId, revertedByEventId) {
+  try {
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/edit_events?id=eq.${eventId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reverted_at: new Date().toISOString(),
+          reverted_by: revertedByEventId
+        })
+      }
+    );
+
+    return response.ok;
+  } catch (e) {
+    console.error('Error marking event reverted:', e);
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SYSTEM PROMPT v3 - "Document Engineering Engine" (Lovable-style)
 // ═══════════════════════════════════════════════════════════════
 
-function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode, negativeConstraints) {
+function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode, negativeConstraints, docSkeleton) {
   let prompt = `
 ═══════════════════════════════════════════════════════════════
 IDENTITAT
@@ -233,6 +337,42 @@ ${styleGuide}
   if (strictMode) {
     prompt += `
 ⚠️ MODE ESTRICTE ACTIU: Respon NOMÉS amb informació verificable del context/fitxer. NO inventis dades.
+`;
+  }
+
+  // v2.9: Document skeleton (structure awareness)
+  if (docSkeleton && docSkeleton.structure && docSkeleton.structure.length > 0) {
+    prompt += `
+═══════════════════════════════════════════════════════════════
+📊 ESTRUCTURA DEL DOCUMENT (Context Engine v2.9)
+═══════════════════════════════════════════════════════════════
+Aquest és un MAPA de l'estructura del document. Usa-ho per entendre el context:
+
+`;
+    // Add document stats
+    if (docSkeleton.stats) {
+      prompt += `📄 ${docSkeleton.doc_name || 'Document'} | ${docSkeleton.stats.total_chars} chars | ${docSkeleton.stats.paragraph_count} paràgrafs\n\n`;
+    }
+
+    // Add structure items
+    prompt += `ESTRUCTURA:\n`;
+    docSkeleton.structure.forEach((item, idx) => {
+      if (item.type === 'SECTION') {
+        prompt += `  [${idx}] 📄 ${item.preview.substring(0, 60)}...\n`;
+        if (item.entities && item.entities.length > 0) {
+          prompt += `       └─ Entitats: ${item.entities.slice(0, 5).join(', ')}\n`;
+        }
+      } else if (item.type !== 'WARNING') {
+        // It's a heading (H1, H2, VISUAL_H, BOLD_H, etc.)
+        prompt += `  [${idx}] 📌 ${item.type}: "${item.text}"\n`;
+      }
+    });
+
+    prompt += `
+Usa aquest mapa per:
+- Entendre l'organització jeràrquica del document
+- Identificar on fer canvis sense trencar l'estructura
+- Detectar entitats rellevants (dates, imports, percentatges)
 `;
   }
 
@@ -411,6 +551,13 @@ export default {
       if (body.action === 'delete_receipt') {
         return await handleDeleteReceipt(body, env, corsHeaders);
       }
+      // v3.0: Event Sourcing endpoints
+      if (body.action === 'get_edit_history') {
+        return await handleGetEditHistory(body, env, corsHeaders);
+      }
+      if (body.action === 'revert_edit') {
+        return await handleRevertEdit(body, env, corsHeaders);
+      }
 
       // Default: Chat handler
       return await handleChat(body, env, corsHeaders);
@@ -440,7 +587,8 @@ async function handleChat(body, env, corsHeaders) {
     chat_history,  // Conversational memory
     last_edit,     // v2.6: Last edit memory for "una altra" cases
     user_mode,     // v2.6.2: User-selected mode (auto | edit | chat)
-    negative_constraints  // v2.8: Banned words/phrases
+    negative_constraints,  // v2.8: Banned words/phrases
+    doc_skeleton   // v2.9: Document structure (headings, sections, entities)
   } = body;
 
   if (!license_key) throw new Error("missing_license");
@@ -456,7 +604,8 @@ async function handleChat(body, env, corsHeaders) {
     !!knowledge_file_uri,
     style_guide,
     strict_mode,
-    negative_constraints  // v2.8: Banned words
+    negative_constraints,  // v2.8: Banned words
+    doc_skeleton  // v2.9: Document structure
   );
 
   // 3. Build contents array with chat history (MEMORY)
@@ -643,13 +792,61 @@ REESCRIU la resposta substituint aquestes paraules per sinònims acceptables.`
   }
   // 'auto' mode: no override, AI decides
 
+  // 5.2 Save edit event (v3.0 Event Sourcing)
+  let savedEventId = null;
+  if (parsedResponse.mode === 'UPDATE_BY_ID' && parsedResponse.updates) {
+    // Save each update as an event (for now, save only the first one to keep it simple)
+    const updateEntries = Object.entries(parsedResponse.updates);
+    if (updateEntries.length > 0) {
+      const [targetId, afterText] = updateEntries[0];
+      // Note: We need before_text from the original document, which we'll get from last_edit or text
+      const beforeText = last_edit?.targetId === targetId ? last_edit.originalText : null;
+
+      const eventData = {
+        license_key_hash: licenseHash,
+        doc_id: doc_metadata?.doc_id || 'unknown',
+        event_type: 'UPDATE_BY_ID',
+        target_id: parseInt(targetId, 10),
+        before_text: beforeText,
+        after_text: afterText,
+        user_instruction: user_instruction,
+        thought: parsedResponse.thought,
+        ai_mode: effectiveMode
+      };
+
+      const savedEvent = await saveEditEvent(env, eventData);
+      if (savedEvent) {
+        savedEventId = savedEvent.id;
+      }
+    }
+  } else if (parsedResponse.mode === 'REWRITE' && parsedResponse.blocks) {
+    // Save REWRITE as a single event with blocks as JSON
+    const eventData = {
+      license_key_hash: licenseHash,
+      doc_id: doc_metadata?.doc_id || 'unknown',
+      event_type: 'REWRITE',
+      target_id: null,
+      before_text: null,  // Full rewrite doesn't have a "before"
+      after_text: JSON.stringify(parsedResponse.blocks),
+      user_instruction: user_instruction,
+      thought: parsedResponse.thought,
+      ai_mode: effectiveMode
+    };
+
+    const savedEvent = await saveEditEvent(env, eventData);
+    if (savedEvent) {
+      savedEventId = savedEvent.id;
+    }
+  }
+
   // 6. Return response
   return new Response(JSON.stringify({
     status: "ok",
     data: parsedResponse,
     credits_remaining: creditsResult.credits_remaining || 0,
+    event_id: savedEventId,  // v3.0: Include event ID for tracking
     _debug: {
-      version: "2.8",
+      version: "3.0",
       has_selection: has_selection,
       history_length: chat_history?.length || 0,
       has_last_edit: !!last_edit,
@@ -657,7 +854,10 @@ REESCRIU la resposta substituint aquestes paraules per sinònims acceptables.`
       retries: retryCount,
       banned_word_retry: bannedWordRetry,
       negative_constraints_count: negative_constraints?.length || 0,
-      thought: parsedResponse.thought
+      has_skeleton: !!doc_skeleton,
+      skeleton_items: doc_skeleton?.structure?.length || 0,
+      thought: parsedResponse.thought,
+      event_saved: !!savedEventId
     }
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
@@ -850,5 +1050,102 @@ async function handleDeleteReceipt(body, env, corsHeaders) {
   return new Response(JSON.stringify({
     status: "ok",
     deleted: true
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EVENT SOURCING HANDLERS (v3.0)
+// ═══════════════════════════════════════════════════════════════
+
+async function handleGetEditHistory(body, env, corsHeaders) {
+  const { license_key, doc_id, limit } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!doc_id) throw new Error("missing_doc_id");
+
+  const licenseHash = await hashKey(license_key);
+  const events = await getEditHistory(env, licenseHash, doc_id, limit || 20);
+
+  // Format events for UI
+  const formattedEvents = events.map(event => ({
+    id: event.id,
+    event_type: event.event_type,
+    target_id: event.target_id,
+    before_text: event.before_text ? event.before_text.substring(0, 100) + (event.before_text.length > 100 ? '...' : '') : null,
+    after_text: event.after_text ? event.after_text.substring(0, 100) + (event.after_text.length > 100 ? '...' : '') : null,
+    user_instruction: event.user_instruction,
+    thought: event.thought,
+    created_at: event.created_at,
+    is_reverted: !!event.reverted_at
+  }));
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    events: formattedEvents,
+    count: formattedEvents.length
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+async function handleRevertEdit(body, env, corsHeaders) {
+  const { license_key, doc_id, event_id } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!doc_id) throw new Error("missing_doc_id");
+  if (!event_id) throw new Error("missing_event_id");
+
+  const licenseHash = await hashKey(license_key);
+
+  // 1. Get the original event
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/edit_events?id=eq.${event_id}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("event_not_found");
+  }
+
+  const events = await response.json();
+  if (events.length === 0) {
+    throw new Error("event_not_found");
+  }
+
+  const originalEvent = events[0];
+
+  // Check if already reverted
+  if (originalEvent.reverted_at) {
+    throw new Error("event_already_reverted");
+  }
+
+  // 2. Create a REVERT event
+  const revertEvent = await saveEditEvent(env, {
+    license_key_hash: licenseHash,
+    doc_id: doc_id,
+    event_type: 'REVERT',
+    target_id: originalEvent.target_id,
+    before_text: originalEvent.after_text,  // What we're reverting FROM
+    after_text: originalEvent.before_text,   // What we're reverting TO
+    user_instruction: `Revert: ${originalEvent.user_instruction || 'previous edit'}`,
+    thought: `Reverting edit from ${originalEvent.created_at}`,
+    ai_mode: 'edit'
+  });
+
+  // 3. Mark original event as reverted
+  if (revertEvent) {
+    await markEventReverted(env, event_id, revertEvent.id);
+  }
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    revert_event: revertEvent ? { id: revertEvent.id } : null,
+    restore_text: originalEvent.before_text,  // The text to restore in the document
+    target_id: originalEvent.target_id
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
