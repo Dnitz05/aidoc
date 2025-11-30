@@ -1,17 +1,47 @@
 // --- CONFIGURACIÓ ---
 const API_URL = 'https://sidecar-api.conteucontes.workers.dev';
 
+/**
+ * Crea el menú quan s'obre el document
+ * Això funciona amb simple triggers (sense permisos especials)
+ */
 function onOpen() {
-  showSidebar();
+  DocumentApp.getUi()
+    .createMenu('🚗 SideCar')
+    .addItem('Obrir SideCar', 'showSidebar')
+    .addSeparator()
+    .addItem('Ajuda', 'showHelp')
+    .addToUi();
 }
 
+/**
+ * Obre el sidebar (requereix autorització, per això és al menú)
+ */
 function showSidebar() {
   try {
-    const html = HtmlService.createTemplateFromFile('Sidebar').evaluate().setTitle('SideCar AI');
+    const html = HtmlService.createTemplateFromFile('Sidebar')
+      .evaluate()
+      .setTitle('SideCar');
     DocumentApp.getUi().showSidebar(html);
   } catch (e) {
     DocumentApp.getUi().alert('ERROR: ' + e.message);
   }
+}
+
+/**
+ * Mostra ajuda bàsica
+ */
+function showHelp() {
+  const ui = DocumentApp.getUi();
+  ui.alert(
+    'SideCar - Ajuda',
+    'SideCar és el teu assistent d\'escriptura.\n\n' +
+    '1. Fes clic a "Obrir SideCar" per mostrar el panell lateral.\n' +
+    '2. Escriu instruccions com "corregeix l\'ortografia" o "tradueix al castellà".\n' +
+    '3. Selecciona text abans d\'enviar per editar només aquesta part.\n\n' +
+    'Necessites una clau de llicència per funcionar.',
+    ui.ButtonSet.OK
+  );
 }
 
 // --- GESTIÓ DE MEMÒRIA I FITXERS ---
@@ -56,6 +86,89 @@ function clearKnowledgeFile() {
   return "Fitxer oblidat.";
 }
 
+// --- LAST EDIT MEMORY (v2.6) ---
+// Guarda l'últim fragment editat per permetre "una altra", "aquesta no m'agrada", etc.
+const LAST_EDIT_KEY = 'SIDECAR_LAST_EDIT';
+
+function loadLastEdit() {
+  const props = PropertiesService.getDocumentProperties();
+  const json = props.getProperty(LAST_EDIT_KEY);
+  if (!json) return null;
+  try {
+    return JSON.parse(json);
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveLastEdit(lastEdit) {
+  const props = PropertiesService.getDocumentProperties();
+  if (lastEdit) {
+    props.setProperty(LAST_EDIT_KEY, JSON.stringify(lastEdit));
+  } else {
+    props.deleteProperty(LAST_EDIT_KEY);
+  }
+}
+
+/**
+ * Reverteix l'últim canvi fet (v2.6)
+ * Retorna { success: true } o { success: false, error: string }
+ */
+function revertLastEdit() {
+  try {
+    const lastEdit = loadLastEdit();
+    if (!lastEdit) {
+      return { success: false, error: "No hi ha cap canvi per desfer." };
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const targetId = parseInt(lastEdit.targetId, 10);
+
+    // Reconstruir el mapa d'elements (igual que a processUserCommand)
+    let elementsToProcess = [];
+    const numChildren = body.getNumChildren();
+    for (let i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
+          child.getType() === DocumentApp.ElementType.LIST_ITEM) {
+        elementsToProcess.push(child);
+      }
+    }
+
+    // Trobar l'element per ID
+    let targetElement = null;
+    let currentIndex = 0;
+    for (let i = 0; i < elementsToProcess.length; i++) {
+      const el = elementsToProcess[i];
+      const text = el.asText().getText();
+      if (text.trim().length > 0) {
+        if (currentIndex === targetId) {
+          targetElement = el;
+          break;
+        }
+        currentIndex++;
+      }
+    }
+
+    if (!targetElement) {
+      return { success: false, error: "No s'ha trobat el paràgraf original." };
+    }
+
+    // Revertir al text original
+    targetElement.asText().setText(lastEdit.originalText);
+
+    // v2.6.1: Actualitzar currentText = originalText (no esborrar)
+    // Així si l'usuari diu "una altra" després de desfer, la IA entén que partim de l'original
+    lastEdit.currentText = lastEdit.originalText;
+    saveLastEdit(lastEdit);
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
 // --- PUJADA DE FITXERS (PROXY VIA WORKER) ---
 function uploadFileToWorker(base64Data, mimeType, fileName) {
   const settingsStr = getSettings();
@@ -93,8 +206,8 @@ function uploadFileToWorker(base64Data, mimeType, fileName) {
   }
 }
 
-// --- NUCLI DEL PROCESSAMENT (AMB ROUTER D'INTENCIÓ) ---
-function processUserCommand(instruction) {
+// --- NUCLI DEL PROCESSAMENT (v2.6 amb lastEdit Memory) ---
+function processUserCommand(instruction, chatHistory) {
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
   const body = doc.getBody();
@@ -102,6 +215,9 @@ function processUserCommand(instruction) {
   let contentPayload = "";
   let mapIdToElement = {};
   let isSelection = false;
+
+  // v2.6: Carregar l'últim edit per contexte
+  const lastEdit = loadLastEdit();
 
   const settings = JSON.parse(getSettings());
   if (!settings.license_key) throw new Error("Falta llicència.");
@@ -148,7 +264,15 @@ function processUserCommand(instruction) {
     style_guide: settings.style_guide,
     strict_mode: settings.strict_mode,
     knowledge_file_uri: knowledgeFileUri,
-    knowledge_file_mime: knowledgeFileMime
+    knowledge_file_mime: knowledgeFileMime,
+    has_selection: isSelection,
+    chat_history: chatHistory || [],
+    last_edit: lastEdit,
+    pinned_prefs: {
+      language: 'ca',
+      tone: 'tècnic però entenedor',
+      style_notes: settings.style_guide || ''
+    }
   };
 
   const options = {
@@ -179,9 +303,32 @@ function processUserCommand(instruction) {
     }
 
     if (aiData.mode === 'UPDATE_BY_ID') {
+      let capturedLastEdit = null;
+      const existingLastEdit = loadLastEdit(); // v2.6.1: Carregar ABANS del loop
+
       for (const [id, newText] of Object.entries(aiData.updates)) {
         const targetElement = mapIdToElement[id];
-        if (targetElement) updateParagraphPreservingAttributes(targetElement, newText);
+        if (targetElement) {
+          const currentDocText = targetElement.asText().getText();
+          updateParagraphPreservingAttributes(targetElement, newText);
+
+          // v2.6.1: Preservar originalText si editem el MATEIX paràgraf (cadena d'alternatives)
+          // Si és un paràgraf diferent, comencem nova cadena amb l'actual com a original
+          const isSameTarget = existingLastEdit &&
+                               String(existingLastEdit.targetId) === String(id);
+          const preservedOriginal = isSameTarget
+                                    ? existingLastEdit.originalText
+                                    : currentDocText;
+
+          capturedLastEdit = {
+            targetId: id,
+            originalText: preservedOriginal,
+            currentText: newText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1')
+          };
+        }
+      }
+      if (capturedLastEdit) {
+        saveLastEdit(capturedLastEdit);
       }
     } else {
       if (isSelection && elementsToProcess.length > 0) {

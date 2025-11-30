@@ -7,38 +7,45 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
       /* ═══════════════════════════════════════════════════════════
-         SIDECAR UI - Refined Dark Theme
+         SIDECAR UI - Google Docs Native Theme System
          ═══════════════════════════════════════════════════════════ */
 
+      /* ─────────────────────────────────────────────────────────────
+         LIGHT THEME (Default - Google Docs Style)
+         ───────────────────────────────────────────────────────────── */
       :root {
-        /* Base (Dark Theme) */
-        --bg-primary: #0f0f0f;
-        --bg-secondary: #1a1a1a;
-        --bg-tertiary: #252525;
-        --bg-elevated: #2a2a2a;
+        /* Base (Light - Google Docs) */
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8f9fa;
+        --bg-tertiary: #f1f3f4;
+        --bg-elevated: #e8eaed;
 
         /* Text */
-        --text-primary: #fafafa;
-        --text-secondary: #a1a1a1;
-        --text-muted: #666666;
+        --text-primary: #202124;
+        --text-secondary: #5f6368;
+        --text-muted: #80868b;
 
-        /* Accent (Emerald) */
-        --accent: #10b981;
-        --accent-hover: #34d399;
-        --accent-muted: rgba(16, 185, 129, 0.15);
-        --accent-glow: rgba(16, 185, 129, 0.3);
+        /* Accent (Google Blue) */
+        --accent: #1a73e8;
+        --accent-hover: #1967d2;
+        --accent-muted: rgba(26, 115, 232, 0.12);
+        --accent-glow: rgba(26, 115, 232, 0.25);
 
         /* Semantic */
-        --success: #22c55e;
-        --error: #ef4444;
-        --error-muted: rgba(239, 68, 68, 0.15);
-        --warning: #f59e0b;
+        --success: #188038;
+        --success-muted: rgba(24, 128, 56, 0.12);
+        --error: #d93025;
+        --error-muted: rgba(217, 48, 37, 0.12);
+        --warning: #f9ab00;
 
         /* Borders & Shadows */
-        --border: rgba(255, 255, 255, 0.08);
-        --border-hover: rgba(255, 255, 255, 0.15);
-        --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-        --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+        --border: #dadce0;
+        --border-hover: #bdc1c6;
+        --shadow-sm: 0 1px 3px rgba(60, 64, 67, 0.15);
+        --shadow-md: 0 2px 6px rgba(60, 64, 67, 0.2);
+
+        /* User message gradient */
+        --user-msg-gradient: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
 
         /* Spacing */
         --space-xs: 4px;
@@ -58,10 +65,52 @@
         --font-mono: 'JetBrains Mono', monospace;
       }
 
+      /* ─────────────────────────────────────────────────────────────
+         DARK THEME (Blue Accent)
+         ───────────────────────────────────────────────────────────── */
+      [data-theme="dark"] {
+        /* Base (Dark) */
+        --bg-primary: #1f1f1f;
+        --bg-secondary: #282828;
+        --bg-tertiary: #303134;
+        --bg-elevated: #3c4043;
+
+        /* Text */
+        --text-primary: #e8eaed;
+        --text-secondary: #9aa0a6;
+        --text-muted: #5f6368;
+
+        /* Accent (Blue for Dark) */
+        --accent: #8ab4f8;
+        --accent-hover: #aecbfa;
+        --accent-muted: rgba(138, 180, 248, 0.15);
+        --accent-glow: rgba(138, 180, 248, 0.3);
+
+        /* Semantic */
+        --success: #81c995;
+        --success-muted: rgba(129, 201, 149, 0.15);
+        --error: #f28b82;
+        --error-muted: rgba(242, 139, 130, 0.15);
+        --warning: #fdd663;
+
+        /* Borders & Shadows */
+        --border: rgba(255, 255, 255, 0.1);
+        --border-hover: rgba(255, 255, 255, 0.2);
+        --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+        --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+
+        /* User message gradient */
+        --user-msg-gradient: linear-gradient(135deg, #8ab4f8 0%, #669df6 100%);
+      }
+
       * {
         box-sizing: border-box;
         margin: 0;
         padding: 0;
+      }
+
+      html {
+        transition: background-color 0.2s ease, color 0.2s ease;
       }
 
       body {
@@ -74,54 +123,54 @@
         overflow: hidden;
         font-size: 13px;
         line-height: 1.5;
+        transition: background-color 0.2s ease, color 0.2s ease;
       }
 
       /* ═══════════════════════════════════════════════════════════
-         NAVIGATION - Icon Tabs
+         NAVIGATION - Header with Brand, Tabs & Close
          ═══════════════════════════════════════════════════════════ */
 
       .nav {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: var(--space-xs);
-        padding: var(--space-md);
-        background: var(--bg-secondary);
+        padding: 6px var(--space-sm);
+        background: var(--bg-primary);
         border-bottom: 1px solid var(--border);
-        position: relative;
+        transition: background-color 0.2s ease, border-color 0.2s ease;
       }
 
       .nav-tabs {
         display: flex;
         align-items: center;
-        gap: var(--space-xs);
+        gap: 2px;
         background: var(--bg-tertiary);
-        padding: var(--space-xs);
-        border-radius: var(--radius-lg);
+        padding: 3px;
+        border-radius: var(--radius-md);
         position: relative;
+        transition: background-color 0.2s ease;
       }
 
       .nav-pill {
         position: absolute;
-        height: calc(100% - 8px);
-        background: var(--bg-elevated);
-        border-radius: var(--radius-md);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        height: calc(100% - 6px);
+        background: var(--bg-primary);
+        border-radius: var(--radius-sm);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease;
         box-shadow: var(--shadow-sm);
       }
 
       .tab {
         position: relative;
         z-index: 1;
-        width: 40px;
-        height: 36px;
+        width: 28px;
+        height: 24px;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-sm);
         color: var(--text-muted);
-        font-size: 18px;
         transition: color 0.2s ease;
         border: none;
         background: none;
@@ -136,12 +185,13 @@
       }
 
       .tab svg {
-        width: 20px;
-        height: 20px;
+        width: 14px;
+        height: 14px;
         stroke: currentColor;
         stroke-width: 2;
         fill: none;
       }
+
 
       /* ═══════════════════════════════════════════════════════════
          PANELS
@@ -194,6 +244,10 @@
         border-radius: var(--radius-full);
       }
 
+      .chat-messages::-webkit-scrollbar-thumb:hover {
+        background: var(--text-muted);
+      }
+
       /* Message Bubbles */
       .msg {
         max-width: 85%;
@@ -217,9 +271,13 @@
 
       .msg.user {
         align-self: flex-end;
-        background: linear-gradient(135deg, var(--accent) 0%, #059669 100%);
+        background: var(--user-msg-gradient);
         color: white;
         border-bottom-right-radius: var(--space-xs);
+      }
+
+      [data-theme="dark"] .msg.user {
+        color: #202124;
       }
 
       .msg.ai {
@@ -228,6 +286,7 @@
         border: 1px solid var(--border);
         border-bottom-left-radius: var(--space-xs);
         color: var(--text-primary);
+        transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
       }
 
       .msg.system {
@@ -241,8 +300,8 @@
       .msg.error {
         align-self: flex-start;
         background: var(--error-muted);
-        border: 1px solid rgba(239, 68, 68, 0.3);
-        color: #fca5a5;
+        border: 1px solid var(--error);
+        color: var(--error);
       }
 
       /* Edit Badge */
@@ -254,15 +313,52 @@
         font-size: 10px;
         font-weight: 500;
         color: var(--success);
-        background: rgba(34, 197, 94, 0.15);
+        background: var(--success-muted);
         padding: 2px 8px;
         border-radius: var(--radius-sm);
         margin-bottom: var(--space-sm);
-        border: 1px solid rgba(34, 197, 94, 0.3);
+        border: 1px solid var(--success);
       }
 
       .edit-badge::before {
         content: '';
+      }
+
+      /* Revert Button */
+      .revert-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--text-muted);
+        background: var(--bg-elevated);
+        padding: 2px 6px;
+        border-radius: var(--radius-sm);
+        margin-left: var(--space-sm);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        vertical-align: middle;
+      }
+
+      .revert-btn:hover {
+        color: var(--warning);
+        border-color: var(--warning);
+        background: rgba(249, 171, 0, 0.1);
+      }
+
+      .revert-btn:active {
+        transform: scale(0.95);
+      }
+
+      .revert-btn svg {
+        width: 10px;
+        height: 10px;
+        stroke: currentColor;
+        stroke-width: 2;
+        fill: none;
       }
 
       /* Thinking Indicator */
@@ -301,6 +397,7 @@
         padding: var(--space-md);
         background: var(--bg-secondary);
         border-top: 1px solid var(--border);
+        transition: background-color 0.2s ease, border-color 0.2s ease;
       }
 
       .input-wrapper {
@@ -311,7 +408,7 @@
         border: 1px solid var(--border);
         border-radius: var(--radius-lg);
         padding: var(--space-sm);
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
       }
 
       .input-wrapper:focus-within {
@@ -338,39 +435,44 @@
       }
 
       .send-btn {
-        width: 36px;
-        height: 36px;
+        width: 32px;
+        height: 32px;
         display: flex;
         align-items: center;
         justify-content: center;
         background: var(--accent);
         border: none;
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-full);
         color: white;
         cursor: pointer;
-        transition: all 0.15s ease;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         flex-shrink: 0;
+        box-shadow: 0 2px 8px var(--accent-glow);
       }
 
       .send-btn:hover:not(:disabled) {
         background: var(--accent-hover);
-        transform: scale(1.05);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px var(--accent-glow);
       }
 
       .send-btn:active:not(:disabled) {
-        transform: scale(0.95);
+        transform: translateY(0) scale(0.95);
+        box-shadow: 0 1px 4px var(--accent-glow);
       }
 
       .send-btn:disabled {
-        opacity: 0.5;
+        opacity: 0.4;
         cursor: not-allowed;
+        box-shadow: none;
+        background: var(--text-muted);
       }
 
       .send-btn svg {
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
         stroke: currentColor;
-        stroke-width: 2;
+        stroke-width: 2.5;
         fill: none;
       }
 
@@ -425,7 +527,7 @@
         border: 1px solid var(--border);
         border-radius: var(--radius-md);
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.2s ease, background-color 0.2s ease;
         overflow: hidden;
       }
 
@@ -644,6 +746,7 @@
         border-radius: var(--radius-md);
         padding: var(--space-lg);
         margin-bottom: var(--space-md);
+        transition: background-color 0.2s ease, border-color 0.2s ease;
       }
 
       .settings-card-header {
@@ -679,6 +782,7 @@
         border: 1px solid var(--border);
         border-radius: var(--radius-md);
         margin-bottom: var(--space-md);
+        transition: background-color 0.2s ease, border-color 0.2s ease;
       }
 
       .toggle-label {
@@ -1017,6 +1121,20 @@
         </label>
       </div>
 
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span class="icon">🌙</span>
+          <div>
+            <div class="text">Mode Fosc</div>
+            <div class="hint">Canvia l'aparença de la barra lateral</div>
+          </div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="darkMode" onchange="toggleTheme()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
       <button class="save-btn" id="saveBtn" onclick="saveSettings()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -1032,8 +1150,8 @@
     <div id="inputArea" class="input-area">
       <div class="input-wrapper">
         <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="1"></textarea>
-        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Enviar">
+          <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
         </button>
       </div>
       <div class="credits-display" id="creditsDisplay"></div>
@@ -1048,7 +1166,35 @@
       let selectedEmoji = '⚡';
       let currentTab = 'chat';
 
+      // ═══════════════════════════════════════════════════════════
+      // THEME MANAGEMENT
+      // ═══════════════════════════════════════════════════════════
+
+      function initTheme() {
+        const savedTheme = localStorage.getItem('sidecar-theme');
+        const isDark = savedTheme === 'dark';
+        applyTheme(isDark);
+        document.getElementById('darkMode').checked = isDark;
+      }
+
+      function toggleTheme() {
+        const isDark = document.getElementById('darkMode').checked;
+        applyTheme(isDark);
+        localStorage.setItem('sidecar-theme', isDark ? 'dark' : 'light');
+      }
+
+      function applyTheme(isDark) {
+        if (isDark) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      }
+
       window.onload = function() {
+        // Initialize theme
+        initTheme();
+
         // Position nav pill
         updateNavPill();
 
@@ -1124,6 +1270,41 @@
       }
 
       // ═══════════════════════════════════════════════════════════
+      // CHAT HISTORY (Memory for v2.4)
+      // ═══════════════════════════════════════════════════════════
+
+      function getRecentHistory() {
+        const messages = document.querySelectorAll('#chatHistory .msg');
+        const history = [];
+
+        messages.forEach(function(msg) {
+          // Skip system messages, errors, and thinking indicators
+          if (msg.classList.contains('system') ||
+              msg.classList.contains('error') ||
+              msg.classList.contains('thinking')) {
+            return;
+          }
+
+          if (msg.classList.contains('user')) {
+            // Get text without emoji prefix from receipts
+            let text = msg.innerText.trim();
+            if (text.startsWith('🎯 ')) text = text.substring(3);
+            history.push({ role: 'user', text: text });
+          } else if (msg.classList.contains('ai')) {
+            // Get text, removing edit badge if present
+            let text = msg.innerText.trim();
+            if (text.startsWith('Document modificat')) {
+              text = text.replace('Document modificat', '').trim();
+            }
+            history.push({ role: 'model', text: text });
+          }
+        });
+
+        // Return last 12 messages (6 turns) for better context
+        return history.slice(-12);
+      }
+
+      // ═══════════════════════════════════════════════════════════
       // CHAT
       // ═══════════════════════════════════════════════════════════
 
@@ -1155,7 +1336,7 @@
             btn.disabled = false;
             addBubble('error', 'Error: ' + err.message);
           })
-          .processUserCommand(text);
+          .processUserCommand(text, getRecentHistory());
       }
 
       function addBubble(type, text, isEdit) {
@@ -1164,7 +1345,7 @@
         bubble.className = 'msg ' + type;
 
         if (type === 'ai' && isEdit) {
-          bubble.innerHTML = '<div class="edit-badge">Document modificat</div>' + text;
+          bubble.innerHTML = '<div class="edit-badge">Document modificat<button class="revert-btn" onclick="revertLastEdit(this)" title="Desfer canvi"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Desfer</button></div>' + text;
         } else {
           bubble.innerText = text;
         }
@@ -1292,7 +1473,7 @@
             document.getElementById('sendBtn').disabled = false;
             addBubble('error', 'Error: ' + err.message);
           })
-          .processUserCommand(instruction);
+          .processUserCommand(instruction, getRecentHistory());
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -1372,6 +1553,41 @@
         google.script.run.withSuccessHandler(function() {
           showFileStatus(null);
         }).clearKnowledgeFile();
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // REVERT LAST EDIT (v2.6)
+      // ═══════════════════════════════════════════════════════════
+
+      function revertLastEdit(btn) {
+        // Disable button to prevent double-click
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="spinner" width="10" height="10" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/></svg>';
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.success) {
+              // Update the badge to show reverted
+              const badge = btn.parentElement;
+              badge.innerHTML = '<span style="color: var(--warning);">↩ Canvi desfet</span>';
+              badge.style.background = 'rgba(249, 171, 0, 0.1)';
+              badge.style.borderColor = 'var(--warning)';
+              badge.style.color = 'var(--warning)';
+
+              // Add system message
+              addBubble('system', 'S\'ha desfet l\'últim canvi.');
+            } else {
+              btn.disabled = false;
+              btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Desfer';
+              alert('No s\'ha pogut desfer: ' + (res.error || 'Error desconegut'));
+            }
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Desfer';
+            alert('Error: ' + err.message);
+          })
+          .revertLastEdit();
       }
     </script>
   </body>
