@@ -3,15 +3,27 @@ const API_URL = 'https://sidecar-api.conteucontes.workers.dev';
 
 /**
  * Crea el menú quan s'obre el document
- * Això funciona amb simple triggers (sense permisos especials)
+ * Gestiona tant simple triggers com installable triggers
+ * @param {Object} e - Event object amb authMode
  */
-function onOpen() {
-  DocumentApp.getUi()
-    .createMenu('🚗 SideCar')
+function onOpen(e) {
+  const ui = DocumentApp.getUi();
+  const menu = ui.createMenu('🚗 SideCar')
     .addItem('Obrir SideCar', 'showSidebar')
     .addSeparator()
-    .addItem('Ajuda', 'showHelp')
-    .addToUi();
+    .addItem('Ajuda', 'showHelp');
+
+  // En AuthMode.NONE (abans d'autorització), el menú es mostra però
+  // les funcions que requereixen permisos no funcionaran fins autoritzar
+  menu.addToUi();
+}
+
+/**
+ * S'executa quan l'usuari instal·la l'Add-on des del Marketplace
+ * @param {Object} e - Event object
+ */
+function onInstall(e) {
+  onOpen(e);
 }
 
 /**
