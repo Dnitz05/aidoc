@@ -1,10 +1,16 @@
 /**
- * SIDECAR CORE API v3.0 - Event Sourcing
+ * SIDECAR CORE API v3.1 - Shadow Validator (Surgical Refactor)
  *
- * v3.0 features:
- * - NEW: Event Sourcing (edit_events table)
- * - NEW: Edit history per document
- * - NEW: Revert any edit (not just last one)
+ * v3.1 features:
+ * - NEW: Time Budget (25s safety cutoff)
+ * - NEW: Unified validateResponse() function
+ * - NEW: Graceful degradation with _meta warnings
+ * - IMPROVED: processWithRetry() pattern
+ *
+ * v3.0 features (preserved):
+ * - Event Sourcing (edit_events table)
+ * - Edit history per document
+ * - Revert any edit (not just last one)
  *
  * v2.9 features (preserved):
  * - Document Skeleton (doc_skeleton) - estructura + entitats
@@ -17,12 +23,18 @@
  * v2.7 features (preserved):
  * - "Motor d'Enginyeria" system prompt (Lovable-style)
  * - Mandatory "thought" field (Chain of Thought)
- * - Retry loop for invalid JSON (1 retry with feedback)
  *
  * v2.6.x features (preserved):
  * - Mode selector (auto | edit | chat)
  * - lastEdit memory, revert button, pinned_prefs
  */
+
+// ═══════════════════════════════════════════════════════════════
+// SHADOW VALIDATOR CONSTANTS (v3.1)
+// ═══════════════════════════════════════════════════════════════
+
+const TIMEOUT_CUTOFF = 25000;  // 25s safety margin (GAS timeout is 30s)
+const MAX_RETRIES = 2;         // Initial attempt + 2 retries max
 
 // ═══════════════════════════════════════════════════════════════
 // UTILITY FUNCTIONS
@@ -422,6 +434,107 @@ function safeParseJSON(rawText) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// UNIFIED RESPONSE VALIDATOR (v3.1 - Shadow Validator)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Unified validation function - single source of truth for response quality
+ * @param {string} rawText - Raw response from Gemini
+ * @param {Object} constraints - Validation constraints
+ * @param {string[]} constraints.bannedWords - Words that must not appear
+ * @param {number} constraints.maxLength - Maximum output length (optional)
+ * @returns {Object} Validation result
+ */
+function validateResponse(rawText, constraints = {}) {
+  const result = {
+    isValid: true,
+    json: null,
+    parsed: null,
+    errors: [],
+    warnings: [],
+    blocker: null  // 'JSON' | 'BANNED' | 'EMPTY' | null
+  };
+
+  // ─── CHECK 1: Empty Response ───
+  if (!rawText || rawText.trim().length < 5) {
+    result.isValid = false;
+    result.errors.push('Empty or too short response');
+    result.blocker = 'EMPTY';
+    return result;
+  }
+
+  // ─── CHECK 2: JSON Validity ───
+  const jsonResult = safeParseJSON(rawText);
+  if (jsonResult === null) {
+    result.isValid = false;
+    result.errors.push('Invalid JSON structure');
+    result.blocker = 'JSON';
+    return result;
+  }
+  result.json = jsonResult;
+
+  // ─── CHECK 3: Parse and Normalize ───
+  result.parsed = parseAndValidate(rawText);
+
+  // ─── CHECK 4: Banned Words ───
+  if (constraints.bannedWords && constraints.bannedWords.length > 0) {
+    const outputText = getOutputText(result.parsed);
+    const foundBanned = findBannedWords(outputText, constraints.bannedWords);
+
+    if (foundBanned.length > 0) {
+      result.isValid = false;
+      result.errors.push(`Banned words detected: ${foundBanned.join(', ')}`);
+      result.blocker = 'BANNED';
+      result.bannedWordsFound = foundBanned;
+    }
+  }
+
+  // ─── CHECK 5: Length Sanity (Warning only) ───
+  if (constraints.maxLength) {
+    const outputText = getOutputText(result.parsed);
+    if (outputText.length > constraints.maxLength) {
+      result.warnings.push(`Output length (${outputText.length}) exceeds recommended max (${constraints.maxLength})`);
+    }
+  }
+
+  // ─── CHECK 6: Required Fields ───
+  if (!result.parsed.mode) {
+    result.warnings.push('Missing mode field, defaulted to CHAT_ONLY');
+  }
+  if (!result.parsed.thought) {
+    result.warnings.push('Missing thought field (Chain of Thought)');
+  }
+
+  return result;
+}
+
+/**
+ * Build error feedback message for retry prompt
+ * @param {Object} validation - Result from validateResponse()
+ * @returns {string} Feedback message for Gemini
+ */
+function buildRetryFeedback(validation) {
+  if (validation.blocker === 'JSON') {
+    return `ERROR: La teva resposta no era JSON vàlid.
+Torna a intentar-ho amb NOMÉS el JSON, sense text extra abans ni després.
+Format requerit: { "thought": "...", "mode": "...", ... }`;
+  }
+
+  if (validation.blocker === 'BANNED') {
+    return `ERROR: La teva resposta conté paraules PROHIBIDES: "${validation.bannedWordsFound.join('", "')}".
+Aquestes paraules estan a la LLISTA NEGRA de l'usuari i MAI s'han d'usar.
+REESCRIU la resposta substituint aquestes paraules per sinònims acceptables.`;
+  }
+
+  if (validation.blocker === 'EMPTY') {
+    return `ERROR: La teva resposta estava buida o era massa curta.
+Genera una resposta completa seguint el format JSON especificat.`;
+  }
+
+  return `ERROR: La resposta no ha passat la validació. Errors: ${validation.errors.join('; ')}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // RESPONSE PARSER AND VALIDATOR - Robust normalization
 // ═══════════════════════════════════════════════════════════════
 
@@ -574,6 +687,9 @@ export default {
 // ═══════════════════════════════════════════════════════════════
 
 async function handleChat(body, env, corsHeaders) {
+  // ═══ v3.1: Start time tracking for Time Budget ═══
+  const startTime = Date.now();
+
   const {
     license_key,
     text,
@@ -686,16 +802,33 @@ INSTRUCCIÓ DE L'USUARI:
   userParts.push({ text: currentMessage });
   contents.push({ role: 'user', parts: userParts });
 
-  // 4. Call Gemini with retry loop (v2.7 + v2.8 banned word validation)
+  // ═══════════════════════════════════════════════════════════════
+  // 4. SHADOW VALIDATOR LOOP (v3.1 - Unified Validation + Time Budget)
+  // ═══════════════════════════════════════════════════════════════
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`;
 
   let parsedResponse = null;
   let retryCount = 0;
-  const MAX_RETRIES = 2;  // v2.8: Increased to allow for banned word retry
   let currentContents = [...contents];
-  let bannedWordRetry = false;
+  let lastValidation = null;
+  let timeoutAborted = false;
+
+  // Validation constraints
+  const validationConstraints = {
+    bannedWords: negative_constraints || [],
+    maxLength: 10000  // Sanity check for hallucinations
+  };
 
   while (retryCount <= MAX_RETRIES) {
+    // ─── TIME BUDGET CHECK (v3.1) ───
+    const elapsedTime = Date.now() - startTime;
+    if (elapsedTime > TIMEOUT_CUTOFF) {
+      console.warn(`[Shadow Validator] Time budget exceeded: ${elapsedTime}ms > ${TIMEOUT_CUTOFF}ms. Aborting retries.`);
+      timeoutAborted = true;
+      break;
+    }
+
+    // ─── CALL GEMINI ───
     const geminiResp = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -704,54 +837,30 @@ INSTRUCCIÓ DE L'USUARI:
         system_instruction: { parts: [{ text: systemPrompt }] },
         generationConfig: {
           responseMimeType: "application/json",
-          temperature: retryCount === 0 ? 0.4 : 0.2  // Lower temp on retry for more deterministic output
+          temperature: retryCount === 0 ? 0.4 : 0.2  // Lower temp on retry
         }
       })
     });
 
     if (!geminiResp.ok) throw new Error("gemini_error: " + await geminiResp.text());
     const geminiData = await geminiResp.json();
-
     const rawResponse = geminiData.candidates[0].content.parts[0].text;
 
-    // Try to parse JSON
-    const directParse = safeParseJSON(rawResponse);
+    // ─── UNIFIED VALIDATION (v3.1) ───
+    lastValidation = validateResponse(rawResponse, validationConstraints);
 
-    if (directParse !== null) {
-      // Valid JSON - now check for banned words (v2.8)
-      parsedResponse = parseAndValidate(rawResponse);
-
-      // v2.8: Validate output doesn't contain banned words
-      if (negative_constraints && negative_constraints.length > 0) {
-        const outputText = getOutputText(parsedResponse);
-        const foundBanned = findBannedWords(outputText, negative_constraints);
-
-        if (foundBanned.length > 0 && !bannedWordRetry && retryCount < MAX_RETRIES) {
-          // Banned words found - retry with specific feedback
-          bannedWordRetry = true;
-          retryCount++;
-          currentContents = [...contents];
-          currentContents.push({
-            role: 'model',
-            parts: [{ text: rawResponse }]
-          });
-          currentContents.push({
-            role: 'user',
-            parts: [{
-              text: `ERROR: La teva resposta conté paraules PROHIBIDES: "${foundBanned.join('", "')}".
-Aquestes paraules estan a la LLISTA NEGRA de l'usuari i MAI s'han d'usar.
-REESCRIU la resposta substituint aquestes paraules per sinònims acceptables.`
-            }]
-          });
-          continue;  // Retry
-        }
-      }
-
-      // All validations passed
+    if (lastValidation.isValid) {
+      // ✅ All validations passed
+      parsedResponse = lastValidation.parsed;
       break;
-    } else if (retryCount < MAX_RETRIES) {
-      // Invalid JSON - retry with error feedback
+    }
+
+    // ❌ Validation failed - decide if we retry
+    if (retryCount < MAX_RETRIES) {
       retryCount++;
+      console.log(`[Shadow Validator] Retry ${retryCount}/${MAX_RETRIES}. Blocker: ${lastValidation.blocker}`);
+
+      // Build retry prompt with specific feedback
       currentContents = [...contents];
       currentContents.push({
         role: 'model',
@@ -759,15 +868,42 @@ REESCRIU la resposta substituint aquestes paraules per sinònims acceptables.`
       });
       currentContents.push({
         role: 'user',
-        parts: [{
-          text: 'ERROR: La teva resposta no era JSON vàlid. Torna a intentar-ho amb NOMÉS el JSON, sense text extra. Recorda el format: { "thought": "...", "mode": "...", ... }'
-        }]
+        parts: [{ text: buildRetryFeedback(lastValidation) }]
       });
     } else {
-      // Max retries reached - use fallback
-      parsedResponse = parseAndValidate(rawResponse);
+      // Max retries exhausted - use best effort
+      console.warn(`[Shadow Validator] Max retries exhausted. Using best effort response.`);
+      parsedResponse = lastValidation.parsed || parseAndValidate(rawResponse);
       break;
     }
+  }
+
+  // ─── GRACEFUL DEGRADATION (v3.1) ───
+  // If we exited abnormally, ensure we have a parsedResponse
+  if (!parsedResponse && lastValidation) {
+    parsedResponse = lastValidation.parsed || {
+      mode: 'CHAT_ONLY',
+      chat_response: 'Ho sento, hi ha hagut un problema processant la resposta.',
+      change_summary: 'Error de validació'
+    };
+  }
+
+  // Build _meta for response quality tracking
+  const _meta = {
+    validation_passed: lastValidation?.isValid ?? false,
+    retries: retryCount,
+    timeout_aborted: timeoutAborted,
+    elapsed_ms: Date.now() - startTime
+  };
+
+  if (lastValidation && !lastValidation.isValid) {
+    _meta.warning = "Low confidence response";
+    _meta.errors = lastValidation.errors;
+    _meta.blocker = lastValidation.blocker;
+  }
+
+  if (lastValidation?.warnings?.length > 0) {
+    _meta.warnings = lastValidation.warnings;
   }
 
   // 5.1 Mode enforcement (v2.6.2)
@@ -839,25 +975,28 @@ REESCRIU la resposta substituint aquestes paraules per sinònims acceptables.`
     }
   }
 
-  // 6. Return response
+  // 6. Return response with _meta for quality tracking (v3.1)
   return new Response(JSON.stringify({
     status: "ok",
     data: parsedResponse,
     credits_remaining: creditsResult.credits_remaining || 0,
     event_id: savedEventId,  // v3.0: Include event ID for tracking
+    _meta: _meta,  // v3.1: Shadow Validator metadata
     _debug: {
-      version: "3.0",
+      version: "3.1",
       has_selection: has_selection,
       history_length: chat_history?.length || 0,
       has_last_edit: !!last_edit,
       user_mode: effectiveMode,
       retries: retryCount,
-      banned_word_retry: bannedWordRetry,
+      timeout_aborted: timeoutAborted,
+      validation_passed: lastValidation?.isValid ?? false,
       negative_constraints_count: negative_constraints?.length || 0,
       has_skeleton: !!doc_skeleton,
       skeleton_items: doc_skeleton?.structure?.length || 0,
       thought: parsedResponse.thought,
-      event_saved: !!savedEventId
+      event_saved: !!savedEventId,
+      elapsed_ms: Date.now() - startTime
     }
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
