@@ -1,6 +1,6 @@
 # Terms of Service
 
-**SideCar AI - Document Engineering Assistant**
+**Docmile - Document Engineering Assistant**
 
 *Last updated: November 30, 2024*
 
@@ -8,13 +8,13 @@
 
 ## 1. Acceptance of Terms
 
-By installing, accessing, or using SideCar ("the Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service.
+By installing, accessing, or using Docmile ("the Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service.
 
 ---
 
 ## 2. Description of Service
 
-SideCar is a Google Docs Add-on that provides:
+Docmile is a Google Docs Add-on that provides:
 - AI-powered text editing and improvement
 - Document structure analysis
 - Custom editing macros ("Receipts")
@@ -28,7 +28,7 @@ The Service uses artificial intelligence to process your instructions and modify
 
 ### 3.1 License Grant
 
-Subject to these Terms, we grant you a limited, non-exclusive, non-transferable, revocable license to use SideCar for your personal or business document editing needs.
+Subject to these Terms, we grant you a limited, non-exclusive, non-transferable, revocable license to use Docmile for your personal or business document editing needs.
 
 ### 3.2 License Key
 
@@ -48,13 +48,13 @@ The Service operates on a credit-based system:
 
 ## 4. Acceptable Use
 
-### 4.1 You MAY use SideCar to:
+### 4.1 You MAY use Docmile to:
 - Edit and improve your own documents
 - Process documents you have permission to edit
 - Create and save custom editing macros
 - Use AI suggestions for legitimate writing purposes
 
-### 4.2 You MAY NOT use SideCar to:
+### 4.2 You MAY NOT use Docmile to:
 - Process content that violates any laws or regulations
 - Generate content that is defamatory, abusive, or harmful
 - Attempt to reverse-engineer or extract our AI prompts
@@ -96,7 +96,7 @@ We do not guarantee that AI suggestions will:
 
 ### 6.1 Our Property
 
-SideCar, including its code, design, prompts, and documentation, is owned by us and protected by intellectual property laws. You may not copy, modify, or distribute any part of the Service.
+Docmile, including its code, design, prompts, and documentation, is owned by us and protected by intellectual property laws. You may not copy, modify, or distribute any part of the Service.
 
 ### 6.2 Your Content
 
@@ -240,4 +240,4 @@ For questions about these Terms:
 
 ---
 
-*By using SideCar, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.*
+*By using Docmile, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.*

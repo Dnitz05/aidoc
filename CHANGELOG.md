@@ -1,6 +1,6 @@
 # Changelog
 
-Totes les versions notables de SideCar estan documentades aquí.
+Totes les versions notables de Docmile estan documentades aquí.
 
 Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
@@ -290,7 +290,7 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fonts: Plus Jakarta Sans + JetBrains Mono
 
 ### Architecture
-- Menu "SideCar" en lloc d'obertura automàtica
+- Menu "Docmile" en lloc d'obertura automàtica
 - `onOpen()` crea menú, `showSidebar()` obre panell
 
 ### Fixed

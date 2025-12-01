@@ -1,6 +1,6 @@
 # Roadmap
 
-Pla de desenvolupament de SideCar - "Lovable for Google Docs"
+Pla de desenvolupament de Docmile - "Lovable for Google Docs"
 
 ---
 

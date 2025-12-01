@@ -1,4 +1,4 @@
-# SideCar
+# Docmile
 
 **"Lovable for Google Docs"** - Motor d'Enginyeria Documental amb IA
 
@@ -8,9 +8,9 @@
 
 ---
 
-## Què és SideCar?
+## Què és Docmile?
 
-SideCar és un assistent d'escriptura intel·ligent integrat a Google Docs que transforma instruccions en llenguatge natural en **operacions atòmiques sobre documents**.
+Docmile és un assistent d'escriptura intel·ligent integrat a Google Docs que transforma instruccions en llenguatge natural en **operacions atòmiques sobre documents**.
 
 No és un xatbot passiu. És un **Motor d'Enginyeria Documental** inspirat en eines com Cursor, Aider i Lovable.
 
@@ -18,7 +18,7 @@ No és un xatbot passiu. És un **Motor d'Enginyeria Documental** inspirat en ei
 
 ```
 Cursor/Aider    →  Codi      →  Diffs/AST
-SideCar         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
+Docmile         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 ```
 
 ---
@@ -115,7 +115,7 @@ SideCar         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 2. Extensions → Apps Script
 3. Copia `docs-addon/Code.gs` i `docs-addon/Sidebar.html`
 4. Refresca el document
-5. Menú "SideCar" → "Obrir SideCar"
+5. Menú "Docmile" → "Obrir Docmile"
 
 ### 2. Cloudflare Worker
 

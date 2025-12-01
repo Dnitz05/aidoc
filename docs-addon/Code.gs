@@ -8,8 +8,8 @@ const API_URL = 'https://sidecar-api.conteucontes.workers.dev';
  */
 function onOpen(e) {
   const ui = DocumentApp.getUi();
-  const menu = ui.createMenu('🚗 SideCar')
-    .addItem('Obrir SideCar', 'showSidebar')
+  const menu = ui.createMenu('📄 Docmile')
+    .addItem('Obrir Docmile', 'showSidebar')
     .addSeparator()
     .addItem('Ajuda', 'showHelp');
 
@@ -33,7 +33,7 @@ function showSidebar() {
   try {
     const html = HtmlService.createTemplateFromFile('Sidebar')
       .evaluate()
-      .setTitle('SideCar');
+      .setTitle('Docmile');
     DocumentApp.getUi().showSidebar(html);
   } catch (e) {
     DocumentApp.getUi().alert('ERROR: ' + e.message);
@@ -46,9 +46,9 @@ function showSidebar() {
 function showHelp() {
   const ui = DocumentApp.getUi();
   ui.alert(
-    'SideCar - Ajuda',
-    'SideCar és el teu assistent d\'escriptura.\n\n' +
-    '1. Fes clic a "Obrir SideCar" per mostrar el panell lateral.\n' +
+    'Docmile - Ajuda',
+    'Docmile és el teu assistent d\'escriptura.\n\n' +
+    '1. Fes clic a "Obrir Docmile" per mostrar el panell lateral.\n' +
     '2. Escriu instruccions com "corregeix l\'ortografia" o "tradueix al castellà".\n' +
     '3. Selecciona text abans d\'enviar per editar només aquesta part.\n\n' +
     'Necessites una clau de llicència per funcionar.',

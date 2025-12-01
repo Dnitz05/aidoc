@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**SideCar AI - Document Engineering Assistant**
+**Docmile - Document Engineering Assistant**
 
 *Last updated: November 30, 2024*
 
@@ -8,7 +8,7 @@
 
 ## 1. Introduction
 
-SideCar ("we", "our", or "the Service") is a Google Docs Add-on that helps users edit and improve their documents using artificial intelligence. This Privacy Policy explains how we handle your information when you use our Service.
+Docmile ("we", "our", or "the Service") is a Google Docs Add-on that helps users edit and improve their documents using artificial intelligence. This Privacy Policy explains how we handle your information when you use our Service.
 
 **Our Core Principle:** We process your text to provide AI-powered editing, but we do not permanently store your document content.
 
@@ -18,7 +18,7 @@ SideCar ("we", "our", or "the Service") is a Google Docs Add-on that helps users
 
 ### 2.1 Document Content (Temporary Processing Only)
 
-When you use SideCar, we temporarily process:
+When you use Docmile, we temporarily process:
 - The text content of your Google Document (or selected portions)
 - Your editing instructions and preferences
 
@@ -58,7 +58,7 @@ We automatically collect:
 
 ## 4. Third-Party Services
 
-SideCar uses the following third-party services to operate:
+Docmile uses the following third-party services to operate:
 
 | Service | Purpose | Their Privacy Policy |
 |---------|---------|---------------------|
@@ -107,7 +107,7 @@ You have the right to:
 
 ## 8. Children's Privacy
 
-SideCar is not intended for use by children under 13 years of age. We do not knowingly collect information from children under 13.
+Docmile is not intended for use by children under 13 years of age. We do not knowingly collect information from children under 13.
 
 ---
 
@@ -136,7 +136,7 @@ For any privacy-related questions or requests:
 
 ## 12. Google API Services User Data Policy
 
-SideCar's use and transfer of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
+Docmile's use and transfer of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
 
 Specifically:
 - We only request access to the current document (`documents.currentonly` scope)

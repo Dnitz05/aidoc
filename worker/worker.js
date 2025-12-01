@@ -241,7 +241,7 @@ function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode, negati
 ═══════════════════════════════════════════════════════════════
 IDENTITAT
 ═══════════════════════════════════════════════════════════════
-Ets SideCar, un MOTOR D'ENGINYERIA DOCUMENTAL.
+Ets Docmile, un MOTOR D'ENGINYERIA DOCUMENTAL.
 NO ets un xatbot passiu. Ets un AGENT D'EXECUCIÓ que transforma intencions en operacions atòmiques.
 
 ═══════════════════════════════════════════════════════════════
