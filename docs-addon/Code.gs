@@ -1,5 +1,5 @@
 // --- CONFIGURACIÓ ---
-const API_URL = 'https://sidecar-api.conteucontes.workers.dev';
+const API_URL = 'https://docmile-api.conteucontes.workers.dev';
 
 /**
  * Crea el menú quan s'obre el document
