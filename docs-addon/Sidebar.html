@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
       /* ═══════════════════════════════════════════════════════════
-         SIDECAR UI - Google Docs Native Theme System
+         DOCMILE UI - Google Docs Native Theme System
          ═══════════════════════════════════════════════════════════ */
 
       /* ─────────────────────────────────────────────────────────────
@@ -501,24 +501,180 @@
       }
 
       /* ═══════════════════════════════════════════════════════════
-         INPUT AREA
+         PREVIEW MODE (v3.2) - Visual Diff
+         ═══════════════════════════════════════════════════════════ */
+
+      .preview-panel {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        margin: var(--space-md);
+        overflow: hidden;
+        animation: msgAppear 0.3s ease;
+      }
+
+      .preview-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-primary);
+      }
+
+      .preview-header .icon {
+        font-size: 16px;
+      }
+
+      .preview-content {
+        padding: var(--space-md);
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .preview-change {
+        margin-bottom: var(--space-md);
+        padding-bottom: var(--space-md);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .preview-change:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+      }
+
+      .preview-location {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: var(--space-xs);
+      }
+
+      .preview-diff {
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--text-primary);
+        background: var(--bg-primary);
+        padding: var(--space-sm);
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+      }
+
+      /* Diff colors */
+      .diff-del {
+        background: rgba(239, 68, 68, 0.15);
+        color: #dc2626;
+        text-decoration: line-through;
+        padding: 1px 2px;
+        border-radius: 2px;
+      }
+
+      .diff-ins {
+        background: rgba(34, 197, 94, 0.15);
+        color: #16a34a;
+        text-decoration: none;
+        padding: 1px 2px;
+        border-radius: 2px;
+        font-weight: 500;
+      }
+
+      .diff-context {
+        color: var(--text-muted);
+      }
+
+      /* Dark mode adjustments */
+      [data-theme="dark"] .diff-del {
+        background: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+      }
+
+      [data-theme="dark"] .diff-ins {
+        background: rgba(34, 197, 94, 0.2);
+        color: #4ade80;
+      }
+
+      .preview-actions {
+        display: flex;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+        background: var(--bg-tertiary);
+        border-top: 1px solid var(--border);
+      }
+
+      .preview-actions .btn {
+        flex: 1;
+        padding: var(--space-sm) var(--space-md);
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-xs);
+      }
+
+      .preview-actions .btn-apply {
+        background: var(--success);
+        color: white;
+        border: none;
+      }
+
+      .preview-actions .btn-apply:hover {
+        background: #15803d;
+        transform: translateY(-1px);
+      }
+
+      .preview-actions .btn-cancel {
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+      }
+
+      .preview-actions .btn-cancel:hover {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+      }
+
+      .preview-panel.applying {
+        opacity: 0.7;
+        pointer-events: none;
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         INPUT AREA (v3.2 Redesign)
          ═══════════════════════════════════════════════════════════ */
 
       .input-area {
-        padding: var(--space-md);
+        padding: var(--space-sm) var(--space-md) var(--space-md);
         background: var(--bg-secondary);
         border-top: 1px solid var(--border);
         transition: background-color 0.2s ease, border-color 0.2s ease;
       }
 
-      .input-wrapper {
+      /* Header amb mode selector i crèdits */
+      .input-header {
         display: flex;
-        align-items: flex-end;
-        gap: var(--space-sm);
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--space-xs);
+        padding: 0 var(--space-xs);
+      }
+
+      .input-wrapper {
+        position: relative;
         background: var(--bg-tertiary);
         border: 1px solid var(--border);
         border-radius: var(--radius-lg);
         padding: var(--space-sm);
+        padding-right: 44px; /* Espai pel botó send */
         transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
       }
 
@@ -528,17 +684,18 @@
       }
 
       .input-wrapper textarea {
-        flex: 1;
+        width: 100%;
         background: transparent;
         border: none;
         color: var(--text-primary);
         font-family: var(--font-display);
-        font-size: 13px;
+        font-size: 14px;
+        line-height: 1.5;
         resize: none;
         outline: none;
-        min-height: 24px;
-        max-height: 120px;
-        padding: var(--space-xs) var(--space-sm);
+        min-height: 44px;
+        max-height: 200px;
+        padding: var(--space-xs) 0;
       }
 
       .input-wrapper textarea::placeholder {
@@ -546,6 +703,9 @@
       }
 
       .send-btn {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
         width: 32px;
         height: 32px;
         display: flex;
@@ -557,18 +717,17 @@
         color: white;
         cursor: pointer;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        flex-shrink: 0;
         box-shadow: 0 2px 8px var(--accent-glow);
       }
 
       .send-btn:hover:not(:disabled) {
         background: var(--accent-hover);
-        transform: translateY(-2px);
+        transform: scale(1.05);
         box-shadow: 0 4px 12px var(--accent-glow);
       }
 
       .send-btn:active:not(:disabled) {
-        transform: translateY(0) scale(0.95);
+        transform: scale(0.95);
         box-shadow: 0 1px 4px var(--accent-glow);
       }
 
@@ -588,39 +747,36 @@
       }
 
       .credits-display {
-        text-align: center;
         font-family: var(--font-mono);
-        font-size: 11px;
+        font-size: 10px;
         color: var(--text-muted);
-        margin-top: var(--space-sm);
         display: flex;
         align-items: center;
-        justify-content: center;
-        gap: var(--space-xs);
+        gap: 4px;
       }
 
       .credits-display .icon {
         color: var(--accent);
+        font-size: 11px;
       }
 
       /* ═══════════════════════════════════════════════════════════
-         MODE SELECTOR (Cursor-style)
+         MODE SELECTOR (v3.2 Compact)
          ═══════════════════════════════════════════════════════════ */
 
       .mode-selector {
         position: relative;
-        flex-shrink: 0;
       }
 
       .mode-btn {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 4px;
-        padding: 6px 8px;
-        background: var(--bg-elevated);
-        border: 1px solid var(--border);
+        padding: 4px 8px;
+        background: transparent;
+        border: none;
         border-radius: var(--radius-sm);
-        color: var(--text-secondary);
+        color: var(--text-muted);
         font-family: var(--font-display);
         font-size: 11px;
         font-weight: 500;
@@ -630,7 +786,7 @@
       }
 
       .mode-btn:hover {
-        border-color: var(--accent);
+        background: var(--bg-tertiary);
         color: var(--text-primary);
       }
 
@@ -639,12 +795,13 @@
       }
 
       .mode-btn .mode-arrow {
-        width: 10px;
-        height: 10px;
+        width: 8px;
+        height: 8px;
         stroke: currentColor;
         stroke-width: 2;
         fill: none;
         transition: transform 0.2s ease;
+        opacity: 0.6;
       }
 
       .mode-selector.open .mode-arrow {
@@ -653,17 +810,17 @@
 
       .mode-dropdown {
         position: absolute;
-        bottom: calc(100% + 6px);
-        right: 0;
-        min-width: 160px;
+        bottom: calc(100% + 4px);
+        left: 0;
+        min-width: 180px;
         background: var(--bg-secondary);
         border: 1px solid var(--border);
         border-radius: var(--radius-md);
         box-shadow: var(--shadow-md);
         opacity: 0;
         visibility: hidden;
-        transform: translateY(8px);
-        transition: all 0.2s ease;
+        transform: translateY(4px);
+        transition: all 0.15s ease;
         z-index: 100;
         overflow: hidden;
       }
@@ -678,7 +835,7 @@
         display: flex;
         align-items: flex-start;
         gap: var(--space-sm);
-        padding: var(--space-md);
+        padding: var(--space-sm) var(--space-md);
         cursor: pointer;
         transition: background 0.15s ease;
         border: none;
@@ -696,7 +853,7 @@
       }
 
       .mode-option .icon {
-        font-size: 14px;
+        font-size: 13px;
         flex-shrink: 0;
         margin-top: 1px;
       }
@@ -707,10 +864,10 @@
       }
 
       .mode-option .name {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         color: var(--text-primary);
-        margin-bottom: 2px;
+        margin-bottom: 1px;
       }
 
       .mode-option .desc {
@@ -1567,6 +1724,9 @@
         <button class="tab" data-tab="tools" onclick="switchTab('tools')" title="Eines">
           <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         </button>
+        <button class="tab" data-tab="docs" onclick="switchTab('docs')" title="Coneixement">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </button>
         <button class="tab" data-tab="brain" onclick="switchTab('brain')" title="Configuracio">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
@@ -1663,6 +1823,57 @@
       </div>
     </div>
 
+    <!-- Docs Panel (Knowledge) -->
+    <div id="docsPanel" class="panel">
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <span class="icon">📎</span>
+          <div>
+            <div class="title">Fitxer de Coneixement</div>
+            <div class="subtitle">PDF o TXT com a referència per la IA</div>
+          </div>
+        </div>
+        <div class="file-upload" id="fileUploadArea">
+          <label class="file-upload-label">
+            <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md" onchange="handleFileSelect()">
+            <span class="icon">📄</span>
+            <span class="text">Clica per seleccionar un fitxer</span>
+          </label>
+        </div>
+        <div id="fileStatusContainer"></div>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span class="icon">🔒</span>
+          <div>
+            <div class="text">Mode Estricte</div>
+            <div class="hint">Només usa info del fitxer/context</div>
+          </div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="strictMode">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="settings-card" style="margin-top: var(--space-lg);">
+        <div class="settings-card-header">
+          <span class="icon">💡</span>
+          <div>
+            <div class="title">Com funciona</div>
+            <div class="subtitle">Consells d'ús</div>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+          <p>• Puja un <strong>PDF</strong> o <strong>TXT</strong> amb informació de referència</p>
+          <p>• La IA usarà aquest context per respondre millor</p>
+          <p>• Activa <strong>Mode Estricte</strong> per limitar respostes al contingut del fitxer</p>
+          <p>• Els fitxers expiren després d'un temps - torna a pujar si cal</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Brain Panel (Settings) -->
     <div id="brainPanel" class="panel">
       <div class="settings-card">
@@ -1687,38 +1898,6 @@
         <textarea class="form-input" id="styleGuide" rows="3" placeholder="Ex: Sigues formal, utilitza catala correcte..."></textarea>
       </div>
 
-      <div class="settings-card">
-        <div class="settings-card-header">
-          <span class="icon">📎</span>
-          <div>
-            <div class="title">Fitxer de Coneixement</div>
-            <div class="subtitle">PDF o TXT com a referencia</div>
-          </div>
-        </div>
-        <div class="file-upload" id="fileUploadArea">
-          <label class="file-upload-label">
-            <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md" onchange="handleFileSelect()">
-            <span class="icon">📄</span>
-            <span class="text">Clica per seleccionar un fitxer</span>
-          </label>
-        </div>
-        <div id="fileStatusContainer"></div>
-      </div>
-
-      <div class="toggle-row">
-        <div class="toggle-label">
-          <span class="icon">🔒</span>
-          <div>
-            <div class="text">Mode Estricte</div>
-            <div class="hint">Nomes usa info del fitxer/context</div>
-          </div>
-        </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="strictMode">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-
       <div class="toggle-row">
         <div class="toggle-label">
           <span class="icon">🌙</span>
@@ -1729,6 +1908,20 @@
         </div>
         <label class="toggle-switch">
           <input type="checkbox" id="darkMode" onchange="toggleTheme()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span class="icon">👁️</span>
+          <div>
+            <div class="text">Preview Mode</div>
+            <div class="hint">Previsualitza canvis abans d'aplicar</div>
+          </div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="previewModeToggle" checked onchange="togglePreviewMode()">
           <span class="toggle-slider"></span>
         </label>
       </div>
@@ -1761,12 +1954,10 @@
       <div id="saveStatus" class="save-status">Guardat correctament!</div>
     </div>
 
-    <!-- Input Area (Footer) -->
+    <!-- Input Area (Footer) - v3.2 Redesign -->
     <div id="inputArea" class="input-area">
-      <div class="input-wrapper">
-        <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="1"></textarea>
-
-        <!-- Mode Selector -->
+      <!-- Header: Mode selector + Credits -->
+      <div class="input-header">
         <div class="mode-selector" id="modeSelector">
           <button class="mode-btn" onclick="toggleModeDropdown()" type="button">
             <span class="mode-icon" id="modeIcon">✨</span>
@@ -1797,12 +1988,16 @@
             </button>
           </div>
         </div>
+        <div class="credits-display" id="creditsDisplay"></div>
+      </div>
 
+      <!-- Input wrapper amb textarea i send button flotant -->
+      <div class="input-wrapper">
+        <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="2"></textarea>
         <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Enviar">
           <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
         </button>
       </div>
-      <div class="credits-display" id="creditsDisplay"></div>
     </div>
 
     <script>
@@ -1816,6 +2011,9 @@
       let currentMode = 'auto'; // auto | edit | chat
       let bannedWords = []; // v2.8: Banned expressions
       let pendingUndo = null; // v2.6 Sprint: Snapshot per Optimistic UI Undo
+      let pendingPreviewChanges = null; // v3.2: Canvis pendents d'aprovar
+      let pendingDocSnapshot = null;    // v3.3: Snapshot per detectar race conditions
+      let previewModeEnabled = true;    // v3.2: Toggle per activar/desactivar preview
 
       const MODES = {
         auto: { icon: '✨', label: 'Auto' },
@@ -1828,7 +2026,7 @@
       // ═══════════════════════════════════════════════════════════
 
       function initTheme() {
-        const savedTheme = localStorage.getItem('sidecar-theme');
+        const savedTheme = localStorage.getItem('docmile-theme');
         const isDark = savedTheme === 'dark';
         applyTheme(isDark);
         document.getElementById('darkMode').checked = isDark;
@@ -1837,7 +2035,22 @@
       function toggleTheme() {
         const isDark = document.getElementById('darkMode').checked;
         applyTheme(isDark);
-        localStorage.setItem('sidecar-theme', isDark ? 'dark' : 'light');
+        localStorage.setItem('docmile-theme', isDark ? 'dark' : 'light');
+      }
+
+      function togglePreviewMode() {
+        const isEnabled = document.getElementById('previewModeToggle').checked;
+        previewModeEnabled = isEnabled;
+        localStorage.setItem('docmile-preview', isEnabled ? 'true' : 'false');
+        showToast(isEnabled ? '👁️ Preview Mode activat' : '⚡ Canvis directes activats');
+      }
+
+      function initPreviewMode() {
+        const saved = localStorage.getItem('docmile-preview');
+        // Default is true (preview enabled)
+        previewModeEnabled = saved !== 'false';
+        const toggle = document.getElementById('previewModeToggle');
+        if (toggle) toggle.checked = previewModeEnabled;
       }
 
       function applyTheme(isDark) {
@@ -1851,6 +2064,9 @@
       window.onload = function() {
         // Initialize theme
         initTheme();
+
+        // Initialize preview mode (v3.2)
+        initPreviewMode();
 
         // Initialize mode selector
         initModeSelector();
@@ -1891,10 +2107,19 @@
           }
         });
 
-        // Auto-resize textarea
-        document.getElementById('userInput').addEventListener('input', function() {
+        // Auto-resize textarea (v3.2 - expanded limits)
+        const userInput = document.getElementById('userInput');
+        userInput.addEventListener('input', function() {
           this.style.height = 'auto';
-          this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+          const newHeight = Math.min(Math.max(this.scrollHeight, 44), 200);
+          this.style.height = newHeight + 'px';
+        });
+
+        // Ensure minimum height on focus
+        userInput.addEventListener('focus', function() {
+          if (this.scrollHeight < 44) {
+            this.style.height = '44px';
+          }
         });
 
         // Select first emoji
@@ -1906,7 +2131,7 @@
       // ═══════════════════════════════════════════════════════════
 
       function initModeSelector() {
-        const savedMode = localStorage.getItem('sidecar-mode') || 'auto';
+        const savedMode = localStorage.getItem('docmile-mode') || 'auto';
         selectMode(savedMode, false);
 
         // Close dropdown when clicking outside
@@ -1943,7 +2168,7 @@
 
         // Persist
         if (save) {
-          localStorage.setItem('sidecar-mode', mode);
+          localStorage.setItem('docmile-mode', mode);
         }
       }
 
@@ -1969,9 +2194,9 @@
         // Update pill position
         updateNavPill();
 
-        // Show/hide input area
+        // Show/hide input area (hide for settings panels)
         const inputArea = document.getElementById('inputArea');
-        if (tabName === 'brain') {
+        if (tabName === 'brain' || tabName === 'docs') {
           inputArea.classList.add('hidden');
         } else {
           inputArea.classList.remove('hidden');
@@ -2022,12 +2247,23 @@
             if (text.startsWith('🎯 ')) text = text.substring(3);
             history.push({ role: 'user', text: text });
           } else if (msg.classList.contains('ai')) {
-            // Get text, removing edit badge if present
+            // v3.3: Get text, removing entire edit badge block if present
             let text = msg.innerText.trim();
-            if (text.startsWith('Document modificat')) {
-              text = text.replace('Document modificat', '').trim();
+
+            // Remove complete badge line (Document modificat + Desfer + Prohibir)
+            // The badge appears as: "Document modificatDesfer🚫 Prohibir" in innerText
+            text = text.replace(/^Document modificat\s*(Desfer)?\s*(🚫 Prohibir)?\s*/i, '');
+
+            // Also clean any remaining button artifacts
+            text = text.replace(/^Desfer\s*/i, '');
+            text = text.replace(/^🚫 Prohibir\s*/i, '');
+
+            // Remove leading newlines
+            text = text.replace(/^\s*\n+/, '').trim();
+
+            if (text) {
+              history.push({ role: 'model', text: text });
             }
-            history.push({ role: 'model', text: text });
           }
         });
 
@@ -2057,8 +2293,39 @@
           .withSuccessHandler(function(res) {
             hideThinking();
             btn.disabled = false;
-            // v2.8: Pass last_edit_word for ban button
+
+            // v3.2: Handle Preview Mode response
+            if (res.status === 'preview' && res.changes && res.changes.length > 0) {
+              // DEBUG TEMPORAL: Mostrar info del document
+              if (res._debug_doc_chars !== undefined) {
+                addBubble('system', '📄 Doc: ' + res._debug_doc_chars + ' chars | Preview: "' + (res._debug_doc_preview || '').substring(0, 50) + '..."');
+              }
+              showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
+              if (res.credits !== undefined) {
+                document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+              }
+              return;
+            }
+
+            // Handle preview with 0 changes (fallback - IDs didn't match)
+            if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
+              addBubble('ai', res.ai_response + '\n\n⚠️ No s\'han pogut identificar els canvis específics.', true);
+              if (res.credits !== undefined) {
+                document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+              }
+              return;
+            }
+
+            // Normal response handling
             addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
+
+            // DEBUG TEMPORAL: Mostrar info del document rebut
+            if (res._debug_doc_chars !== undefined) {
+              console.log('[DEBUG] Document chars:', res._debug_doc_chars);
+              console.log('[DEBUG] Document preview:', res._debug_doc_preview);
+              addBubble('system', '📄 Doc: ' + res._debug_doc_chars + ' chars | Preview: "' + (res._debug_doc_preview || '').substring(0, 50) + '..."');
+            }
+
             if (res.credits !== undefined) {
               document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
             }
@@ -2073,15 +2340,27 @@
           .withFailureHandler(function(err) {
             hideThinking();
             btn.disabled = false;
-            addBubble('error', 'Error: ' + err.message);
+            // Handle expired knowledge file error
+            if (err.message && err.message.includes('KNOWLEDGE_FILE_EXPIRED')) {
+              addBubble('error', '⚠️ El fitxer de coneixement ha expirat. <button onclick="clearKnowledgeFileAndRetry()" style="margin-left:8px;padding:4px 8px;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;">Esborrar fitxer</button>');
+            } else {
+              addBubble('error', 'Error: ' + err.message);
+            }
           })
-          .processUserCommand(text, getRecentHistory(), getCurrentMode());
+          .processUserCommand(text, getRecentHistory(), getCurrentMode(), previewModeEnabled);
       }
 
       function addBubble(type, text, isEdit, lastEditWord) {
         const container = document.getElementById('chatHistory');
         const bubble = document.createElement('div');
         bubble.className = 'msg ' + type;
+
+        // v3.3: Funció per escapar HTML i permetre salts de línia
+        function sanitizeText(t) {
+          const div = document.createElement('div');
+          div.textContent = t;
+          return div.innerHTML.replace(/\n/g, '<br>');
+        }
 
         if (type === 'ai' && isEdit) {
           let badgeHtml = '<div class="edit-badge">Document modificat' +
@@ -2096,7 +2375,11 @@
           }
 
           badgeHtml += '</div>';
-          bubble.innerHTML = badgeHtml + text;
+          // v3.3: Escapar text per evitar XSS
+          bubble.innerHTML = badgeHtml + sanitizeText(text);
+        } else if (type === 'error') {
+          // v3.3: Errors poden tenir HTML per botons (controlat internament)
+          bubble.innerHTML = text;
         } else {
           bubble.innerText = text;
         }
@@ -2284,10 +2567,37 @@
           .withSuccessHandler(function(res) {
             hideThinking();
             document.getElementById('sendBtn').disabled = false;
-            // v2.8: Pass last_edit_word for ban button
+
+            // v3.3: Handle Preview Mode response (same logic as sendMessage)
+            if (res.status === 'preview' && res.changes && res.changes.length > 0) {
+              showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
+              if (res.credits !== undefined) {
+                document.getElementById('creditsDisplay').innerHTML =
+                  '<span class="icon">⚡</span> ' + res.credits + ' credits';
+              }
+              return;
+            }
+
+            // Handle preview with 0 changes (fallback)
+            if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
+              addBubble('ai', res.ai_response + '\n\n⚠️ No s\'han pogut identificar els canvis específics.', true);
+              if (res.credits !== undefined) {
+                document.getElementById('creditsDisplay').innerHTML =
+                  '<span class="icon">⚡</span> ' + res.credits + ' credits';
+              }
+              return;
+            }
+
+            // Normal response handling
             addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
             if (res.credits !== undefined) {
-              document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+              document.getElementById('creditsDisplay').innerHTML =
+                '<span class="icon">⚡</span> ' + res.credits + ' credits';
+            }
+            // v3.3: Show undo bar if edit was made
+            if (res.mode === 'edit' && res.undo_snapshot) {
+              pendingUndo = res.undo_snapshot;
+              showUndoBar();
             }
           })
           .withFailureHandler(function(err) {
@@ -2295,7 +2605,7 @@
             document.getElementById('sendBtn').disabled = false;
             addBubble('error', 'Error: ' + err.message);
           })
-          .processUserCommand(instruction, getRecentHistory(), getCurrentMode());
+          .processUserCommand(instruction, getRecentHistory(), getCurrentMode(), previewModeEnabled);
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -2411,11 +2721,7 @@
         }).join('');
       }
 
-      function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-      }
+      // v3.3: escapeHtml definida més avall a la secció Preview Mode
 
       function addBannedWord() {
         const input = document.getElementById('newBannedWord');
@@ -2474,6 +2780,259 @@
           .saveBannedWords(bannedWords);
       }
 
+      // ═══════════════════════════════════════════════════════════
+      // PREVIEW MODE (v3.2) - Visual Diff Engine
+      // ═══════════════════════════════════════════════════════════
+
+      /**
+       * Computes HTML diff between two texts using word-level comparison
+       * Returns HTML with <del> and <ins> tags
+       */
+      function computeDiffHtml(original, proposed) {
+        if (!original && !proposed) return '';
+        if (!original) return '<ins class="diff-ins">' + escapeHtml(proposed) + '</ins>';
+        if (!proposed) return '<del class="diff-del">' + escapeHtml(original) + '</del>';
+
+        // Tokenize by words (keeping punctuation attached)
+        const originalWords = original.split(/(\s+)/);
+        const proposedWords = proposed.split(/(\s+)/);
+
+        // Simple LCS-based diff
+        const diff = computeWordDiff(originalWords, proposedWords);
+        return renderDiff(diff);
+      }
+
+      /**
+       * Compute word-level diff using simple comparison
+       */
+      function computeWordDiff(oldWords, newWords) {
+        const result = [];
+        let i = 0, j = 0;
+
+        while (i < oldWords.length || j < newWords.length) {
+          if (i >= oldWords.length) {
+            // Rest of new words are insertions
+            result.push({ type: 'ins', text: newWords[j] });
+            j++;
+          } else if (j >= newWords.length) {
+            // Rest of old words are deletions
+            result.push({ type: 'del', text: oldWords[i] });
+            i++;
+          } else if (oldWords[i] === newWords[j]) {
+            // Match
+            result.push({ type: 'eq', text: oldWords[i] });
+            i++;
+            j++;
+          } else {
+            // Look ahead for potential match
+            const lookAheadOld = oldWords.slice(i, i + 5).indexOf(newWords[j]);
+            const lookAheadNew = newWords.slice(j, j + 5).indexOf(oldWords[i]);
+
+            if (lookAheadOld !== -1 && (lookAheadNew === -1 || lookAheadOld <= lookAheadNew)) {
+              // Delete old words until match
+              for (let k = 0; k < lookAheadOld; k++) {
+                result.push({ type: 'del', text: oldWords[i + k] });
+              }
+              i += lookAheadOld;
+            } else if (lookAheadNew !== -1) {
+              // Insert new words until match
+              for (let k = 0; k < lookAheadNew; k++) {
+                result.push({ type: 'ins', text: newWords[j + k] });
+              }
+              j += lookAheadNew;
+            } else {
+              // No match found - treat as replace
+              result.push({ type: 'del', text: oldWords[i] });
+              result.push({ type: 'ins', text: newWords[j] });
+              i++;
+              j++;
+            }
+          }
+        }
+
+        return result;
+      }
+
+      /**
+       * Render diff array to HTML
+       */
+      function renderDiff(diff) {
+        let html = '';
+        let currentType = null;
+        let buffer = '';
+
+        for (const item of diff) {
+          if (item.type !== currentType) {
+            // Flush buffer
+            if (buffer) {
+              if (currentType === 'del') {
+                html += '<del class="diff-del">' + escapeHtml(buffer) + '</del>';
+              } else if (currentType === 'ins') {
+                html += '<ins class="diff-ins">' + escapeHtml(buffer) + '</ins>';
+              } else {
+                html += escapeHtml(buffer);
+              }
+              buffer = '';
+            }
+            currentType = item.type;
+          }
+          buffer += item.text;
+        }
+
+        // Flush remaining buffer
+        if (buffer) {
+          if (currentType === 'del') {
+            html += '<del class="diff-del">' + escapeHtml(buffer) + '</del>';
+          } else if (currentType === 'ins') {
+            html += '<ins class="diff-ins">' + escapeHtml(buffer) + '</ins>';
+          } else {
+            html += escapeHtml(buffer);
+          }
+        }
+
+        return html;
+      }
+
+      /**
+       * Escape HTML special characters
+       */
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      /**
+       * Show preview panel with proposed changes
+       */
+      function showPreviewPanel(changes, aiResponse, docSnapshot) {
+        pendingPreviewChanges = changes;
+        pendingDocSnapshot = docSnapshot || null; // v3.3: Guardar snapshot
+
+        // Remove existing preview panel
+        hidePreviewPanel();
+
+        // Build preview HTML
+        let changesHtml = '';
+        for (const change of changes) {
+          const diffHtml = computeDiffHtml(change.originalText, change.proposedText);
+          changesHtml += `
+            <div class="preview-change">
+              <div class="preview-location">Paràgraf ${parseInt(change.targetId) + 1}</div>
+              <div class="preview-diff">${diffHtml}</div>
+            </div>
+          `;
+        }
+
+        const previewPanel = document.createElement('div');
+        previewPanel.id = 'previewPanel';
+        previewPanel.className = 'preview-panel';
+        previewPanel.innerHTML = `
+          <div class="preview-header">
+            <span class="icon">👁️</span>
+            <span>Previsualització de Canvis</span>
+          </div>
+          <div class="preview-content">
+            ${changesHtml}
+          </div>
+          <div class="preview-actions">
+            <button class="btn btn-cancel" onclick="cancelPreview()">
+              ❌ Cancel·lar
+            </button>
+            <button class="btn btn-apply" onclick="applyPreviewedChanges()">
+              ✅ Aplicar
+            </button>
+          </div>
+        `;
+
+        // Add to chat history
+        const container = document.getElementById('chatHistory');
+        container.appendChild(previewPanel);
+        container.scrollTop = container.scrollHeight;
+
+        // Add AI response bubble
+        if (aiResponse) {
+          addBubble('ai', aiResponse);
+        }
+      }
+
+      /**
+       * Hide preview panel
+       */
+      function hidePreviewPanel() {
+        const existing = document.getElementById('previewPanel');
+        if (existing) existing.remove();
+      }
+
+      /**
+       * Apply the previewed changes
+       */
+      function applyPreviewedChanges() {
+        if (!pendingPreviewChanges || pendingPreviewChanges.length === 0) {
+          showToast('❌ No hi ha canvis pendents');
+          return;
+        }
+
+        const panel = document.getElementById('previewPanel');
+        if (panel) panel.classList.add('applying');
+
+        // v3.3: Timeout de seguretat (15 segons)
+        const timeoutId = setTimeout(function() {
+          const p = document.getElementById('previewPanel');
+          if (p) p.classList.remove('applying');
+          addBubble('error', '⏱️ Timeout: L\'operació ha trigat massa. Torna-ho a provar.');
+        }, 15000);
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            clearTimeout(timeoutId);
+            hidePreviewPanel();
+            pendingPreviewChanges = null;
+            pendingDocSnapshot = null; // v3.3: Clear snapshot
+
+            if (res.ok) {
+              addBubble('system', '✅ ' + res.applied + ' canvi(s) aplicat(s)');
+
+              // Show undo bar for reverting
+              if (res.undoSnapshots && res.undoSnapshots.length > 0) {
+                pendingUndo = res.undoSnapshots[0];
+                showUndoBar();
+              }
+            } else {
+              addBubble('error', 'Error: ' + (res.error || 'Error desconegut'));
+            }
+          })
+          .withFailureHandler(function(err) {
+            clearTimeout(timeoutId);
+            const panel = document.getElementById('previewPanel');
+            if (panel) panel.classList.remove('applying');
+            addBubble('error', 'Error: ' + err.message);
+          })
+          .applyPendingChanges(pendingPreviewChanges, pendingDocSnapshot);
+      }
+
+      /**
+       * Cancel preview and discard changes
+       */
+      function cancelPreview() {
+        pendingPreviewChanges = null;
+        pendingDocSnapshot = null; // v3.3: Clear snapshot
+        hidePreviewPanel();
+        addBubble('system', '↩ Canvis descartats');
+      }
+
+      function clearKnowledgeFileAndRetry() {
+        google.script.run
+          .withSuccessHandler(function() {
+            showToast('✅ Fitxer esborrat. Torna a enviar el missatge.');
+            updateKnowledgeFileDisplay();
+          })
+          .withFailureHandler(function(err) {
+            showToast('❌ Error: ' + err.message);
+          })
+          .clearKnowledgeFile();
+      }
+
       function showToast(message) {
         // Create a simple toast notification
         const toast = document.createElement('div');
@@ -2496,7 +3055,7 @@
       // ═══════════════════════════════════════════════════════════
 
       let currentSkeleton = null;
-      const HINT_SHOWN_KEY = 'sidecar-structure-hint-shown';
+      const HINT_SHOWN_KEY = 'docmile-structure-hint-shown';
 
       /**
        * Check and show one-time structure hint in chat (v2.5)

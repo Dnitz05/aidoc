@@ -58,12 +58,33 @@ function showHelp() {
 
 // --- GESTIÓ DE MEMÒRIA I FITXERS ---
 function saveSettings(jsonSettings) {
-  PropertiesService.getUserProperties().setProperty('SIDECAR_SETTINGS', jsonSettings);
+  PropertiesService.getUserProperties().setProperty('DOCMILE_SETTINGS', jsonSettings);
   return "OK";
 }
 
 function getSettings() {
-  const json = PropertiesService.getUserProperties().getProperty('SIDECAR_SETTINGS');
+  const props = PropertiesService.getUserProperties();
+
+  // v3.3: Migració automàtica de SIDECAR a DOCMILE (per usuaris existents)
+  const oldJson = props.getProperty('SIDECAR_SETTINGS');
+  if (oldJson && !props.getProperty('DOCMILE_SETTINGS')) {
+    props.setProperty('DOCMILE_SETTINGS', oldJson);
+    props.deleteProperty('SIDECAR_SETTINGS');
+    // Also migrate file keys
+    const oldUri = props.getProperty('SIDECAR_FILE_URI');
+    const oldName = props.getProperty('SIDECAR_FILE_NAME');
+    const oldMime = props.getProperty('SIDECAR_FILE_MIME');
+    if (oldUri) {
+      props.setProperty('DOCMILE_FILE_URI', oldUri);
+      props.setProperty('DOCMILE_FILE_NAME', oldName || '');
+      props.setProperty('DOCMILE_FILE_MIME', oldMime || '');
+      props.deleteProperty('SIDECAR_FILE_URI');
+      props.deleteProperty('SIDECAR_FILE_NAME');
+      props.deleteProperty('SIDECAR_FILE_MIME');
+    }
+  }
+
+  const json = props.getProperty('DOCMILE_SETTINGS');
   const defaults = {
     license_key: "",
     style_guide: "",
@@ -75,16 +96,16 @@ function getSettings() {
 
 function saveFileUri(uri, name, mime) {
   const props = PropertiesService.getUserProperties();
-  props.setProperty('SIDECAR_FILE_URI', uri);
-  props.setProperty('SIDECAR_FILE_NAME', name);
-  props.setProperty('SIDECAR_FILE_MIME', mime);
+  props.setProperty('DOCMILE_FILE_URI', uri);
+  props.setProperty('DOCMILE_FILE_NAME', name);
+  props.setProperty('DOCMILE_FILE_MIME', mime);
   return { name: name, uri: uri };
 }
 
 function getKnowledgeFileInfo() {
   const props = PropertiesService.getUserProperties();
-  const uri = props.getProperty('SIDECAR_FILE_URI');
-  const name = props.getProperty('SIDECAR_FILE_NAME');
+  const uri = props.getProperty('DOCMILE_FILE_URI');
+  const name = props.getProperty('DOCMILE_FILE_NAME');
 
   if (uri && name) return { hasFile: true, name: name };
   return { hasFile: false, name: "Cap fitxer actiu" };
@@ -92,19 +113,19 @@ function getKnowledgeFileInfo() {
 
 function clearKnowledgeFile() {
   const props = PropertiesService.getUserProperties();
-  props.deleteProperty('SIDECAR_FILE_URI');
-  props.deleteProperty('SIDECAR_FILE_NAME');
-  props.deleteProperty('SIDECAR_FILE_MIME');
+  props.deleteProperty('DOCMILE_FILE_URI');
+  props.deleteProperty('DOCMILE_FILE_NAME');
+  props.deleteProperty('DOCMILE_FILE_MIME');
   return "Fitxer oblidat.";
 }
 
 // --- LAST EDIT MEMORY (v2.6) ---
 // Guarda l'últim fragment editat per permetre "una altra", "aquesta no m'agrada", etc.
-const LAST_EDIT_KEY = 'SIDECAR_LAST_EDIT';
+const LAST_EDIT_KEY = 'DOCMILE_LAST_EDIT';
 
 // --- BANNED WORDS (v2.8) ---
 // Paraules que la IA mai hauria d'usar
-const BANNED_WORDS_KEY = 'SIDECAR_BANNED_WORDS';
+const BANNED_WORDS_KEY = 'DOCMILE_BANNED_WORDS';
 
 function loadLastEdit() {
   const props = PropertiesService.getDocumentProperties();
@@ -318,8 +339,8 @@ function uploadFileToWorker(base64Data, mimeType, fileName) {
   }
 }
 
-// --- NUCLI DEL PROCESSAMENT (v2.9 amb skeleton) ---
-function processUserCommand(instruction, chatHistory, userMode) {
+// --- NUCLI DEL PROCESSAMENT (v3.2 amb preview mode) ---
+function processUserCommand(instruction, chatHistory, userMode, previewMode) {
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
   const body = doc.getBody();
@@ -347,8 +368,8 @@ function processUserCommand(instruction, chatHistory, userMode) {
   if (!settings.license_key) throw new Error("Falta llicència.");
 
   const fileProps = PropertiesService.getUserProperties();
-  const knowledgeFileUri = fileProps.getProperty('SIDECAR_FILE_URI');
-  const knowledgeFileMime = fileProps.getProperty('SIDECAR_FILE_MIME');
+  const knowledgeFileUri = fileProps.getProperty('DOCMILE_FILE_URI');
+  const knowledgeFileMime = fileProps.getProperty('DOCMILE_FILE_MIME');
 
   let elementsToProcess = [];
   if (selection) {
@@ -370,15 +391,23 @@ function processUserCommand(instruction, chatHistory, userMode) {
     }
   }
 
-  elementsToProcess.forEach((el, index) => {
+  // Use separate counter to ensure sequential IDs (skip empty paragraphs)
+  let contentIndex = 0;
+  elementsToProcess.forEach((el) => {
     const text = el.asText().getText();
     if (text.trim().length > 0) {
-      contentPayload += `{{${index}}} ${text}\n`;
-      mapIdToElement[index] = el;
+      contentPayload += `{{${contentIndex}}} ${text}\n`;
+      mapIdToElement[contentIndex] = el;
+      contentIndex++;
     }
   });
 
   if (!contentPayload.trim()) contentPayload = "[Document Buit]";
+
+  // DEBUG TEMPORAL: Log per verificar que es llegeix el document
+  Logger.log('[DEBUG] contentPayload length: ' + contentPayload.length);
+  Logger.log('[DEBUG] contentPayload preview: ' + contentPayload.substring(0, 200));
+  Logger.log('[DEBUG] elementsToProcess count: ' + elementsToProcess.length);
 
   const payload = {
     license_key: settings.license_key,
@@ -425,7 +454,10 @@ function processUserCommand(instruction, chatHistory, userMode) {
         ok: true,
         ai_response: aiData.chat_response || aiData.change_summary,
         credits: json.credits_remaining,
-        mode: 'chat'
+        mode: 'chat',
+        // DEBUG: afegir info del document per verificar
+        _debug_doc_chars: contentPayload.length,
+        _debug_doc_preview: contentPayload.substring(0, 100)
       };
     }
 
@@ -435,6 +467,52 @@ function processUserCommand(instruction, chatHistory, userMode) {
     let undoSnapshot = null;
 
     if (aiData.mode === 'UPDATE_BY_ID') {
+      // v3.2: Preview Mode - Return changes without applying
+      if (previewMode) {
+        const changes = [];
+        // v3.3: Build snapshot fingerprint for race condition detection
+        let docSnapshot = '';
+        let snapshotIdx = 0;
+
+        for (const [id, newText] of Object.entries(aiData.updates)) {
+          const targetElement = mapIdToElement[id];
+          if (targetElement) {
+            const currentDocText = targetElement.asText().getText();
+            const cleanNewText = newText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+            changes.push({
+              targetId: id,
+              originalText: currentDocText,
+              proposedText: cleanNewText
+            });
+            // Build snapshot for first few elements
+            if (snapshotIdx < 5) {
+              docSnapshot += '{{' + id + '}} ' + currentDocText.substring(0, 100) + '\n';
+              snapshotIdx++;
+            }
+          }
+        }
+
+        // If no changes found (IDs don't match), fall back to normal mode
+        if (changes.length === 0) {
+          // Try to apply directly instead of showing empty preview
+        } else {
+          return {
+            ok: true,
+            status: 'preview',
+            changes: changes,
+            ai_response: aiData.change_summary,
+            credits: json.credits_remaining,
+            thought: aiData.thought,
+            mode: 'edit',
+            doc_snapshot: docSnapshot,  // v3.3: For race condition detection
+            // DEBUG: afegir info del document per verificar
+            _debug_doc_chars: contentPayload.length,
+            _debug_doc_preview: contentPayload.substring(0, 100)
+          };
+        }
+      }
+
+      // Normal mode - Apply changes directly
       let capturedLastEdit = null;
       const existingLastEdit = loadLastEdit(); // v2.6.1: Carregar ABANS del loop
 
@@ -501,6 +579,111 @@ function processUserCommand(instruction, chatHistory, userMode) {
 
   } catch (e) {
     throw new Error("Error: " + e.message);
+  }
+}
+
+// --- v3.2: APPLY PENDING CHANGES (Preview Mode) ---
+/**
+ * Aplica els canvis prèviament previsualitzats
+ * @param {Array} changes - Array de {targetId, originalText, proposedText}
+ * @returns {Object} {ok, applied, undoSnapshots, error}
+ */
+function applyPendingChanges(changes, expectedSnapshot) {
+  try {
+    if (!changes || !Array.isArray(changes) || changes.length === 0) {
+      return { ok: false, error: "No hi ha canvis per aplicar" };
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+
+    // Reconstruir el mapa d'elements (igual que a processUserCommand)
+    let elementsToProcess = [];
+    const numChildren = body.getNumChildren();
+    for (let i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
+          child.getType() === DocumentApp.ElementType.LIST_ITEM) {
+        elementsToProcess.push(child);
+      }
+    }
+
+    // Crear mapa ID -> Element (només els que tenen text)
+    let mapIdToElement = {};
+    let currentIndex = 0;
+    for (let i = 0; i < elementsToProcess.length; i++) {
+      const el = elementsToProcess[i];
+      const text = el.asText().getText();
+      if (text.trim().length > 0) {
+        mapIdToElement[currentIndex] = el;
+        currentIndex++;
+      }
+    }
+
+    // v3.3: Verificar que el document no ha canviat (race condition detection)
+    if (expectedSnapshot) {
+      let currentSnapshot = '';
+      let snapshotIdx = 0;
+      for (const id of Object.keys(mapIdToElement).slice(0, 5)) {
+        const el = mapIdToElement[id];
+        const text = el.asText().getText();
+        currentSnapshot += '{{' + id + '}} ' + text.substring(0, 100) + '\n';
+        snapshotIdx++;
+      }
+      if (currentSnapshot !== expectedSnapshot) {
+        return {
+          ok: false,
+          error: "El document ha canviat des de la previsualització. Sol·licita els canvis de nou."
+        };
+      }
+    }
+
+    const undoSnapshots = [];
+    let appliedCount = 0;
+    const existingLastEdit = loadLastEdit();
+
+    for (const change of changes) {
+      const targetId = parseInt(change.targetId, 10);
+      const targetElement = mapIdToElement[targetId];
+
+      if (targetElement) {
+        const currentDocText = targetElement.asText().getText();
+
+        // Guardar snapshot per undo
+        undoSnapshots.push({
+          targetId: change.targetId,
+          originalText: currentDocText
+        });
+
+        // Aplicar el canvi
+        updateParagraphPreservingAttributes(targetElement, change.proposedText);
+        appliedCount++;
+
+        // Actualitzar lastEdit memory (per al primer canvi)
+        if (appliedCount === 1) {
+          const isSameTarget = existingLastEdit &&
+                               String(existingLastEdit.targetId) === String(change.targetId);
+          const preservedOriginal = isSameTarget
+                                    ? existingLastEdit.originalText
+                                    : currentDocText;
+
+          saveLastEdit({
+            targetId: change.targetId,
+            originalText: preservedOriginal,
+            currentText: change.proposedText
+          });
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      applied: appliedCount,
+      undoSnapshots: undoSnapshots
+    };
+
+  } catch (e) {
+    return { ok: false, error: e.message };
   }
 }
 
