@@ -3745,123 +3745,6 @@
       }
 
       // ═══════════════════════════════════════════════════════════
-      // DOC STATUS BAR v3.7 - Universal Doc Reader UI
-      // ═══════════════════════════════════════════════════════════
-
-      let docStatusCollapsed = false;
-
-      function toggleDocStatus() {
-        docStatusCollapsed = !docStatusCollapsed;
-        const bar = document.getElementById('docStatusBar');
-        if (docStatusCollapsed) {
-          bar.classList.add('collapsed');
-        } else {
-          bar.classList.remove('collapsed');
-        }
-        localStorage.setItem('docmile-status-collapsed', docStatusCollapsed ? 'true' : 'false');
-      }
-
-      function initDocStatusCollapsed() {
-        const saved = localStorage.getItem('docmile-status-collapsed');
-        docStatusCollapsed = saved === 'true';
-        if (docStatusCollapsed) {
-          document.getElementById('docStatusBar').classList.add('collapsed');
-        }
-      }
-
-      function loadDocStatus() {
-        google.script.run
-          .withSuccessHandler(renderDocStatus)
-          .withFailureHandler(function(err) {
-            renderDocStatusError(err.message);
-          })
-          .getDiagnostics();
-      }
-
-      function renderDocStatus(diag) {
-        const label = document.getElementById('docStatusLabel');
-        const content = document.getElementById('docStatusContent');
-
-        if (!diag || !diag.ok) {
-          renderDocStatusError(diag ? diag.error : 'Error desconegut');
-          return;
-        }
-
-        // Update label with summary
-        const totalVisible = diag.stats.visible_to_ai || 0;
-        const totalChars = diag.stats.total_chars || 0;
-        label.textContent = totalVisible > 0
-          ? `${totalVisible} elements · ${formatChars(totalChars)}`
-          : 'Document buit';
-
-        // Build stats chips
-        let html = '';
-
-        // Main content stats
-        if (diag.stats.by_type) {
-          const types = diag.stats.by_type;
-          if (types.PARAGRAPH) {
-            html += `<span class="doc-stat"><span class="emoji">📝</span>${types.PARAGRAPH} par.</span>`;
-          }
-          if (types.LIST_ITEM) {
-            html += `<span class="doc-stat"><span class="emoji">📋</span>${types.LIST_ITEM} llistes</span>`;
-          }
-          if (types.TABLE) {
-            html += `<span class="doc-stat info"><span class="emoji">📊</span>${types.TABLE} taula(es)</span>`;
-          }
-        }
-
-        // Special sections
-        if (diag.invisible) {
-          if (diag.invisible.tables > 0) {
-            html += `<span class="doc-stat info"><span class="emoji">📊</span>${diag.invisible.tables} taula(es)</span>`;
-          }
-          if (diag.invisible.images > 0) {
-            html += `<span class="doc-stat"><span class="emoji">🖼️</span>${diag.invisible.images} imatge(s)</span>`;
-          }
-        }
-
-        // Issues/Warnings
-        if (diag.issues && diag.issues.length > 0) {
-          diag.issues.forEach(function(issue) {
-            if (issue.type === 'CRITICAL') {
-              html += `<span class="doc-stat warning"><span class="emoji">⚠️</span>${issue.message}</span>`;
-            } else if (issue.type === 'WARNING') {
-              html += `<span class="doc-stat warning"><span class="emoji">👁️</span>${issue.message}</span>`;
-            }
-          });
-        }
-
-        // Show what AI will see
-        if (diag.ai_will_see === 'DOCUMENT_EMPTY') {
-          html += `<span class="doc-stat warning"><span class="emoji">🚫</span>IA veu: BUIT</span>`;
-        } else if (totalVisible > 0) {
-          html += `<span class="doc-stat success"><span class="emoji">✓</span>IA veu: OK</span>`;
-        }
-
-        content.innerHTML = html || '<span class="doc-status-loading">Cap contingut detectat</span>';
-      }
-
-      function renderDocStatusError(error) {
-        const label = document.getElementById('docStatusLabel');
-        const content = document.getElementById('docStatusContent');
-        label.textContent = 'Error';
-        content.innerHTML = `<span class="doc-stat warning"><span class="emoji">⚠️</span>${error}</span>`;
-      }
-
-      function formatChars(chars) {
-        if (chars < 1000) return chars + ' car.';
-        return (chars / 1000).toFixed(1) + 'k car.';
-      }
-
-      // Refresh doc status when tab changes to chat
-      function refreshDocStatusIfNeeded() {
-        if (currentTab === 'chat') {
-          loadDocStatus();
-        }
-      }
-
-      // ═══════════════════════════════════════════════════════════
       // INTENT CLASSIFICATION v3.7 - Detectar intenció localment
       // ═══════════════════════════════════════════════════════════
 
@@ -4121,10 +4004,6 @@
 
         // Initialize mode selector
         initModeSelector();
-
-        // v3.7: Initialize Doc Status Bar
-        initDocStatusCollapsed();
-        loadDocStatus();
 
         // Position nav pill
         updateNavPill();
