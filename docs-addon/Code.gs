@@ -588,7 +588,7 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
           const targetElement = mapIdToElement[id];
           if (targetElement) {
             const currentDocText = targetElement.asText().getText();
-            const cleanNewText = newText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+            const cleanNewText = cleanMarkdown(newText);
             changes.push({
               targetId: id,
               originalText: currentDocText,
@@ -710,7 +710,7 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
 
           // v3.7: Validar que l'edició s'ha aplicat correctament
           const newDocText = targetElement.asText().getText();
-          const cleanNewText = newText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+          const cleanNewText = cleanMarkdown(newText);
           if (newDocText !== cleanNewText) {
             logDiagnostic('EDIT_VALIDATION', {
               status: 'MISMATCH',
@@ -993,9 +993,7 @@ function applyInDocumentPreview(changes) {
 
       const textObj = targetElement.editAsText();
       const originalText = textObj.getText();
-      const cleanNewText = (change.proposedText || '')
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1');
+      const cleanNewText = cleanMarkdown(change.proposedText || '');
 
       // Evitar preview si són iguals
       if (originalText.trim() === cleanNewText.trim()) {
@@ -1267,7 +1265,7 @@ function hasPendingInDocPreview() {
 function updateParagraphPreservingAttributes(element, newMarkdownText) {
   const textObj = element.editAsText();
   const oldText = textObj.getText();
-  const cleanText = newMarkdownText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+  const cleanText = cleanMarkdown(newMarkdownText);
 
   if (oldText.length > 0) {
     textObj.insertText(0, cleanText);
