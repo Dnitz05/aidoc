@@ -2341,6 +2341,10 @@
         border: 1px solid var(--border);
         border-radius: var(--radius-md);
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
       }
 
       .structure-section-header {
@@ -2392,7 +2396,8 @@
       /* Outline Tree */
       .outline-tree {
         padding: var(--space-sm);
-        max-height: 280px;
+        flex: 1;
+        min-height: 100px;
         overflow-y: auto;
         font-family: var(--font-mono);
         font-size: 11px;
@@ -2487,6 +2492,11 @@
       .outline-item[data-depth="1"] { padding-left: 20px; }
       .outline-item[data-depth="2"] { padding-left: 36px; }
       .outline-item[data-depth="3"] { padding-left: 52px; }
+
+      /* Entities Section - no expand */
+      #entitiesSection {
+        flex: 0 0 auto;
+      }
 
       /* Entities Grid */
       .entities-grid {
