@@ -2,7 +2,7 @@
 
 **"Lovable for Google Docs"** - Motor d'Enginyeria Documental amb IA
 
-[![Version](https://img.shields.io/badge/version-5.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-5.1-blue.svg)]()
 [![Platform](https://img.shields.io/badge/platform-Google%20Docs-green.svg)]()
 [![AI](https://img.shields.io/badge/AI-Gemini%202.0-orange.svg)]()
 
@@ -25,10 +25,11 @@ Docmile         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 
 ## Features
 
-### Core (v5.0)
+### Core (v5.1)
 
 | Feature | Descripció |
 |---------|------------|
+| **Knowledge Library** | Biblioteca de fitxers compartida entre documents |
 | **Chat History** | Historial de converses persistent amb auto-save |
 | **Shadow Validator** | Sistema immunitari: valida i auto-corregeix respostes |
 | **Context Engine** | Entén l'estructura del document (headings, seccions, entitats) |
@@ -40,7 +41,7 @@ Docmile         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 | **Atomic Operations** | `UPDATE_BY_ID` - edita paràgrafs específics |
 | **Time Budget** | Safety cutoff de 25s per evitar timeouts |
 | **Receipts** | Macros personalitzades (Custom Actions) |
-| **Knowledge Files** | Adjunta PDFs/TXT com a context |
+| **Knowledge Files** | Adjunta PDFs/TXT com a context (ara amb biblioteca persistent) |
 
 ### UI/UX
 
