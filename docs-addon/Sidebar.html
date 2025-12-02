@@ -426,6 +426,9 @@
         <div class="credits-display" id="creditsDisplay"></div>
       </div>
 
+      <!-- v4.0: Banned Words Chips (visible constraints) -->
+      <div class="constraints-chips" id="constraintsChips"></div>
+
       <!-- Input wrapper amb textarea i send button flotant -->
       <div class="input-wrapper">
         <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="2"></textarea>
@@ -625,6 +628,9 @@
 
         // v3.8: Check for pending in-document preview
         checkPendingInDocPreview();
+
+        // v4.0: Initialize ban tooltip (Sprint 2)
+        initBanTooltip();
 
         // Initialize mode selector
         initModeSelector();
@@ -843,6 +849,11 @@
       function handleSendSuccess(res) {
         hideThinking();
         document.getElementById('sendBtn').disabled = false;
+
+        // v4.0: Handle auto-ban from NL detection (Sprint 3)
+        if (res.auto_ban && res.auto_ban.length > 0) {
+          processAutoBan(res.auto_ban);
+        }
 
         // v3.2: Handle Preview Mode response
         if (res.status === 'preview' && res.changes && res.changes.length > 0) {
@@ -1706,6 +1717,7 @@
           .withSuccessHandler(function(words) {
             bannedWords = words || [];
             renderBannedWordsList();
+            renderConstraintChips(); // v4.0: També renderitza chips
           })
           .withFailureHandler(function(err) {
             console.error('Error loading banned words:', err);
@@ -1729,6 +1741,176 @@
             '<button class="remove-btn" onclick="removeBannedWord(' + index + ')">✕</button>' +
             '</span>';
         }).join('');
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // v4.0 SPRINT 1: CONSTRAINT CHIPS (Visible sobre input)
+      // ═══════════════════════════════════════════════════════════
+
+      function renderConstraintChips() {
+        const container = document.getElementById('constraintsChips');
+        if (!container) return;
+
+        if (bannedWords.length === 0) {
+          container.innerHTML = '';
+          return;
+        }
+
+        container.innerHTML = bannedWords.map(function(word, index) {
+          return '<span class="constraint-chip">' +
+            '<span class="chip-icon">🚫</span>' +
+            '<span class="chip-text">' + escapeHtml(word) + '</span>' +
+            '<button class="chip-remove" onclick="removeConstraintChip(' + index + ')" title="Eliminar restricció">×</button>' +
+            '</span>';
+        }).join('');
+      }
+
+      function removeConstraintChip(index) {
+        const removed = bannedWords.splice(index, 1)[0];
+
+        google.script.run
+          .withSuccessHandler(function() {
+            renderBannedWordsList();
+            renderConstraintChips();
+            showToast('✓ "' + removed + '" ja es pot usar');
+          })
+          .withFailureHandler(function(err) {
+            bannedWords.splice(index, 0, removed); // Rollback
+            console.error('Error removing constraint:', err);
+          })
+          .saveBannedWords(bannedWords);
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // v4.0 SPRINT 2: TOOLTIP SELECCIÓ (Ban from chat)
+      // ═══════════════════════════════════════════════════════════
+
+      let selectedWordToBan = '';
+
+      function initBanTooltip() {
+        const chatHistory = document.getElementById('chatHistory');
+        if (!chatHistory) return;
+
+        // Detectar selecció de text al xat
+        chatHistory.addEventListener('mouseup', handleTextSelection);
+        document.addEventListener('mousedown', hideBanTooltip);
+      }
+
+      function handleTextSelection(e) {
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+
+        // Només mostrar si és una paraula vàlida (1-30 chars, sense espais)
+        if (selectedText && selectedText.length >= 2 && selectedText.length <= 30 && !/\s/.test(selectedText)) {
+          // Verificar que la selecció és dins d'un missatge de la IA
+          const anchorNode = selection.anchorNode;
+          if (anchorNode) {
+            const msgElement = anchorNode.parentElement.closest('.msg.ai, .msg.assistant');
+            if (msgElement) {
+              showBanTooltip(selectedText, e.clientX, e.clientY);
+              return;
+            }
+          }
+        }
+        hideBanTooltip();
+      }
+
+      function showBanTooltip(word, x, y) {
+        const tooltip = document.getElementById('banTooltip');
+        const wordDisplay = document.getElementById('banTooltipWord');
+
+        if (!tooltip || !wordDisplay) return;
+
+        // Ja està prohibida?
+        if (bannedWords.includes(word.toLowerCase())) {
+          return; // No mostrar tooltip per paraules ja prohibides
+        }
+
+        selectedWordToBan = word;
+        wordDisplay.textContent = '"' + word + '"';
+
+        // Posicionar tooltip (amb offset per no tapar selecció)
+        const offsetX = 10;
+        const offsetY = -40;
+        tooltip.style.left = Math.min(x + offsetX, window.innerWidth - 180) + 'px';
+        tooltip.style.top = Math.max(y + offsetY, 10) + 'px';
+        tooltip.classList.add('visible');
+      }
+
+      function hideBanTooltip() {
+        const tooltip = document.getElementById('banTooltip');
+        if (tooltip) {
+          tooltip.classList.remove('visible');
+        }
+        selectedWordToBan = '';
+      }
+
+      function banSelectedWord() {
+        if (!selectedWordToBan) return;
+
+        const word = selectedWordToBan;
+        hideBanTooltip();
+
+        // Afegir a banned words
+        if (bannedWords.includes(word.toLowerCase())) {
+          showToast('⚠️ "' + word + '" ja està prohibida');
+          return;
+        }
+
+        bannedWords.push(word.toLowerCase());
+
+        google.script.run
+          .withSuccessHandler(function() {
+            renderBannedWordsList();
+            renderConstraintChips();
+            showToast('🚫 "' + word + '" afegit - la IA ja no l\'usarà');
+          })
+          .withFailureHandler(function(err) {
+            bannedWords.pop(); // Rollback
+            showToast('❌ Error afegint paraula');
+          })
+          .saveBannedWords(bannedWords);
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // v4.0 SPRINT 3: NL AUTO-BAN (Processar paraules detectades)
+      // ═══════════════════════════════════════════════════════════
+
+      function processAutoBan(words) {
+        if (!words || words.length === 0) return;
+
+        const newWords = [];
+        for (const word of words) {
+          const lowerWord = word.toLowerCase();
+          if (!bannedWords.includes(lowerWord)) {
+            bannedWords.push(lowerWord);
+            newWords.push(word);
+          }
+        }
+
+        if (newWords.length === 0) return;
+
+        // Save to backend
+        google.script.run
+          .withSuccessHandler(function() {
+            renderBannedWordsList();
+            renderConstraintChips();
+            // Show feedback
+            if (newWords.length === 1) {
+              showToast('🚫 "' + newWords[0] + '" afegit automàticament');
+            } else {
+              showToast('🚫 ' + newWords.length + ' paraules afegides automàticament');
+            }
+          })
+          .withFailureHandler(function(err) {
+            // Rollback
+            for (const word of newWords) {
+              const idx = bannedWords.indexOf(word.toLowerCase());
+              if (idx > -1) bannedWords.splice(idx, 1);
+            }
+            console.error('Error saving auto-banned words:', err);
+          })
+          .saveBannedWords(bannedWords);
       }
 
       // v3.3: escapeHtml definida més avall a la secció Preview Mode
@@ -2626,5 +2808,13 @@
           .revertEditById(eventId);
       }
     </script>
+
+    <!-- v4.0: Ban Tooltip (Sprint 2) -->
+    <div id="banTooltip" class="ban-tooltip">
+      <span class="ban-tooltip-word" id="banTooltipWord"></span>
+      <button class="ban-tooltip-btn" onclick="banSelectedWord()">
+        <span>🚫</span> No usis això
+      </button>
+    </div>
   </body>
 </html>

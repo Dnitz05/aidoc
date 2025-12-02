@@ -3049,3 +3049,146 @@
       .doc-status-alert .alert-icon {
         flex-shrink: 0;
       }
+
+      /* ═══════════════════════════════════════════════════════════
+         v4.0 - CHAT-INTEGRATED CONSTRAINTS (Banned Words Chips)
+         ═══════════════════════════════════════════════════════════ */
+
+      /* Sprint 1: Chips container sobre l'input */
+      .constraints-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 0 var(--space-sm);
+        margin-bottom: var(--space-xs);
+        max-height: 60px;
+        overflow-y: auto;
+      }
+
+      .constraints-chips:empty {
+        display: none;
+      }
+
+      .constraint-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        background: var(--error-muted);
+        border: 1px solid var(--error);
+        border-radius: var(--radius-full);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--error);
+        cursor: default;
+        animation: chipAppear 0.2s ease-out;
+      }
+
+      @keyframes chipAppear {
+        from {
+          opacity: 0;
+          transform: scale(0.8);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .constraint-chip .chip-icon {
+        font-size: 10px;
+      }
+
+      .constraint-chip .chip-remove {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: var(--error);
+        font-size: 12px;
+        font-weight: bold;
+        transition: all 0.15s ease;
+        padding: 0;
+        margin-left: 2px;
+      }
+
+      .constraint-chip .chip-remove:hover {
+        background: var(--error);
+        color: white;
+      }
+
+      /* Sprint 2: Tooltip de selecció */
+      .ban-tooltip {
+        position: fixed;
+        display: none;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-md);
+        font-size: 12px;
+        z-index: 9999;
+        animation: tooltipAppear 0.15s ease-out;
+      }
+
+      .ban-tooltip.visible {
+        display: flex;
+      }
+
+      @keyframes tooltipAppear {
+        from {
+          opacity: 0;
+          transform: translateY(5px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .ban-tooltip-btn {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: var(--error-muted);
+        border: 1px solid var(--error);
+        border-radius: var(--radius-sm);
+        color: var(--error);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .ban-tooltip-btn:hover {
+        background: var(--error);
+        color: white;
+      }
+
+      .ban-tooltip-word {
+        font-weight: 600;
+        color: var(--text-primary);
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* Dark theme adjustments */
+      [data-theme="dark"] .constraint-chip {
+        background: rgba(242, 139, 130, 0.15);
+        border-color: var(--error);
+      }
+
+      [data-theme="dark"] .ban-tooltip {
+        background: var(--bg-secondary);
+        border-color: var(--border);
+      }

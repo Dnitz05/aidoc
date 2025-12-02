@@ -74,26 +74,6 @@ function saveSettings(jsonSettings) {
 
 function getSettings() {
   const props = PropertiesService.getUserProperties();
-
-  // v3.3: Migració automàtica de SIDECAR a DOCMILE (per usuaris existents)
-  const oldJson = props.getProperty('SIDECAR_SETTINGS');
-  if (oldJson && !props.getProperty('DOCMILE_SETTINGS')) {
-    props.setProperty('DOCMILE_SETTINGS', oldJson);
-    props.deleteProperty('SIDECAR_SETTINGS');
-    // Also migrate file keys
-    const oldUri = props.getProperty('SIDECAR_FILE_URI');
-    const oldName = props.getProperty('SIDECAR_FILE_NAME');
-    const oldMime = props.getProperty('SIDECAR_FILE_MIME');
-    if (oldUri) {
-      props.setProperty('DOCMILE_FILE_URI', oldUri);
-      props.setProperty('DOCMILE_FILE_NAME', oldName || '');
-      props.setProperty('DOCMILE_FILE_MIME', oldMime || '');
-      props.deleteProperty('SIDECAR_FILE_URI');
-      props.deleteProperty('SIDECAR_FILE_NAME');
-      props.deleteProperty('SIDECAR_FILE_MIME');
-    }
-  }
-
   const json = props.getProperty('DOCMILE_SETTINGS');
   const defaults = {
     license_key: "",
@@ -161,6 +141,59 @@ function saveLastEdit(lastEdit) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// UTILITATS - Funcions compartides (v3.10 refactor)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Obté els elements editables (paràgrafs i llistes) del document
+ * @param {Body} body - El body del document
+ * @returns {Array} Array d'elements editables
+ */
+function getEditableElements(body) {
+  const elements = [];
+  const numChildren = body.getNumChildren();
+  for (let i = 0; i < numChildren; i++) {
+    const child = body.getChild(i);
+    if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
+        child.getType() === DocumentApp.ElementType.LIST_ITEM) {
+      elements.push(child);
+    }
+  }
+  return elements;
+}
+
+/**
+ * Troba un element pel seu índex (comptant només elements amb text)
+ * @param {Array} elements - Array d'elements del document
+ * @param {number} targetIndex - Índex a trobar
+ * @returns {Element|null} L'element trobat o null
+ */
+function findElementByIndex(elements, targetIndex) {
+  let currentIndex = 0;
+  for (const el of elements) {
+    const text = el.asText().getText();
+    if (text.trim().length > 0) {
+      if (currentIndex === targetIndex) {
+        return el;
+      }
+      currentIndex++;
+    }
+  }
+  return null;
+}
+
+/**
+ * Neteja el markdown inline (bold/italic) del text
+ * @param {string} text - Text amb possible markdown
+ * @returns {string} Text net sense markdown
+ */
+function cleanMarkdown(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1');
+}
+
 /**
  * Reverteix l'últim canvi fet (v2.6)
  * Retorna { success: true } o { success: false, error: string }
@@ -176,31 +209,9 @@ function revertLastEdit() {
     const body = doc.getBody();
     const targetId = parseInt(lastEdit.targetId, 10);
 
-    // Reconstruir el mapa d'elements (igual que a processUserCommand)
-    let elementsToProcess = [];
-    const numChildren = body.getNumChildren();
-    for (let i = 0; i < numChildren; i++) {
-      const child = body.getChild(i);
-      if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
-          child.getType() === DocumentApp.ElementType.LIST_ITEM) {
-        elementsToProcess.push(child);
-      }
-    }
-
-    // Trobar l'element per ID
-    let targetElement = null;
-    let currentIndex = 0;
-    for (let i = 0; i < elementsToProcess.length; i++) {
-      const el = elementsToProcess[i];
-      const text = el.asText().getText();
-      if (text.trim().length > 0) {
-        if (currentIndex === targetId) {
-          targetElement = el;
-          break;
-        }
-        currentIndex++;
-      }
-    }
+    // v3.10: Usar funcions utilitat refactoritzades
+    const elementsToProcess = getEditableElements(body);
+    const targetElement = findElementByIndex(elementsToProcess, targetId);
 
     if (!targetElement) {
       return { success: false, error: "No s'ha trobat el paràgraf original." };
@@ -210,7 +221,6 @@ function revertLastEdit() {
     targetElement.asText().setText(lastEdit.originalText);
 
     // v2.6.1: Actualitzar currentText = originalText (no esborrar)
-    // Així si l'usuari diu "una altra" després de desfer, la IA entén que partim de l'original
     lastEdit.currentText = lastEdit.originalText;
     saveLastEdit(lastEdit);
 
@@ -241,31 +251,9 @@ function restoreText(targetId, originalText) {
     const body = doc.getBody();
     const numericId = parseInt(targetId, 10);
 
-    // Reconstruir el mapa d'elements (igual que a processUserCommand)
-    let elementsToProcess = [];
-    const numChildren = body.getNumChildren();
-    for (let i = 0; i < numChildren; i++) {
-      const child = body.getChild(i);
-      if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
-          child.getType() === DocumentApp.ElementType.LIST_ITEM) {
-        elementsToProcess.push(child);
-      }
-    }
-
-    // Trobar l'element per ID (comptant només els que tenen text)
-    let targetElement = null;
-    let currentIndex = 0;
-    for (let i = 0; i < elementsToProcess.length; i++) {
-      const el = elementsToProcess[i];
-      const text = el.asText().getText();
-      if (text.trim().length > 0) {
-        if (currentIndex === numericId) {
-          targetElement = el;
-          break;
-        }
-        currentIndex++;
-      }
-    }
+    // v3.10: Usar funcions utilitat refactoritzades
+    const elementsToProcess = getEditableElements(body);
+    const targetElement = findElementByIndex(elementsToProcess, numericId);
 
     if (!targetElement) {
       return { status: 'error', error: 'No s\'ha trobat el paràgraf (ID: ' + numericId + ')' };
@@ -878,22 +866,13 @@ function applyPendingChanges(changes, expectedSnapshot) {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
 
-    // Reconstruir el mapa d'elements (igual que a processUserCommand)
-    let elementsToProcess = [];
-    const numChildren = body.getNumChildren();
-    for (let i = 0; i < numChildren; i++) {
-      const child = body.getChild(i);
-      if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
-          child.getType() === DocumentApp.ElementType.LIST_ITEM) {
-        elementsToProcess.push(child);
-      }
-    }
+    // v3.10: Usar funció utilitat refactoritzada
+    const elementsToProcess = getEditableElements(body);
 
     // Crear mapa ID -> Element (només els que tenen text)
     let mapIdToElement = {};
     let currentIndex = 0;
-    for (let i = 0; i < elementsToProcess.length; i++) {
-      const el = elementsToProcess[i];
+    for (const el of elementsToProcess) {
       const text = el.asText().getText();
       if (text.trim().length > 0) {
         mapIdToElement[currentIndex] = el;
@@ -1844,18 +1823,6 @@ function convertTableToText(table) {
   return text;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// LEGACY WRAPPER - Mantenir compatibilitat
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Wrapper per compatibilitat amb codi existent
- * @deprecated Usar captureFullDocument() directament
- */
-function captureDocumentComplete(body, isSelection, selectedElements) {
-  const doc = DocumentApp.getActiveDocument();
-  return captureFullDocument(doc, body, isSelection, selectedElements);
-}
 
 /**
  * Envia mètriques de diagnòstic al Worker per analitzar patrons

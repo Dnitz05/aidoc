@@ -73,6 +73,45 @@ function escapeRegex(string) {
 }
 
 /**
+ * v4.0: Detect NL ban patterns in user message
+ * Patterns like: "no usis X", "no facis servir X", "sense la paraula X"
+ * Returns array of words to auto-ban
+ */
+function detectNLBanPatterns(userMessage) {
+  if (!userMessage) return [];
+
+  const patterns = [
+    // Catalan patterns
+    /no\s+(?:usis|facis\s+servir|utilitzis|posis)\s+(?:la\s+paraula\s+)?["']?([a-zA-ZàèéíòóúüïçÀÈÉÍÒÓÚÜÏÇ]+)["']?/gi,
+    /sense\s+(?:la\s+paraula\s+)?["']?([a-zA-ZàèéíòóúüïçÀÈÉÍÒÓÚÜÏÇ]+)["']?/gi,
+    /evita\s+(?:la\s+paraula\s+)?["']?([a-zA-ZàèéíòóúüïçÀÈÉÍÒÓÚÜÏÇ]+)["']?/gi,
+    /elimina\s+["']?([a-zA-ZàèéíòóúüïçÀÈÉÍÒÓÚÜÏÇ]+)["']?/gi,
+    // Spanish patterns
+    /no\s+(?:uses|utilices|pongas)\s+(?:la\s+palabra\s+)?["']?([a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]+)["']?/gi,
+    /sin\s+(?:la\s+palabra\s+)?["']?([a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]+)["']?/gi,
+    // English patterns
+    /don'?t\s+use\s+(?:the\s+word\s+)?["']?([a-zA-Z]+)["']?/gi,
+    /avoid\s+(?:the\s+word\s+)?["']?([a-zA-Z]+)["']?/gi,
+    /without\s+(?:the\s+word\s+)?["']?([a-zA-Z]+)["']?/gi,
+  ];
+
+  const foundWords = new Set();
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(userMessage)) !== null) {
+      const word = match[1].toLowerCase().trim();
+      // Filter out common false positives and very short words
+      if (word.length >= 3 && !['que', 'the', 'and', 'una', 'els', 'les', 'amb'].includes(word)) {
+        foundWords.add(word);
+      }
+    }
+  }
+
+  return Array.from(foundWords);
+}
+
+/**
  * v2.8: Extract all text from a parsed response for validation
  */
 function getOutputText(parsedResponse) {
@@ -936,6 +975,9 @@ async function handleChat(body, env, corsHeaders) {
   if (!license_key) throw new Error("missing_license");
   if (!text) throw new Error("missing_text");
 
+  // v4.0: Detect NL ban patterns (Sprint 3)
+  const autoBanWords = detectNLBanPatterns(user_instruction);
+
   // 1. License validation and credit usage
   const licenseHash = await hashKey(license_key);
   const creditsResult = await useCredits(env, licenseHash, doc_metadata);
@@ -1176,36 +1218,8 @@ INSTRUCCIÓ DE L'USUARI:
       parsedResponse.chat_response = (parsedResponse.chat_response || "") +
         "\n\n💡 Tip: Si vols que editi el text seleccionat, reformula la instrucció.";
     }
-  } else if (effectiveMode === 'auto' && client_intent) {
-    // v3.7: Enhanced AUTO mode with client intent classification
-    // Use client classification to provide hints when there's mismatch
-    const aiMode = parsedResponse.mode;
-    const clientIntent = client_intent.intent; // 'edit', 'chat', 'ambiguous'
-    const confidence = client_intent.confidence || 0;
-
-    // Case 1: Client strongly detected EDIT but AI chose CHAT_ONLY
-    if (clientIntent === 'edit' && confidence > 0.7 && aiMode === 'CHAT_ONLY') {
-      console.log('[Intent Mismatch] Client: EDIT (high confidence), AI: CHAT_ONLY');
-      // AI might have misinterpreted - add suggestion to user
-      parsedResponse.chat_response = (parsedResponse.chat_response || "") +
-        "\n\n💡 Si volies que edités el document, prova reformulant: 'corregeix', 'tradueix', 'modifica'...";
-      _meta.intent_mismatch = true;
-    }
-    // Case 2: Client strongly detected CHAT but AI wants to edit
-    else if (clientIntent === 'chat' && confidence > 0.7 && aiMode !== 'CHAT_ONLY') {
-      console.log('[Intent Mismatch] Client: CHAT (high confidence), AI: EDIT');
-      // AI wants to edit but user seems to be asking a question - warn
-      // Don't block the edit, but add clarification
-      parsedResponse.chat_response = (parsedResponse.chat_response || parsedResponse.change_summary || "") +
-        "\n\n📝 He aplicat canvis. Si només volies una resposta sense editar, usa mode 'Xat'.";
-      _meta.intent_mismatch = true;
-    }
-    // Case 3: Ambiguous intent - AI decides, but flag it
-    else if (clientIntent === 'ambiguous') {
-      _meta.intent_ambiguous = true;
-    }
   }
-  // 'auto' mode without client_intent: AI decides (original behavior)
+  // v3.10: Mode is now either 'edit' or 'chat' - no 'auto' mode
 
   // 5.2 Save edit event (v3.0 Event Sourcing)
   let savedEventId = null;
@@ -1260,6 +1274,7 @@ INSTRUCCIÓ DE L'USUARI:
     data: parsedResponse,
     credits_remaining: creditsResult.credits_remaining || 0,
     event_id: savedEventId,  // v3.0: Include event ID for tracking
+    auto_ban: autoBanWords,  // v4.0: Words to auto-ban from NL detection
     _meta: _meta,  // v3.1: Shadow Validator metadata
     _debug: {
       version: "3.1.1",

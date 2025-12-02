@@ -6,6 +6,43 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [4.0] - 2024-12-02
+
+### Added
+- **Chat-Integrated Constraints** - Gestió de paraules prohibides directament al xat
+
+  **Sprint 1: Constraint Chips**
+  - Chips visibles sobre l'àrea d'input amb paraules prohibides
+  - Animació d'aparició (`chipAppear`)
+  - Botó X per eliminar restriccions directament
+  - Scroll si hi ha moltes restriccions
+
+  **Sprint 2: Tooltip Selecció**
+  - Selecciona una paraula al xat de la IA → apareix tooltip "🚫 No usis això"
+  - Clic per afegir automàticament a restriccions
+  - Només funciona en missatges de la IA
+  - Posicionament intel·ligent del tooltip
+
+  **Sprint 3: NL Detection**
+  - Detecció automàtica de patrons com "no usis X", "sense la paraula X"
+  - Suport multilingüe: Català, Castellà, Anglès
+  - `detectNLBanPatterns()` al Worker
+  - `processAutoBan()` al frontend
+  - Toast de feedback quan s'afegeixen paraules automàticament
+
+### Changed
+- `renderBannedWordsList()` ara també crida `renderConstraintChips()`
+- Resposta del Worker inclou `auto_ban` array
+- `handleSendSuccess()` processa auto_ban automàticament
+
+### Technical
+- CSS: `.constraints-chips`, `.constraint-chip`, `.ban-tooltip`
+- JS: `initBanTooltip()`, `handleTextSelection()`, `showBanTooltip()`, `banSelectedWord()`
+- Worker: `detectNLBanPatterns()` amb regex multilingües
+- Patrons detectats: "no usis/facis servir/uses/utilices", "sense/sin/without", "evita/avoid"
+
+---
+
 ## [3.8] - 2024-12-02
 
 ### Added
