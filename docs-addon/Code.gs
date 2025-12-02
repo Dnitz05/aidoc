@@ -2471,9 +2471,23 @@ function revertEditById(eventId) {
  * @return {Object} - The response from the worker
  */
 function callWorker(payload) {
-  // Add license_key_hash from user properties
-  const props = PropertiesService.getUserProperties();
-  const licenseKey = props.getProperty('LICENSE_KEY');
+  // v5.1 fix: Use license_key from payload if available, otherwise read from settings
+  let licenseKey = payload.license_key;
+
+  if (!licenseKey) {
+    // Fallback: read from DOCMILE_SETTINGS
+    const props = PropertiesService.getUserProperties();
+    const settingsJson = props.getProperty('DOCMILE_SETTINGS');
+
+    if (settingsJson) {
+      try {
+        const settings = JSON.parse(settingsJson);
+        licenseKey = settings.license_key;
+      } catch (e) {
+        // Invalid JSON
+      }
+    }
+  }
 
   if (!licenseKey) {
     throw new Error("Llicència no configurada");

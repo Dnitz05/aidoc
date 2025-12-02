@@ -162,6 +162,22 @@
 
     <!-- Docs Panel (Knowledge) v5.1 - Library System -->
     <div id="docsPanel" class="panel">
+      <!-- Credits Widget v5.1 -->
+      <div class="settings-card credits-card" id="creditsCard">
+        <div class="credits-widget">
+          <div class="credits-info">
+            <span class="i i--accent"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+            <div class="credits-text">
+              <div class="credits-label">Crèdits disponibles</div>
+              <div class="credits-value" id="creditsValue">--/--</div>
+            </div>
+          </div>
+          <div class="credits-bar">
+            <div class="credits-bar-fill" id="creditsBarFill" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Active File Section -->
       <div class="settings-card" id="activeFileSection">
         <div class="settings-card-header">
@@ -465,7 +481,6 @@
             </button>
           </div>
         </div>
-        <div class="credits-display" id="creditsDisplay"></div>
       </div>
 
       <!-- v4.0: Banned Words Chips (visible constraints) -->
@@ -569,6 +584,35 @@
         const svg = ICONS[name] || ICONS.alertCircle;
         const classes = 'i' + (className ? ' ' + className : '');
         return '<span class="' + classes + '">' + svg + '</span>';
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // CREDITS WIDGET (v5.1)
+      // ═══════════════════════════════════════════════════════════
+
+      let totalCredits = 100; // Default, will be updated from API
+
+      function updateCredits(remaining) {
+        if (remaining === undefined || remaining === null) return;
+
+        const valueEl = document.getElementById('creditsValue');
+        const barFillEl = document.getElementById('creditsBarFill');
+
+        if (valueEl) {
+          valueEl.textContent = remaining + '/' + totalCredits;
+        }
+
+        if (barFillEl) {
+          const percent = Math.max(0, Math.min(100, (remaining / totalCredits) * 100));
+          barFillEl.style.width = percent + '%';
+
+          // Add 'low' class if credits are below 20%
+          if (percent < 20) {
+            barFillEl.classList.add('low');
+          } else {
+            barFillEl.classList.remove('low');
+          }
+        }
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -1275,7 +1319,7 @@
           }
           showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
           if (res.credits !== undefined) {
-            document.getElementById('creditsDisplay').innerHTML = '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+            updateCredits(res.credits);
           }
           return;
         }
@@ -1284,7 +1328,7 @@
         if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
           addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No s\'han pogut identificar els canvis específics.', true);
           if (res.credits !== undefined) {
-            document.getElementById('creditsDisplay').innerHTML = '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+            updateCredits(res.credits);
           }
           return;
         }
@@ -1295,7 +1339,7 @@
           addBubble('ai', res.ai_response + '\n\n' + icon('search', 'i--sm i--accent') + ' **Preview actiu al document** - Mira el document per veure els canvis proposats.', false);
           showInDocPreviewBar(previewCount);
           if (res.credits !== undefined) {
-            document.getElementById('creditsDisplay').innerHTML = '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+            updateCredits(res.credits);
           }
           return;
         }
@@ -1304,7 +1348,7 @@
         if (res.status === 'in_doc_preview_error') {
           addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' ' + (res.preview_error || 'Error aplicant preview al document'), true);
           if (res.credits !== undefined) {
-            document.getElementById('creditsDisplay').innerHTML = '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+            updateCredits(res.credits);
           }
           return;
         }
@@ -1326,7 +1370,7 @@
         }
 
         if (res.credits !== undefined) {
-          document.getElementById('creditsDisplay').innerHTML = '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+          updateCredits(res.credits);
         }
         // v2.6 Sprint: Show undo bar if edit was made
         if (res.mode === 'edit' && res.undo_snapshot) {
@@ -1670,8 +1714,7 @@
             if (res.status === 'preview' && res.changes && res.changes.length > 0) {
               showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
               if (res.credits !== undefined) {
-                document.getElementById('creditsDisplay').innerHTML =
-                  '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+                updateCredits(res.credits);
               }
               return;
             }
@@ -1680,8 +1723,7 @@
             if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
               addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No s\'han pogut identificar els canvis específics.', true);
               if (res.credits !== undefined) {
-                document.getElementById('creditsDisplay').innerHTML =
-                  '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+                updateCredits(res.credits);
               }
               return;
             }
@@ -1689,8 +1731,7 @@
             // Normal response handling
             addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
             if (res.credits !== undefined) {
-              document.getElementById('creditsDisplay').innerHTML =
-                '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+              updateCredits(res.credits);
             }
             // v3.3: Show undo bar if edit was made
             if (res.mode === 'edit' && res.undo_snapshot) {
@@ -1923,8 +1964,7 @@
             if (res.status === 'preview' && res.changes && res.changes.length > 0) {
               showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
               if (res.credits !== undefined) {
-                document.getElementById('creditsDisplay').innerHTML =
-                  '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+                updateCredits(res.credits);
               }
               return;
             }
@@ -1933,8 +1973,7 @@
             if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
               addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No s\'han pogut identificar els canvis específics.', true);
               if (res.credits !== undefined) {
-                document.getElementById('creditsDisplay').innerHTML =
-                  '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+                updateCredits(res.credits);
               }
               return;
             }
@@ -1942,8 +1981,7 @@
             // Normal response handling
             addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
             if (res.credits !== undefined) {
-              document.getElementById('creditsDisplay').innerHTML =
-                '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
+              updateCredits(res.credits);
             }
             if (res.mode === 'edit' && res.undo_snapshot) {
               pendingUndo = res.undo_snapshot;

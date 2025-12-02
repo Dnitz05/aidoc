@@ -951,20 +951,6 @@
         fill: none;
       }
 
-      .credits-display {
-        font-family: var(--font-mono);
-        font-size: 10px;
-        color: var(--text-muted);
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-
-      .credits-display .icon {
-        color: var(--accent);
-        font-size: 11px;
-      }
-
       /* ═══════════════════════════════════════════════════════════
          MODE SELECTOR (v3.2 Compact)
          ═══════════════════════════════════════════════════════════ */
@@ -1580,21 +1566,23 @@
       /* Folder */
       .folder {
         border-radius: var(--radius-md);
+        margin-bottom: 16px;
       }
 
       .folder-header {
         display: flex;
         align-items: center;
         padding: 10px 12px;
-        background: var(--bg-secondary);
+        background: var(--bg-tertiary);
         border-radius: var(--radius-md);
+        border-left: 3px solid var(--accent);
         cursor: pointer;
         transition: all 0.2s ease;
         gap: 8px;
       }
 
       .folder-header:hover {
-        background: var(--bg-tertiary);
+        background: var(--bg-elevated);
       }
 
       .folder-icon {
@@ -1665,9 +1653,11 @@
 
       /* Folder Content */
       .folder-content {
-        padding-left: 8px;
+        padding-left: 16px;
         padding-right: 4px;
         margin-top: 8px;
+        margin-left: 4px;
+        border-left: 1px solid var(--border);
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 6px;
@@ -1686,12 +1676,11 @@
         cursor: pointer;
         transition: all 0.15s ease;
         gap: 6px;
-        background: var(--bg-secondary);
-        border: 1px solid var(--border);
+        background: transparent;
       }
 
       .folder-recipe:hover {
-        background: var(--accent-muted);
+        background: var(--bg-secondary);
       }
 
       .folder-recipe-emoji {
@@ -2291,6 +2280,64 @@
         font-size: 11px;
         color: var(--text-muted);
         margin-top: 2px;
+      }
+
+      /* Credits Widget (v5.1) */
+      .credits-card {
+        padding: var(--space-md);
+      }
+
+      .credits-widget {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+      }
+
+      .credits-info {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+      }
+
+      .credits-info .i {
+        flex-shrink: 0;
+      }
+
+      .credits-text {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .credits-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .credits-value {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+      }
+
+      .credits-bar {
+        height: 6px;
+        background: var(--bg-elevated);
+        border-radius: var(--radius-full);
+        overflow: hidden;
+      }
+
+      .credits-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent) 0%, var(--success) 100%);
+        border-radius: var(--radius-full);
+        transition: width 0.5s ease;
+      }
+
+      .credits-bar-fill.low {
+        background: linear-gradient(90deg, var(--warning) 0%, var(--error) 100%);
       }
 
       /* Tool Card (Skeleton, Auto-Structure) */
