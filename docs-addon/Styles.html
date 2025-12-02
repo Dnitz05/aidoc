@@ -1618,9 +1618,11 @@
 
       /* Folder Content */
       .folder-content {
-        padding-left: 20px;
+        padding-left: 8px;
         padding-right: 4px;
-        overflow: visible;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
       }
 
       .folder.collapsed .folder-content {
@@ -1631,12 +1633,13 @@
       .folder-recipe {
         display: flex;
         align-items: center;
-        padding: 8px 10px;
-        margin: 4px 0;
+        padding: 8px;
         border-radius: var(--radius-sm);
         cursor: pointer;
         transition: all 0.15s ease;
-        gap: 8px;
+        gap: 6px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
       }
 
       .folder-recipe:hover {
@@ -1650,8 +1653,11 @@
 
       .folder-recipe-name {
         flex: 1;
-        font-size: 12px;
+        font-size: 11px;
         color: var(--text-primary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .folder-recipe-delete {
