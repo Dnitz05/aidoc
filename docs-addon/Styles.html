@@ -55,6 +55,13 @@
         /* Typography */
         --font-display: 'Plus Jakarta Sans', -apple-system, sans-serif;
         --font-mono: 'JetBrains Mono', monospace;
+
+        /* Icons */
+        --icon-default: #5f6368;
+        --icon-accent: #1a73e8;
+        --icon-success: #188038;
+        --icon-error: #d93025;
+        --icon-warning: #f9ab00;
       }
 
       /* ─────────────────────────────────────────────────────────────
@@ -85,6 +92,13 @@
         --error-muted: rgba(242, 139, 130, 0.15);
         --warning: #fdd663;
 
+        /* Icons (Dark) */
+        --icon-default: #9aa0a6;
+        --icon-accent: #8ab4f8;
+        --icon-success: #81c995;
+        --icon-error: #f28b82;
+        --icon-warning: #fdd663;
+
         /* Borders & Shadows */
         --border: rgba(255, 255, 255, 0.1);
         --border-hover: rgba(255, 255, 255, 0.2);
@@ -112,11 +126,44 @@
         height: 100vh;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
-        font-size: 13px;
-        line-height: 1.5;
-        transition: background-color 0.2s ease, color 0.2s ease;
       }
+
+      /* ═══════════════════════════════════════════════════════════
+         ICON SYSTEM (v4.1)
+         ═══════════════════════════════════════════════════════════ */
+
+      .i {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
+
+      .i svg {
+        width: 100%;
+        height: 100%;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+      }
+
+      /* Icon sizes */
+      .i--sm { width: 12px; height: 12px; }
+      .i--md { width: 16px; height: 16px; }
+      .i--lg { width: 20px; height: 20px; }
+      .i--xl { width: 24px; height: 24px; }
+
+      /* Icon colors */
+      .i--default { color: var(--icon-default); }
+      .i--accent { color: var(--icon-accent); }
+      .i--success { color: var(--icon-success); }
+      .i--error { color: var(--icon-error); }
+      .i--warning { color: var(--icon-warning); }
+      .i--muted { color: var(--text-muted); }
 
       /* ═══════════════════════════════════════════════════════════
          NAVIGATION - Header with Brand, Tabs & Close

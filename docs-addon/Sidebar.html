@@ -66,16 +66,16 @@
       <!-- Document Outline -->
       <div class="structure-section">
         <div class="structure-section-header">
-          <span class="section-title-icon">📑</span>
+          <span class="section-title-icon i i--accent"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
           <span class="section-title-text">Document Outline</span>
         </div>
         <div class="structure-search">
-          <span class="search-icon">🔍</span>
+          <span class="search-icon i i--muted"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
           <input type="text" class="structure-search-input" id="structureSearch" placeholder="Cerca al document..." oninput="filterOutline()">
         </div>
         <div class="outline-tree" id="outlineTree">
           <div class="outline-empty">
-            <span class="outline-empty-icon">📄</span>
+            <span class="outline-empty-icon i i--muted"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
             <span>Clica "Escanejar" per veure l'estructura</span>
           </div>
         </div>
@@ -84,7 +84,7 @@
       <!-- Entities Detected -->
       <div class="structure-section" id="entitiesSection">
         <div class="structure-section-header">
-          <span class="section-title-icon">🏷️</span>
+          <span class="section-title-icon i i--accent"><svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
           <span class="section-title-text">Entitats Detectades</span>
         </div>
         <div class="entities-grid" id="entitiesGrid">
@@ -94,7 +94,7 @@
 
       <!-- Suggestion Card -->
       <div id="structureSuggestion" class="structure-suggestion hidden">
-        <div class="suggestion-icon">💡</div>
+        <div class="suggestion-icon i i--warning i--lg"><svg viewBox="0 0 24 24"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></div>
         <div class="suggestion-content">
           <div class="suggestion-text" id="suggestionText"></div>
           <div class="suggestion-actions">
@@ -107,10 +107,10 @@
       <!-- Quick Actions -->
       <div class="structure-actions">
         <button class="btn btn-secondary" onclick="refreshStructure()">
-          <span>🔄</span> Escanejar
+          <span class="i i--default"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span> Escanejar
         </button>
         <button class="btn btn-primary" onclick="runAutoStructure()">
-          <span>✨</span> Auto-Structure
+          <span class="i i--default"><svg viewBox="0 0 24 24"><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></svg></span> Auto-Structure
         </button>
       </div>
     </div>
@@ -119,7 +119,7 @@
     <div id="docsPanel" class="panel">
       <div class="settings-card">
         <div class="settings-card-header">
-          <span class="icon">📎</span>
+          <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
           <div>
             <div class="title">Fitxer de Coneixement</div>
             <div class="subtitle">PDF o TXT com a referència per la IA</div>
@@ -128,7 +128,7 @@
         <div class="file-upload" id="fileUploadArea">
           <label class="file-upload-label">
             <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md" onchange="handleFileSelect()">
-            <span class="icon">📄</span>
+            <span class="i i--muted i--lg"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
             <span class="text">Clica per seleccionar un fitxer</span>
           </label>
         </div>
@@ -137,7 +137,7 @@
 
       <div class="toggle-row">
         <div class="toggle-label">
-          <span class="icon">🔒</span>
+          <span class="i i--default"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
           <div>
             <div class="text">Mode Estricte</div>
             <div class="hint">Només usa info del fitxer/context</div>
@@ -151,7 +151,7 @@
 
       <div class="settings-card" style="margin-top: var(--space-lg);">
         <div class="settings-card-header">
-          <span class="icon">💡</span>
+          <span class="i i--warning"><svg viewBox="0 0 24 24"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></span>
           <div>
             <div class="title">Com funciona</div>
             <div class="subtitle">Consells d'ús</div>
@@ -204,21 +204,14 @@
       <div class="modal-backdrop" onclick="hideNewFolderModal()"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <span class="modal-title">📁 Nova Carpeta</span>
-          <button class="modal-close" onclick="hideNewFolderModal()">×</button>
+          <span class="modal-title"><span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span> Nova Carpeta</span>
+          <button class="modal-close" onclick="hideNewFolderModal()"><span class="i"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>
         </div>
         <div class="modal-body">
           <div class="form-group">
             <label class="form-label">Icona</label>
-            <div class="emoji-selector">
-              <button type="button" class="folder-icon-btn selected" data-icon="📁" onclick="selectFolderIcon('📁')">📁</button>
-              <button type="button" class="folder-icon-btn" data-icon="📝" onclick="selectFolderIcon('📝')">📝</button>
-              <button type="button" class="folder-icon-btn" data-icon="🌍" onclick="selectFolderIcon('🌍')">🌍</button>
-              <button type="button" class="folder-icon-btn" data-icon="✨" onclick="selectFolderIcon('✨')">✨</button>
-              <button type="button" class="folder-icon-btn" data-icon="📏" onclick="selectFolderIcon('📏')">📏</button>
-              <button type="button" class="folder-icon-btn" data-icon="⭐" onclick="selectFolderIcon('⭐')">⭐</button>
-              <button type="button" class="folder-icon-btn" data-icon="🎯" onclick="selectFolderIcon('🎯')">🎯</button>
-              <button type="button" class="folder-icon-btn" data-icon="💼" onclick="selectFolderIcon('💼')">💼</button>
+            <div class="icon-selector" id="folderIconSelector">
+              <!-- Icons rendered by JS -->
             </div>
           </div>
           <div class="form-group">
@@ -238,21 +231,14 @@
       <div class="modal-backdrop" onclick="hideNewRecipeModal()"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <span class="modal-title">✨ Nova Recepta</span>
-          <button class="modal-close" onclick="hideNewRecipeModal()">×</button>
+          <span class="modal-title"><span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></svg></span> Nova Recepta</span>
+          <button class="modal-close" onclick="hideNewRecipeModal()"><span class="i"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label">Emoji</label>
-            <div class="emoji-selector">
-              <button type="button" class="recipe-emoji-btn selected" data-emoji="📌" onclick="selectRecipeEmoji('📌')">📌</button>
-              <button type="button" class="recipe-emoji-btn" data-emoji="✏️" onclick="selectRecipeEmoji('✏️')">✏️</button>
-              <button type="button" class="recipe-emoji-btn" data-emoji="✨" onclick="selectRecipeEmoji('✨')">✨</button>
-              <button type="button" class="recipe-emoji-btn" data-emoji="🎯" onclick="selectRecipeEmoji('🎯')">🎯</button>
-              <button type="button" class="recipe-emoji-btn" data-emoji="🔧" onclick="selectRecipeEmoji('🔧')">🔧</button>
-              <button type="button" class="recipe-emoji-btn" data-emoji="📋" onclick="selectRecipeEmoji('📋')">📋</button>
-              <button type="button" class="recipe-emoji-btn" data-emoji="💡" onclick="selectRecipeEmoji('💡')">💡</button>
-              <button type="button" class="recipe-emoji-btn" data-emoji="🚀" onclick="selectRecipeEmoji('🚀')">🚀</button>
+            <label class="form-label">Icona</label>
+            <div class="icon-selector" id="recipeIconSelector">
+              <!-- Icons rendered by JS -->
             </div>
           </div>
           <div class="form-group">
@@ -275,7 +261,7 @@
     <div id="brainPanel" class="panel">
       <div class="settings-card">
         <div class="settings-card-header">
-          <span class="icon">🔑</span>
+          <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></span>
           <div>
             <div class="title">Llicencia API</div>
             <div class="subtitle">La teva clau d'accés a Docmile</div>
@@ -286,7 +272,7 @@
 
       <div class="settings-card">
         <div class="settings-card-header">
-          <span class="icon">📝</span>
+          <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
           <div>
             <div class="title">Guia d'Estil</div>
             <div class="subtitle">Personalitza com escriu la IA</div>
@@ -298,7 +284,7 @@
       <!-- Edit History Section (v3.0 - Moved from Tools) -->
       <div class="settings-card">
         <div class="settings-card-header">
-          <span class="icon">📜</span>
+          <span class="i i--accent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
           <div>
             <div class="title">Historial d'Edicions</div>
             <div class="subtitle" id="historyStatus">Carregant...</div>
@@ -309,14 +295,14 @@
         </div>
         <div style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm);">
           <button class="btn btn-secondary btn-sm" onclick="refreshHistory()" style="flex: 1;">
-            🔄 Actualitzar
+            <span class="i i--default i--sm"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span> Actualitzar
           </button>
         </div>
       </div>
 
       <div class="toggle-row">
         <div class="toggle-label">
-          <span class="icon">🌙</span>
+          <span class="i i--default"><svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
           <div>
             <div class="text">Mode Fosc</div>
             <div class="hint">Canvia l'aparença de la barra lateral</div>
@@ -330,7 +316,7 @@
 
       <div class="toggle-row">
         <div class="toggle-label">
-          <span class="icon">👁️</span>
+          <span class="i i--default"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
           <div>
             <div class="text">Preview Mode</div>
             <div class="hint">Previsualitza canvis abans d'aplicar</div>
@@ -344,7 +330,7 @@
 
       <div class="settings-card">
         <div class="settings-card-header">
-          <span class="icon">🚫</span>
+          <span class="i i--error"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span>
           <div>
             <div class="title">Paraules Prohibides</div>
             <div class="subtitle">La IA mai usara aquestes paraules</div>
@@ -374,7 +360,7 @@
     <div id="inDocPreviewBar" class="in-doc-preview-bar hidden">
       <div class="preview-bar-header">
         <div class="preview-bar-status">
-          <span class="icon">🔍</span>
+          <span class="i i--accent"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
           <span>Preview actiu al document</span>
           <span class="count" id="previewCount">1</span>
         </div>
@@ -382,16 +368,16 @@
       <div class="preview-bar-hint">
         Mira el document per veure els canvis proposats
         <span class="preview-legend">
-          <span class="legend-item delete">✗ Eliminar</span>
-          <span class="legend-item add">✓ Afegir</span>
+          <span class="legend-item delete"><span class="i i--error i--sm"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Eliminar</span>
+          <span class="legend-item add"><span class="i i--success i--sm"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> Afegir</span>
         </span>
       </div>
       <div class="preview-bar-actions">
         <button class="preview-bar-btn commit" onclick="commitInDocPreview()">
-          <span class="icon">✓</span> Aplicar canvis
+          <span class="i i--success i--sm"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> Aplicar canvis
         </button>
         <button class="preview-bar-btn cancel" onclick="cancelInDocPreview()">
-          <span class="icon">✗</span> Cancel·lar
+          <span class="i i--error i--sm"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Cancel·lar
         </button>
       </div>
     </div>
@@ -447,6 +433,66 @@
 
     <script>
       // ═══════════════════════════════════════════════════════════
+      // ICON SYSTEM (v4.1) - SVG Icon Library
+      // ═══════════════════════════════════════════════════════════
+
+      const ICONS = {
+        // Actions
+        ban: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
+        check: '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>',
+        checkCircle: '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+        x: '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+        xCircle: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+        plus: '<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+        minus: '<svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+        edit: '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+        trash: '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+
+        // Navigation
+        chevronDown: '<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>',
+        chevronRight: '<svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>',
+        chevronUp: '<svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>',
+
+        // Content
+        file: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+        fileText: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>',
+        folder: '<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+        folderOpen: '<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M2 10h20"/></svg>',
+        tag: '<svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
+
+        // UI
+        search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+        settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+        key: '<svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>',
+        eye: '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+        eyeOff: '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>',
+
+        // Alerts
+        alertCircle: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+        alertTriangle: '<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+        info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+
+        // Actions
+        play: '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+        zap: '<svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+        lightbulb: '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.9V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.1A7 7 0 0 0 12 2z"/></svg>',
+        book: '<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+        list: '<svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+        layout: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',
+        messageSquare: '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+        send: '<svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+        undo: '<svg viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>',
+        refresh: '<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>'
+      };
+
+      // Helper function to render icons
+      function icon(name, className) {
+        const svg = ICONS[name] || ICONS.alertCircle;
+        const classes = 'i' + (className ? ' ' + className : '');
+        return '<span class="' + classes + '">' + svg + '</span>';
+      }
+
+      // ═══════════════════════════════════════════════════════════
       // STATE & INIT
       // ═══════════════════════════════════════════════════════════
 
@@ -486,7 +532,7 @@
         const isEnabled = document.getElementById('previewModeToggle').checked;
         previewModeEnabled = isEnabled;
         localStorage.setItem('docmile-preview', isEnabled ? 'true' : 'false');
-        showToast(isEnabled ? '👁️ Preview Mode activat' : '⚡ Canvis directes activats');
+        showToast(isEnabled ? 'Preview Mode activat' : 'Canvis directes activats', 'info');
       }
 
       function initPreviewMode() {
@@ -528,7 +574,7 @@
         // Disable buttons during operation
         if (commitBtn) {
           commitBtn.disabled = true;
-          commitBtn.innerHTML = '<span class="icon">⏳</span> Aplicant...';
+          commitBtn.innerHTML = icon('loader', 'i--default') + ' Aplicant...';
         }
         if (cancelBtn) cancelBtn.disabled = true;
 
@@ -536,27 +582,27 @@
           .withSuccessHandler(function(result) {
             hideInDocPreviewBar();
             if (result && result.ok) {
-              showToast('✅ ' + (result.message || 'Canvis aplicats!'));
-              addMessage('assistant', '✅ S\'han aplicat ' + result.applied + ' canvis al document.');
+              showToast(result.message || 'Canvis aplicats!', 'success');
+              addMessage('assistant', icon('checkCircle', 'i--success') + ' S\'han aplicat ' + result.applied + ' canvis al document.');
             } else {
-              showToast('⚠️ ' + (result?.message || 'Error aplicant canvis'));
-              addMessage('assistant', '⚠️ Error: ' + (result?.message || 'No s\'han pogut aplicar els canvis'));
+              showToast(result?.message || 'Error aplicant canvis', 'warning');
+              addMessage('assistant', icon('alertTriangle', 'i--warning') + ' Error: ' + (result?.message || 'No s\'han pogut aplicar els canvis'));
             }
             // Reset buttons
             if (commitBtn) {
               commitBtn.disabled = false;
-              commitBtn.innerHTML = '<span class="icon">✓</span> Aplicar canvis';
+              commitBtn.innerHTML = icon('check', 'i--success') + ' Aplicar canvis';
             }
             if (cancelBtn) cancelBtn.disabled = false;
           })
           .withFailureHandler(function(error) {
             hideInDocPreviewBar();
-            showToast('❌ Error: ' + error.message);
-            addMessage('assistant', '❌ Error aplicant canvis: ' + error.message);
+            showToast('Error: ' + error.message, 'error');
+            addMessage('assistant', icon('xCircle', 'i--error') + ' Error aplicant canvis: ' + error.message);
             // Reset buttons
             if (commitBtn) {
               commitBtn.disabled = false;
-              commitBtn.innerHTML = '<span class="icon">✓</span> Aplicar canvis';
+              commitBtn.innerHTML = icon('check', 'i--success') + ' Aplicar canvis';
             }
             if (cancelBtn) cancelBtn.disabled = false;
           })
@@ -570,7 +616,7 @@
         // Disable buttons during operation
         if (cancelBtn) {
           cancelBtn.disabled = true;
-          cancelBtn.innerHTML = '<span class="icon">⏳</span> Cancel·lant...';
+          cancelBtn.innerHTML = icon('loader', 'i--default') + ' Cancel·lant...';
         }
         if (commitBtn) commitBtn.disabled = true;
 
@@ -578,26 +624,26 @@
           .withSuccessHandler(function(result) {
             hideInDocPreviewBar();
             if (result && result.ok) {
-              showToast('↩️ ' + (result.message || 'Canvis cancel·lats'));
-              addMessage('assistant', '↩️ S\'han cancel·lat ' + result.cancelled + ' canvis. Document restaurat.');
+              showToast(result.message || 'Canvis cancel·lats', 'undo');
+              addMessage('assistant', icon('undo', 'i--default') + ' S\'han cancel·lat ' + result.cancelled + ' canvis. Document restaurat.');
             } else {
-              showToast('⚠️ ' + (result?.message || 'Error cancel·lant'));
+              showToast(result?.message || 'Error cancel·lant', 'warning');
             }
             // Reset buttons
             if (commitBtn) commitBtn.disabled = false;
             if (cancelBtn) {
               cancelBtn.disabled = false;
-              cancelBtn.innerHTML = '<span class="icon">✗</span> Cancel·lar';
+              cancelBtn.innerHTML = icon('x', 'i--error') + ' Cancel·lar';
             }
           })
           .withFailureHandler(function(error) {
             hideInDocPreviewBar();
-            showToast('❌ Error: ' + error.message);
+            showToast('Error: ' + error.message, 'error');
             // Reset buttons
             if (commitBtn) commitBtn.disabled = false;
             if (cancelBtn) {
               cancelBtn.disabled = false;
-              cancelBtn.innerHTML = '<span class="icon">✗</span> Cancel·lar';
+              cancelBtn.innerHTML = icon('x', 'i--error') + ' Cancel·lar';
             }
           })
           .cancelInDocumentPreview();
@@ -609,7 +655,7 @@
           .withSuccessHandler(function(hasPending) {
             if (hasPending) {
               showInDocPreviewBar(1); // Show bar, count unknown
-              addMessage('system', '⚠️ Hi ha un preview pendent al document. Aplica o cancel·la els canvis.');
+              addMessage('system', icon('alertTriangle', 'i--warning') + ' Hi ha un preview pendent al document. Aplica o cancel·la els canvis.');
             }
           })
           .withFailureHandler(function(error) {
@@ -866,7 +912,7 @@
         if (res.status === 'preview' && res.changes && res.changes.length > 0) {
           // DEBUG TEMPORAL: Mostrar info del document
           if (res._debug_doc_chars !== undefined) {
-            addBubble('system', '📄 Doc: ' + res._debug_doc_chars + ' chars | Preview: "' + (res._debug_doc_preview || '').substring(0, 50) + '..."');
+            addBubble('system', icon('file', 'i--accent') + ' Doc: ' + res._debug_doc_chars + ' chars | Preview: "' + (res._debug_doc_preview || '').substring(0, 50) + '..."');
           }
           showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
           if (res.credits !== undefined) {
@@ -986,7 +1032,7 @@
           if (lastEditWord) {
             badgeHtml += '<button class="ban-word-btn" onclick="addToBannedFromChat(\'' +
               lastEditWord.replace(/'/g, "\\'") + '\')" title="No usar mai aquesta paraula">' +
-              '🚫 Prohibir</button>';
+              icon('ban', 'i--error i--sm') + ' Prohibir</button>';
           }
 
           badgeHtml += '</div>';
@@ -1232,49 +1278,49 @@
         {
           id: 'redaccio',
           name: 'Redacció',
-          icon: '📝',
+          icon: 'fileText',
           collapsed: false,
           recipes: [
-            { id: 'r1', name: 'Corregir', emoji: '✏️', instruction: 'Corregeix tots els errors ortogràfics i gramaticals del text' },
-            { id: 'r2', name: 'Formal', emoji: '🎩', instruction: 'Transforma el text a un to més formal i professional' },
-            { id: 'r3', name: 'Informal', emoji: '😊', instruction: 'Fes el text més informal, proper i conversacional' },
-            { id: 'r4', name: 'Millorar', emoji: '✨', instruction: 'Millora la redacció general mantenint el significat original' },
-            { id: 'r5', name: 'Simplificar', emoji: '🔤', instruction: 'Simplifica el text per fer-lo més fàcil d\'entendre' }
+            { id: 'r1', name: 'Corregir', icon: 'edit', instruction: 'Corregeix tots els errors ortogràfics i gramaticals del text' },
+            { id: 'r2', name: 'Formal', icon: 'briefcase', instruction: 'Transforma el text a un to més formal i professional' },
+            { id: 'r3', name: 'Informal', icon: 'messageCircle', instruction: 'Fes el text més informal, proper i conversacional' },
+            { id: 'r4', name: 'Millorar', icon: 'wand', instruction: 'Millora la redacció general mantenint el significat original' },
+            { id: 'r5', name: 'Simplificar', icon: 'type', instruction: 'Simplifica el text per fer-lo més fàcil d\'entendre' }
           ]
         },
         {
           id: 'traduccio',
           name: 'Traducció',
-          icon: '🌍',
+          icon: 'globe',
           collapsed: true,
           recipes: [
-            { id: 't1', name: 'Anglès', emoji: '🇬🇧', instruction: 'Tradueix tot el text a anglès' },
-            { id: 't2', name: 'Castellà', emoji: '🇪🇸', instruction: 'Tradueix tot el text a castellà' },
-            { id: 't3', name: 'Català', emoji: '🏠', instruction: 'Tradueix tot el text a català' },
-            { id: 't4', name: 'Francès', emoji: '🇫🇷', instruction: 'Tradueix tot el text a francès' }
+            { id: 't1', name: 'Anglès', icon: 'globe', instruction: 'Tradueix tot el text a anglès' },
+            { id: 't2', name: 'Castellà', icon: 'globe', instruction: 'Tradueix tot el text a castellà' },
+            { id: 't3', name: 'Català', icon: 'globe', instruction: 'Tradueix tot el text a català' },
+            { id: 't4', name: 'Francès', icon: 'globe', instruction: 'Tradueix tot el text a francès' }
           ]
         },
         {
           id: 'longitud',
           name: 'Longitud',
-          icon: '📏',
+          icon: 'ruler',
           collapsed: true,
           recipes: [
-            { id: 'l1', name: 'Resumir', emoji: '📉', instruction: 'Resumeix el text mantenint només les idees principals' },
-            { id: 'l2', name: 'Ampliar', emoji: '📈', instruction: 'Amplia i desenvolupa el text amb més detalls i exemples' },
-            { id: 'l3', name: 'Concís', emoji: '🎯', instruction: 'Elimina redundàncies i fes el text més directe' }
+            { id: 'l1', name: 'Resumir', icon: 'minimize', instruction: 'Resumeix el text mantenint només les idees principals' },
+            { id: 'l2', name: 'Ampliar', icon: 'maximize', instruction: 'Amplia i desenvolupa el text amb més detalls i exemples' },
+            { id: 'l3', name: 'Concís', icon: 'target', instruction: 'Elimina redundàncies i fes el text més directe' }
           ]
         },
         {
           id: 'estil',
           name: 'Estil',
-          icon: '✨',
+          icon: 'wand',
           collapsed: true,
           recipes: [
-            { id: 's1', name: 'Persuasiu', emoji: '💪', instruction: 'Fes el text més persuasiu i convincent' },
-            { id: 's2', name: 'Creatiu', emoji: '🎨', instruction: 'Afegeix creativitat i originalitat al text' },
-            { id: 's3', name: 'Tècnic', emoji: '🔧', instruction: 'Transforma a un estil més tècnic i precís' },
-            { id: 's4', name: 'Bullets', emoji: '📋', instruction: 'Organitza el contingut en llistes amb bullets' }
+            { id: 's1', name: 'Persuasiu', icon: 'zap', instruction: 'Fes el text més persuasiu i convincent' },
+            { id: 's2', name: 'Creatiu', icon: 'star', instruction: 'Afegeix creativitat i originalitat al text' },
+            { id: 's3', name: 'Tècnic', icon: 'settings', instruction: 'Transforma a un estil més tècnic i precís' },
+            { id: 's4', name: 'Bullets', icon: 'list', instruction: 'Organitza el contingut en llistes amb bullets' }
           ]
         }
       ];
@@ -1385,15 +1431,17 @@
             if (recipes.length === 0) return; // Skip empty folders in search
           }
 
+          // Get folder icon (backwards compatible with emojis)
+          const folderIconName = mapEmojiToIcon(folder.icon);
           html += '<div class="folder' + (isCollapsed ? ' collapsed' : '') + '" data-folder-id="' + folder.id + '">' +
             '<div class="folder-header" onclick="toggleFolder(\'' + folder.id + '\')">' +
-              '<span class="folder-icon">' + folder.icon + '</span>' +
+              '<span class="folder-icon">' + icon(folderIconName, 'i--accent') + '</span>' +
               '<span class="folder-name">' + folder.name + '</span>' +
               '<span class="folder-count">' + folder.recipes.length + '</span>' +
-              '<span class="folder-toggle">' + toggleIcon + '</span>' +
+              '<span class="folder-toggle">' + (isCollapsed ? icon('chevronRight', 'i--sm') : icon('chevronDown', 'i--sm')) + '</span>' +
               '<div class="folder-actions">' +
-                '<button class="folder-action-btn folder-add-btn" onclick="event.stopPropagation(); showAddRecipeToFolder(\'' + folder.id + '\')" title="Afegir recepta">+</button>' +
-                '<button class="folder-action-btn folder-delete-btn" onclick="event.stopPropagation(); deleteFolder(' + folderIndex + ')" title="Esborrar carpeta">🗑️</button>' +
+                '<button class="folder-action-btn folder-add-btn" onclick="event.stopPropagation(); showAddRecipeToFolder(\'' + folder.id + '\')" title="Afegir recepta">' + icon('plus', 'i--sm') + '</button>' +
+                '<button class="folder-action-btn folder-delete-btn" onclick="event.stopPropagation(); deleteFolder(' + folderIndex + ')" title="Esborrar carpeta">' + icon('trash', 'i--error i--sm') + '</button>' +
               '</div>' +
             '</div>' +
             '<div class="folder-content">';
@@ -1402,11 +1450,13 @@
             const realRecipeIndex = folder.recipes.indexOf(recipe);
             const escapedInstruction = recipe.instruction.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const escapedName = recipe.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            // Get recipe icon (backwards compatible with emojis)
+            const recipeIconName = mapEmojiToIcon(recipe.icon || recipe.emoji || 'circle');
 
-            html += '<div class="folder-recipe" onclick="runRecipe(\'' + escapedInstruction + '\', \'' + recipe.emoji + ' ' + escapedName + '\')">' +
-              '<span class="folder-recipe-emoji">' + recipe.emoji + '</span>' +
+            html += '<div class="folder-recipe" onclick="runRecipe(\'' + escapedInstruction + '\', \'' + escapedName + '\')">' +
+              '<span class="folder-recipe-icon">' + icon(recipeIconName, 'i--default') + '</span>' +
               '<span class="folder-recipe-name">' + recipe.name + '</span>' +
-              '<button class="folder-recipe-delete" onclick="event.stopPropagation(); deleteRecipeFromFolder(' + folderIndex + ', ' + realRecipeIndex + ')" title="Esborrar">×</button>' +
+              '<button class="folder-recipe-delete" onclick="event.stopPropagation(); deleteRecipeFromFolder(' + folderIndex + ', ' + realRecipeIndex + ')" title="Esborrar">' + icon('x', 'i--sm') + '</button>' +
             '</div>';
           });
 
@@ -1422,7 +1472,7 @@
       // Run a recipe
       function runRecipe(instruction, label) {
         switchTab('chat');
-        addBubble('user', '📋 ' + label);
+        addBubble('user', icon('clipboard', 'i--accent') + ' ' + label);
         showThinking();
 
         document.getElementById('sendBtn').disabled = true;
@@ -1501,12 +1551,24 @@
       }
 
       // Show new folder modal
+      // Available icons for folders and recipes
+      const FOLDER_ICONS = ['folder', 'folderOpen', 'fileText', 'globe', 'wand', 'ruler', 'star', 'target', 'briefcase'];
+      const RECIPE_ICONS = ['pin', 'edit', 'wand', 'target', 'settings', 'clipboard', 'lightbulb', 'rocket'];
+
+      // Render icon selector buttons
+      function renderIconSelector(containerId, icons, selectedIcon, selectFn) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = icons.map(function(iconName) {
+          const isSelected = iconName === selectedIcon ? ' selected' : '';
+          return '<button type="button" class="icon-picker-btn' + isSelected + '" data-icon="' + iconName + '" onclick="' + selectFn + '(\'' + iconName + '\')">' + icon(iconName, 'i--default') + '</button>';
+        }).join('');
+      }
+
       function showNewFolderModal() {
         document.getElementById('newFolderName').value = '';
-        selectedFolderIcon = '📁';
-        document.querySelectorAll('.folder-icon-btn').forEach(function(btn) {
-          btn.classList.toggle('selected', btn.dataset.icon === '📁');
-        });
+        selectedFolderIcon = 'folder';
+        renderIconSelector('folderIconSelector', FOLDER_ICONS, selectedFolderIcon, 'selectFolderIcon');
         const modal = document.getElementById('newFolderModal');
         modal.classList.remove('hidden');
         setTimeout(function() {
@@ -1524,11 +1586,11 @@
         }, 200);
       }
 
-      let selectedFolderIcon = '📁';
-      function selectFolderIcon(icon) {
-        selectedFolderIcon = icon;
-        document.querySelectorAll('.folder-icon-btn').forEach(function(btn) {
-          btn.classList.toggle('selected', btn.dataset.icon === icon);
+      let selectedFolderIcon = 'folder';
+      function selectFolderIcon(iconName) {
+        selectedFolderIcon = iconName;
+        document.querySelectorAll('#folderIconSelector .icon-picker-btn').forEach(function(btn) {
+          btn.classList.toggle('selected', btn.dataset.icon === iconName);
         });
       }
 
@@ -1537,7 +1599,7 @@
         const name = document.getElementById('newFolderName').value.trim();
 
         if (!name) {
-          alert('Escriu un nom per la carpeta');
+          showToast('Escriu un nom per la carpeta', 'warning');
           return;
         }
 
@@ -1560,10 +1622,8 @@
         selectedFolderId = folderId;
         document.getElementById('newRecipeName').value = '';
         document.getElementById('newRecipeInstruction').value = '';
-        selectedRecipeEmoji = '📌';
-        document.querySelectorAll('.recipe-emoji-btn').forEach(function(btn) {
-          btn.classList.toggle('selected', btn.dataset.emoji === '📌');
-        });
+        selectedRecipeIcon = 'pin';
+        renderIconSelector('recipeIconSelector', RECIPE_ICONS, selectedRecipeIcon, 'selectRecipeIcon');
         const modal = document.getElementById('newRecipeModal');
         modal.classList.remove('hidden');
         setTimeout(function() {
@@ -1582,12 +1642,23 @@
         selectedFolderId = null;
       }
 
-      let selectedRecipeEmoji = '📌';
-      function selectRecipeEmoji(emoji) {
-        selectedRecipeEmoji = emoji;
-        document.querySelectorAll('.recipe-emoji-btn').forEach(function(btn) {
-          btn.classList.toggle('selected', btn.dataset.emoji === emoji);
+      let selectedRecipeIcon = 'pin';
+      function selectRecipeIcon(iconName) {
+        selectedRecipeIcon = iconName;
+        document.querySelectorAll('#recipeIconSelector .icon-picker-btn').forEach(function(btn) {
+          btn.classList.toggle('selected', btn.dataset.icon === iconName);
         });
+      }
+
+      // Backwards compatibility: map old emojis to icon names
+      function mapEmojiToIcon(emoji) {
+        const emojiMap = {
+          '📁': 'folder', '📂': 'folderOpen', '📝': 'fileText', '🌍': 'globe',
+          '✨': 'wand', '📏': 'ruler', '⭐': 'star', '🎯': 'target', '💼': 'briefcase',
+          '📌': 'pin', '✏️': 'edit', '🔧': 'settings', '📋': 'clipboard',
+          '💡': 'lightbulb', '🚀': 'rocket', '•': 'circle'
+        };
+        return emojiMap[emoji] || (ICONS[emoji] ? emoji : 'circle');
       }
 
       // Save new recipe to folder
@@ -1596,24 +1667,24 @@
         const instruction = document.getElementById('newRecipeInstruction').value.trim();
 
         if (!name) {
-          alert('Escriu un nom per la recepta');
+          showToast('Escriu un nom per la recepta', 'warning');
           return;
         }
         if (!instruction) {
-          alert('Escriu la instrucció per la recepta');
+          showToast('Escriu la instrucció per la recepta', 'warning');
           return;
         }
 
         const folder = userFolders.find(f => f.id === selectedFolderId);
         if (!folder) {
-          alert('Error: Carpeta no trobada');
+          showToast('Error: Carpeta no trobada', 'error');
           return;
         }
 
         folder.recipes.push({
           id: 'recipe_' + Date.now(),
           name: name,
-          emoji: selectedRecipeEmoji,
+          icon: selectedRecipeIcon, // Now uses icon name instead of emoji
           instruction: instruction
         });
 
@@ -1751,9 +1822,9 @@
 
         container.innerHTML = bannedWords.map(function(word, index) {
           return '<span class="constraint-chip">' +
-            '<span class="chip-icon">🚫</span>' +
+            '<span class="chip-icon">' + icon('ban', 'i--error i--sm') + '</span>' +
             '<span class="chip-text">' + escapeHtml(word) + '</span>' +
-            '<button class="chip-remove" onclick="removeConstraintChip(' + index + ')" title="Eliminar restricció">×</button>' +
+            '<button class="chip-remove" onclick="removeConstraintChip(' + index + ')" title="Eliminar restricció">' + icon('x', 'i--sm') + '</button>' +
             '</span>';
         }).join('');
       }
@@ -1765,7 +1836,7 @@
           .withSuccessHandler(function() {
             renderBannedWordsList();
             renderConstraintChips();
-            showToast('✓ "' + removed + '" ja es pot usar');
+            showToast('"' + removed + '" ja es pot usar', 'success');
           })
           .withFailureHandler(function(err) {
             bannedWords.splice(index, 0, removed); // Rollback
@@ -1821,12 +1892,12 @@
         }
 
         if (word.length < 2) {
-          showToast('⚠️ Mínim 2 caràcters');
+          showToast('Mínim 2 caràcters', 'warning');
           return;
         }
 
         if (bannedWords.includes(word)) {
-          showToast('⚠️ "' + word + '" ja està prohibida');
+          showToast('"' + word + '" ja està prohibida', 'warning');
           hideConstraintInput();
           return;
         }
@@ -1838,11 +1909,11 @@
           .withSuccessHandler(function() {
             renderBannedWordsList();
             renderConstraintChips();
-            showToast('🚫 "' + word + '" afegit');
+            showToast('"' + word + '" afegit', 'ban');
           })
           .withFailureHandler(function(err) {
             bannedWords.pop(); // Rollback
-            showToast('❌ Error afegint paraula');
+            showToast('Error afegint paraula', 'error');
           })
           .saveBannedWords(bannedWords);
       }
@@ -1919,7 +1990,7 @@
 
         // Afegir a banned words
         if (bannedWords.includes(word.toLowerCase())) {
-          showToast('⚠️ "' + word + '" ja està prohibida');
+          showToast('"' + word + '" ja està prohibida', 'warning');
           return;
         }
 
@@ -1929,11 +2000,11 @@
           .withSuccessHandler(function() {
             renderBannedWordsList();
             renderConstraintChips();
-            showToast('🚫 "' + word + '" afegit - la IA ja no l\'usarà');
+            showToast('"' + word + '" afegit - la IA ja no l\'usarà', 'ban');
           })
           .withFailureHandler(function(err) {
             bannedWords.pop(); // Rollback
-            showToast('❌ Error afegint paraula');
+            showToast('Error afegint paraula', 'error');
           })
           .saveBannedWords(bannedWords);
       }
@@ -1963,9 +2034,9 @@
             renderConstraintChips();
             // Show feedback
             if (newWords.length === 1) {
-              showToast('🚫 "' + newWords[0] + '" afegit automàticament');
+              showToast('"' + newWords[0] + '" afegit automàticament', 'ban');
             } else {
-              showToast('🚫 ' + newWords.length + ' paraules afegides automàticament');
+              showToast(newWords.length + ' paraules afegides automàticament', 'ban');
             }
           })
           .withFailureHandler(function(err) {
@@ -1997,11 +2068,11 @@
         google.script.run
           .withSuccessHandler(function() {
             renderBannedWordsList();
-            showToast('🚫 "' + word + '" afegit a prohibides');
+            showToast('"' + word + '" afegit a prohibides', 'ban');
           })
           .withFailureHandler(function(err) {
             bannedWords.pop(); // Rollback
-            alert('Error: ' + err.message);
+            showToast('Error: ' + err.message, 'error');
           })
           .saveBannedWords(bannedWords);
       }
@@ -2012,11 +2083,11 @@
         google.script.run
           .withSuccessHandler(function() {
             renderBannedWordsList();
-            showToast('✓ "' + removed + '" eliminat de prohibides');
+            showToast('"' + removed + '" eliminat de prohibides', 'success');
           })
           .withFailureHandler(function(err) {
             bannedWords.splice(index, 0, removed); // Rollback
-            alert('Error: ' + err.message);
+            showToast('Error: ' + err.message, 'error');
           })
           .saveBannedWords(bannedWords);
       }
@@ -2029,7 +2100,8 @@
         google.script.run
           .withSuccessHandler(function() {
             renderBannedWordsList();
-            showToast('🚫 "' + word + '" afegit a prohibides');
+            renderConstraintChips(); // Also update chips
+            showToast('"' + word + '" afegit a prohibides', 'ban');
           })
           .withFailureHandler(function(err) {
             bannedWords.pop(); // Rollback
@@ -2187,7 +2259,7 @@
         previewPanel.className = 'preview-panel';
         previewPanel.innerHTML = `
           <div class="preview-header">
-            <span class="icon">👁️</span>
+            ${icon('eye', 'i--accent')}
             <span>Previsualització de Canvis</span>
           </div>
           <div class="preview-content">
@@ -2195,10 +2267,10 @@
           </div>
           <div class="preview-actions">
             <button class="btn btn-cancel" onclick="cancelPreview()">
-              ❌ Cancel·lar
+              ${icon('x', 'i--error i--sm')} Cancel·lar
             </button>
             <button class="btn btn-apply" onclick="applyPreviewedChanges()">
-              ✅ Aplicar
+              ${icon('check', 'i--success i--sm')} Aplicar
             </button>
           </div>
         `;
@@ -2227,7 +2299,7 @@
        */
       function applyPreviewedChanges() {
         if (!pendingPreviewChanges || pendingPreviewChanges.length === 0) {
-          showToast('❌ No hi ha canvis pendents');
+          showToast('No hi ha canvis pendents', 'error');
           return;
         }
 
@@ -2238,7 +2310,7 @@
         const timeoutId = setTimeout(function() {
           const p = document.getElementById('previewPanel');
           if (p) p.classList.remove('applying');
-          addBubble('error', '⏱️ Timeout: L\'operació ha trigat massa. Torna-ho a provar.');
+          addBubble('error', icon('clock', 'i--warning') + ' Timeout: L\'operació ha trigat massa. Torna-ho a provar.');
         }, 15000);
 
         google.script.run
@@ -2249,7 +2321,7 @@
             pendingDocSnapshot = null; // v3.3: Clear snapshot
 
             if (res.ok) {
-              addBubble('system', '✅ ' + res.applied + ' canvi(s) aplicat(s)');
+              addBubble('system', icon('checkCircle', 'i--success') + ' ' + res.applied + ' canvi(s) aplicat(s)');
 
               // Show undo bar for reverting
               if (res.undoSnapshots && res.undoSnapshots.length > 0) {
@@ -2276,29 +2348,39 @@
         pendingPreviewChanges = null;
         pendingDocSnapshot = null; // v3.3: Clear snapshot
         hidePreviewPanel();
-        addBubble('system', '↩ Canvis descartats');
+        addBubble('system', icon('undo', 'i--default') + ' Canvis descartats');
       }
 
       function clearKnowledgeFileAndRetry() {
         google.script.run
           .withSuccessHandler(function() {
-            showToast('✅ Fitxer esborrat. Torna a enviar el missatge.');
+            showToast('Fitxer esborrat. Torna a enviar el missatge.', 'success');
             updateKnowledgeFileDisplay();
           })
           .withFailureHandler(function(err) {
-            showToast('❌ Error: ' + err.message);
+            showToast('Error: ' + err.message, 'error');
           })
           .clearKnowledgeFile();
       }
 
-      function showToast(message) {
-        // Create a simple toast notification
+      function showToast(message, type) {
+        // Create a simple toast notification with icon support
         const toast = document.createElement('div');
         toast.style.cssText = 'position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); ' +
           'background: var(--bg-tertiary); color: var(--text-primary); padding: 8px 16px; ' +
           'border-radius: var(--radius-md); font-size: 12px; box-shadow: var(--shadow-md); ' +
-          'z-index: 1000; animation: msgAppear 0.3s ease;';
-        toast.textContent = message;
+          'z-index: 1000; animation: msgAppear 0.3s ease; display: flex; align-items: center; gap: 6px;';
+
+        // Add icon based on type
+        let iconHtml = '';
+        if (type === 'success') iconHtml = icon('checkCircle', 'i--success');
+        else if (type === 'error') iconHtml = icon('xCircle', 'i--error');
+        else if (type === 'warning') iconHtml = icon('alertTriangle', 'i--warning');
+        else if (type === 'ban') iconHtml = icon('ban', 'i--error');
+        else if (type === 'info') iconHtml = icon('info', 'i--accent');
+        else if (type === 'undo') iconHtml = icon('undo', 'i--default');
+
+        toast.innerHTML = iconHtml + '<span>' + message + '</span>';
         document.body.appendChild(toast);
 
         setTimeout(function() {
@@ -2328,7 +2410,7 @@
               // Mark as shown
               sessionStorage.setItem(HINT_SHOWN_KEY, 'true');
               // Show hint in chat
-              addBubble('system', '💡 Tip: El document té ' + summary.visual_headings +
+              addBubble('system', icon('lightbulb', 'i--warning') + ' Tip: El document té ' + summary.visual_headings +
                 ' títols visuals sense format. Ves a Estructura > Auto-Structure per millorar-lo.');
             }
           })
@@ -2351,7 +2433,7 @@
         const entitiesGrid = document.getElementById('entitiesGrid');
 
         // Show loading state
-        outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">⏳</span><span>Escanejant document...</span></div>';
+        outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">' + icon('loader', 'i--muted') + '</span><span>Escanejant document...</span></div>';
 
         google.script.run
           .withSuccessHandler(function(skeleton) {
@@ -2359,9 +2441,9 @@
             lastScanTime = new Date();
 
             if (skeleton && skeleton.stats) {
-              // Update stats
-              statsChars.textContent = formatNumber(skeleton.stats.chars || 0);
-              statsParagraphs.textContent = skeleton.stats.paragraphs || 0;
+              // Update stats (backend usa total_chars i paragraph_count)
+              statsChars.textContent = formatNumber(skeleton.stats.total_chars || skeleton.stats.chars || 0);
+              statsParagraphs.textContent = skeleton.stats.paragraph_count || skeleton.stats.paragraphs || 0;
 
               const headings = skeleton.structure.filter(function(item) {
                 return item.type !== 'SECTION' && item.type !== 'WARNING';
@@ -2380,16 +2462,16 @@
               // Check for suggestions
               checkStructureSuggestions(skeleton);
             } else if (skeleton && skeleton.error) {
-              outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">⚠️</span><span>' + skeleton.error + '</span></div>';
+              outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">' + icon('alertTriangle', 'i--warning') + '</span><span>' + skeleton.error + '</span></div>';
             } else {
               statsChars.textContent = '0';
               statsParagraphs.textContent = '0';
               statsHeadings.textContent = '0';
-              outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">📄</span><span>Document buit</span></div>';
+              outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">' + icon('file', 'i--muted') + '</span><span>Document buit</span></div>';
             }
           })
           .withFailureHandler(function(err) {
-            outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">❌</span><span>Error: ' + err.message + '</span></div>';
+            outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">' + icon('xCircle', 'i--error') + '</span><span>Error: ' + err.message + '</span></div>';
           })
           .getDocSkeleton();
       }
@@ -2405,7 +2487,7 @@
         const outlineTree = document.getElementById('outlineTree');
 
         if (!skeleton || !skeleton.structure || skeleton.structure.length === 0) {
-          outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">📄</span><span>Cap estructura detectada</span></div>';
+          outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">' + icon('file', 'i--muted') + '</span><span>Cap estructura detectada</span></div>';
           return;
         }
 
@@ -2446,12 +2528,16 @@
 
           currentDepth = depth;
 
-          const preview = item.preview ? item.preview.substring(0, 40) + (item.preview.length > 40 ? '...' : '') : 'Sense text';
+          // Backend retorna 'text' per headings i 'preview' per seccions
+          const textContent = item.text || item.preview || '';
+          const preview = textContent.substring(0, 40) + (textContent.length > 40 ? '...' : '') || 'Sense text';
+          // Backend retorna 'index', no 'idx'
+          const itemIndex = item.index !== undefined ? item.index : idx;
 
-          html += '<div class="outline-item" data-depth="' + depth + '" data-idx="' + item.idx + '" onclick="scrollToElement(' + item.idx + ')">';
+          html += '<div class="outline-item" data-depth="' + depth + '" data-idx="' + itemIndex + '" onclick="scrollToElement(' + itemIndex + ')">';
           html += '<span class="outline-type ' + typeClass + '">' + typeLabel + '</span>';
           html += '<span class="outline-text">' + escapeHtml(preview) + '</span>';
-          html += '<span class="outline-id">¶' + item.idx + '</span>';
+          html += '<span class="outline-id">¶' + itemIndex + '</span>';
           html += '</div>';
         });
 
@@ -2475,22 +2561,22 @@
 
         entitiesSection.style.display = 'block';
 
-        const entityIcons = {
-          dates: '📅',
-          amounts: '💶',
-          percentages: '📊',
-          numbers: '🔢',
-          emails: '📧',
-          urls: '🔗'
+        const entityIconNames = {
+          dates: 'calendar',
+          amounts: 'dollarSign',
+          percentages: 'percent',
+          numbers: 'hash',
+          emails: 'mail',
+          urls: 'link'
         };
 
         let html = '';
 
         for (const [type, items] of Object.entries(skeleton.entities)) {
           if (items && items.length > 0) {
-            const icon = entityIcons[type] || '🏷️';
+            const iconName = entityIconNames[type] || 'tag';
             html += '<div class="entity-tag">';
-            html += '<span class="entity-icon">' + icon + '</span>';
+            html += '<span class="entity-icon">' + icon(iconName, 'i--accent i--sm') + '</span>';
             html += '<span class="entity-count">' + items.length + '</span>';
             html += '<span>' + type + '</span>';
             html += '</div>';
@@ -2683,12 +2769,12 @@
           .withSuccessHandler(function(result) {
             if (result && result.success) {
               if (result.converted > 0) {
-                showToast('✨ ' + result.converted + ' títols convertits a H2');
+                showToast(result.converted + ' títols convertits a H2', 'success');
                 statusEl.textContent = result.converted + ' convertits!';
                 // Refresh skeleton to show new structure
                 setTimeout(refreshSkeleton, 500);
               } else {
-                showToast('ℹ️ Cap canvi necessari');
+                showToast('Cap canvi necessari', 'info');
                 statusEl.textContent = 'Estructura correcta';
               }
             } else {
@@ -2697,7 +2783,7 @@
           })
           .withFailureHandler(function(err) {
             statusEl.textContent = 'Error: ' + err.message;
-            showToast('❌ Error: ' + err.message);
+            showToast('Error: ' + err.message, 'error');
           })
           .applyAutoStructure();
       }
@@ -2716,7 +2802,7 @@
             if (res.success) {
               // Update the badge to show reverted
               const badge = btn.parentElement;
-              badge.innerHTML = '<span style="color: var(--warning);">↩ Canvi desfet</span>';
+              badge.innerHTML = '<span style="color: var(--warning);">' + icon('undo', 'i--warning i--sm') + ' Canvi desfet</span>';
               badge.style.background = 'rgba(249, 171, 0, 0.1)';
               badge.style.borderColor = 'var(--warning)';
               badge.style.color = 'var(--warning)';
@@ -2780,11 +2866,11 @@
           return;
         }
 
-        const typeIcons = {
-          'UPDATE_BY_ID': '✏️',
-          'REWRITE': '📝',
-          'REVERT': '↩️',
-          'AUTO_STRUCTURE': '✨'
+        const typeIconNames = {
+          'UPDATE_BY_ID': 'edit',
+          'REWRITE': 'fileText',
+          'REVERT': 'undo',
+          'AUTO_STRUCTURE': 'wand'
         };
 
         const typeLabels = {
@@ -2796,14 +2882,14 @@
 
         let html = '';
         editHistory.forEach(function(event) {
-          const icon = typeIcons[event.event_type] || '📄';
+          const iconName = typeIconNames[event.event_type] || 'file';
           const typeLabel = typeLabels[event.event_type] || event.event_type;
           const instruction = event.user_instruction || '(Sense instrucció)';
           const timeAgo = formatTimeAgo(new Date(event.created_at));
           const isReverted = event.is_reverted;
 
           html += '<div class="history-item' + (isReverted ? ' reverted' : '') + '" data-id="' + event.id + '">';
-          html += '<span class="icon">' + icon + '</span>';
+          html += '<span class="history-icon">' + icon(iconName, 'i--default') + '</span>';
           html += '<div class="content">';
           html += '<div class="instruction" title="' + escapeHtml(instruction) + '">' + escapeHtml(instruction.substring(0, 50)) + (instruction.length > 50 ? '...' : '') + '</div>';
           html += '<div class="meta">';
@@ -2815,7 +2901,7 @@
           html += '</div></div>';
 
           if (!isReverted && event.event_type !== 'REVERT') {
-            html += '<button class="revert-action" onclick="event.stopPropagation(); revertHistoryItem(\'' + event.id + '\')">↩ Desfer</button>';
+            html += '<button class="revert-action" onclick="event.stopPropagation(); revertHistoryItem(\'' + event.id + '\')">' + icon('undo', 'i--sm') + ' Desfer</button>';
           }
 
           html += '</div>';
@@ -2851,25 +2937,25 @@
         google.script.run
           .withSuccessHandler(function(res) {
             if (res && res.success) {
-              showToast('↩ Edició desfeta');
+              showToast('Edició desfeta', 'undo');
               // Refresh the history list
               refreshHistory();
               // Add system message to chat
-              addBubble('system', 'S\'ha desfet una edició de l\'historial.');
+              addBubble('system', icon('undo', 'i--default') + ' S\'ha desfet una edició de l\'historial.');
             } else {
               if (btn) {
                 btn.disabled = false;
-                btn.textContent = '↩ Desfer';
+                btn.innerHTML = icon('undo', 'i--sm') + ' Desfer';
               }
-              showToast('❌ ' + (res ? res.error : 'Error desconegut'));
+              showToast(res ? res.error : 'Error desconegut', 'error');
             }
           })
           .withFailureHandler(function(err) {
             if (btn) {
               btn.disabled = false;
-              btn.textContent = '↩ Desfer';
+              btn.innerHTML = icon('undo', 'i--sm') + ' Desfer';
             }
-            showToast('❌ Error: ' + err.message);
+            showToast('Error: ' + err.message, 'error');
           })
           .revertEditById(eventId);
       }
@@ -2879,7 +2965,7 @@
     <div id="banTooltip" class="ban-tooltip">
       <span class="ban-tooltip-word" id="banTooltipWord"></span>
       <button class="ban-tooltip-btn" onclick="banSelectedWord()">
-        <span>🚫</span> No usis això
+        <span class="i i--error i--sm"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span> No usis això
       </button>
     </div>
   </body>
