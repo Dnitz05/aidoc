@@ -593,12 +593,9 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cli
     let editDuration = 0;
 
     if (aiData.mode === 'UPDATE_BY_ID') {
-      // v3.2: Preview Mode - Return changes without applying
+      // v3.8: Preview Mode - IN-DOCUMENT preview (Track Changes style)
       if (previewMode) {
         const changes = [];
-        // v3.3: Build snapshot fingerprint for race condition detection
-        let docSnapshot = '';
-        let snapshotIdx = 0;
 
         for (const [id, newText] of Object.entries(aiData.updates)) {
           const targetElement = mapIdToElement[id];
@@ -610,37 +607,45 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cli
               originalText: currentDocText,
               proposedText: cleanNewText
             });
-            // Build snapshot for first few elements
-            if (snapshotIdx < 5) {
-              docSnapshot += '{{' + id + '}} ' + currentDocText.substring(0, 100) + '\n';
-              snapshotIdx++;
-            }
           }
         }
 
         // If no changes found (IDs don't match), fall back to normal mode
         if (changes.length === 0) {
-          // v3.7: Log warning - preview amb 0 canvis
           logDiagnostic('WARNING', {
             issue: 'PREVIEW_NO_CHANGES',
             updates_from_ai: Object.keys(aiData.updates).length,
             map_ids_available: Object.keys(mapIdToElement).length
           });
-          // Try to apply directly instead of showing empty preview
+          // Fall through to apply directly
         } else {
-          // v3.7: Log resposta PREVIEW
+          // v3.8: Aplicar preview VISUAL al document (Track Changes)
+          const previewResult = applyInDocumentPreview(changes);
+
+          if (!previewResult.ok) {
+            // Si falla el preview in-doc, retornem error
+            logDiagnostic('ERROR', {
+              issue: 'IN_DOC_PREVIEW_FAILED',
+              error: previewResult.error
+            });
+            return {
+              ok: false,
+              error: previewResult.error || "Error aplicant preview"
+            };
+          }
+
+          // Log resposta PREVIEW IN-DOCUMENT
           const responseInfo = {
             mode: 'UPDATE_BY_ID',
-            sub_mode: 'PREVIEW',
-            changes_count: changes.length,
-            total_chars_changed: changes.reduce((sum, c) => sum + (c.proposedText || '').length, 0),
+            sub_mode: 'IN_DOC_PREVIEW',
+            changes_count: previewResult.count,
             credits_remaining: json.credits_remaining
           };
           metrics.setResponseInfo(responseInfo);
           logDiagnostic('RESPONSE', {
             mode: 'UPDATE_BY_ID',
-            sub_mode: 'PREVIEW',
-            changes: changes.length,
+            sub_mode: 'IN_DOC_PREVIEW',
+            changes: previewResult.count,
             doc_was_empty: isDocumentEmpty,
             user_wanted: userMode
           });
@@ -648,14 +653,21 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cli
 
           return {
             ok: true,
-            status: 'preview',
-            changes: changes,
+            status: 'in_doc_preview',  // Nou status per frontend
+            changes_count: previewResult.count,
             ai_response: aiData.change_summary,
             credits: json.credits_remaining,
             thought: aiData.thought,
             mode: 'edit',
-            doc_snapshot: docSnapshot,  // v3.3: For race condition detection
-            // v3.7: Afegir diagnòstic
+            // v3.8: Info per la barra d'acció del sidebar
+            preview_info: {
+              count: previewResult.count,
+              previews: previewResult.previews.map(p => ({
+                targetId: p.targetId,
+                originalPreview: p.originalText.substring(0, 50) + (p.originalText.length > 50 ? '...' : ''),
+                newPreview: p.newText.substring(0, 50) + (p.newText.length > 50 ? '...' : '')
+              }))
+            },
             _diag: {
               doc_chars: contentPayload.length,
               doc_empty: isDocumentEmpty,
@@ -955,6 +967,324 @@ function applyPendingChanges(changes, expectedSnapshot) {
   } catch (e) {
     return { ok: false, error: e.message };
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IN-DOCUMENT PREVIEW v3.8 - Track Changes Style
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Colors per la previsualització in-document
+ */
+const PREVIEW_COLORS = {
+  DELETE_BG: '#FFCDD2',      // Vermell clar (fons text a eliminar)
+  DELETE_TEXT: '#B71C1C',    // Vermell fosc (text a eliminar)
+  ADD_BG: '#C8E6C9',         // Verd clar (fons text nou)
+  ADD_TEXT: '#1B5E20'        // Verd fosc (text nou)
+};
+
+/**
+ * Aplica preview visual al document (estil Track Changes)
+ * - Text original: fons vermell + ratllat
+ * - Text nou: fons verd + subratllat
+ *
+ * @param {Array} changes - Array de {targetId, originalText, proposedText}
+ * @returns {Object} { ok, previews, error }
+ */
+function applyInDocumentPreview(changes) {
+  try {
+    if (!changes || !Array.isArray(changes) || changes.length === 0) {
+      return { ok: false, error: "No hi ha canvis per previsualitzar" };
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+
+    // Reconstruir el mapa d'elements
+    const mapIdToElement = buildElementMap(body);
+    const previews = [];
+
+    for (const change of changes) {
+      const targetId = parseInt(change.targetId, 10);
+      const targetElement = mapIdToElement[targetId];
+
+      if (!targetElement) {
+        console.log('[Preview] Element not found:', targetId);
+        continue;
+      }
+
+      const textObj = targetElement.editAsText();
+      const originalText = textObj.getText();
+      const cleanNewText = (change.proposedText || '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1');
+
+      // Evitar preview si són iguals
+      if (originalText.trim() === cleanNewText.trim()) {
+        console.log('[Preview] No changes for:', targetId);
+        continue;
+      }
+
+      const originalLength = originalText.length;
+
+      // 1. Afegir separador i text nou al final
+      const separator = '  →  ';
+      textObj.appendText(separator + cleanNewText);
+
+      // 2. Formatar text ORIGINAL com "a eliminar"
+      if (originalLength > 0) {
+        textObj.setBackgroundColor(0, originalLength - 1, PREVIEW_COLORS.DELETE_BG);
+        textObj.setStrikethrough(0, originalLength - 1, true);
+        textObj.setForegroundColor(0, originalLength - 1, PREVIEW_COLORS.DELETE_TEXT);
+      }
+
+      // 3. Formatar text NOU com "a afegir"
+      const newStart = originalLength + separator.length;
+      const newEnd = newStart + cleanNewText.length - 1;
+      if (newEnd >= newStart) {
+        textObj.setBackgroundColor(newStart, newEnd, PREVIEW_COLORS.ADD_BG);
+        textObj.setUnderline(newStart, newEnd, true);
+        textObj.setForegroundColor(newStart, newEnd, PREVIEW_COLORS.ADD_TEXT);
+      }
+
+      previews.push({
+        targetId: String(targetId),
+        originalText: originalText,
+        newText: cleanNewText,
+        originalLength: originalLength,
+        separatorLength: separator.length
+      });
+    }
+
+    if (previews.length === 0) {
+      return { ok: false, error: "Cap canvi aplicable trobat" };
+    }
+
+    // Guardar l'estat del preview per poder fer commit/cancel
+    savePendingInDocPreview(previews);
+
+    return {
+      ok: true,
+      previews: previews,
+      count: previews.length
+    };
+
+  } catch (e) {
+    console.error('[Preview Error]', e);
+    return { ok: false, error: e.message };
+  }
+}
+
+/**
+ * Confirma els canvis del preview (elimina text original, neteja formatació)
+ *
+ * @returns {Object} { ok, applied, error }
+ */
+function commitInDocumentPreview() {
+  try {
+    const previews = loadPendingInDocPreview();
+    if (!previews || previews.length === 0) {
+      return { ok: false, error: "No hi ha preview pendent" };
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const mapIdToElement = buildElementMap(body);
+
+    let applied = 0;
+    const existingLastEdit = loadLastEdit();
+
+    // Processar en ordre INVERS per no afectar índexs
+    for (let i = previews.length - 1; i >= 0; i--) {
+      const preview = previews[i];
+      const targetId = parseInt(preview.targetId, 10);
+      const targetElement = mapIdToElement[targetId];
+
+      if (!targetElement) continue;
+
+      const textObj = targetElement.editAsText();
+
+      // Eliminar: text original + separador (deixant només el text nou)
+      const deleteEnd = preview.originalLength + preview.separatorLength - 1;
+      if (deleteEnd >= 0) {
+        textObj.deleteText(0, deleteEnd);
+      }
+
+      // Netejar formatació del text que queda (el nou)
+      const remainingLength = textObj.getText().length;
+      if (remainingLength > 0) {
+        textObj.setBackgroundColor(0, remainingLength - 1, null);
+        textObj.setUnderline(0, remainingLength - 1, false);
+        textObj.setForegroundColor(0, remainingLength - 1, null);
+        textObj.setStrikethrough(0, remainingLength - 1, false);
+      }
+
+      applied++;
+
+      // Guardar lastEdit per al primer canvi
+      if (i === 0) {
+        const isSameTarget = existingLastEdit &&
+                             String(existingLastEdit.targetId) === String(preview.targetId);
+        const preservedOriginal = isSameTarget
+                                  ? existingLastEdit.originalText
+                                  : preview.originalText;
+
+        saveLastEdit({
+          targetId: preview.targetId,
+          originalText: preservedOriginal,
+          currentText: preview.newText
+        });
+      }
+    }
+
+    // Netejar preview pendent
+    clearPendingInDocPreview();
+
+    return {
+      ok: true,
+      applied: applied,
+      message: `${applied} canvi${applied !== 1 ? 's' : ''} aplicat${applied !== 1 ? 's' : ''}`
+    };
+
+  } catch (e) {
+    console.error('[Commit Preview Error]', e);
+    return { ok: false, error: e.message };
+  }
+}
+
+/**
+ * Cancel·la el preview (elimina text nou, restaura formatació original)
+ *
+ * @returns {Object} { ok, cancelled, error }
+ */
+function cancelInDocumentPreview() {
+  try {
+    const previews = loadPendingInDocPreview();
+    if (!previews || previews.length === 0) {
+      return { ok: false, error: "No hi ha preview pendent" };
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const mapIdToElement = buildElementMap(body);
+
+    let cancelled = 0;
+
+    for (const preview of previews) {
+      const targetId = parseInt(preview.targetId, 10);
+      const targetElement = mapIdToElement[targetId];
+
+      if (!targetElement) continue;
+
+      const textObj = targetElement.editAsText();
+      const fullText = textObj.getText();
+
+      // Eliminar: separador + text nou (deixant només l'original)
+      const deleteStart = preview.originalLength;
+      const deleteEnd = fullText.length - 1;
+
+      if (deleteEnd >= deleteStart) {
+        textObj.deleteText(deleteStart, deleteEnd);
+      }
+
+      // Netejar formatació del text original
+      if (preview.originalLength > 0) {
+        textObj.setBackgroundColor(0, preview.originalLength - 1, null);
+        textObj.setStrikethrough(0, preview.originalLength - 1, false);
+        textObj.setForegroundColor(0, preview.originalLength - 1, null);
+      }
+
+      cancelled++;
+    }
+
+    // Netejar preview pendent
+    clearPendingInDocPreview();
+
+    return {
+      ok: true,
+      cancelled: cancelled,
+      message: "Preview cancel·lat"
+    };
+
+  } catch (e) {
+    console.error('[Cancel Preview Error]', e);
+    return { ok: false, error: e.message };
+  }
+}
+
+/**
+ * Construeix el mapa ID -> Element del document
+ */
+function buildElementMap(body) {
+  const mapIdToElement = {};
+  const numChildren = body.getNumChildren();
+  let currentIndex = 0;
+
+  for (let i = 0; i < numChildren; i++) {
+    const child = body.getChild(i);
+    if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
+        child.getType() === DocumentApp.ElementType.LIST_ITEM) {
+      const text = child.asText().getText();
+      if (text.trim().length > 0) {
+        mapIdToElement[currentIndex] = child;
+        currentIndex++;
+      }
+    }
+  }
+
+  return mapIdToElement;
+}
+
+/**
+ * Guarda l'estat del preview pendent a DocumentProperties
+ */
+function savePendingInDocPreview(previews) {
+  const props = PropertiesService.getDocumentProperties();
+  props.setProperty('PENDING_INDOC_PREVIEW', JSON.stringify(previews));
+  props.setProperty('PENDING_INDOC_PREVIEW_TIME', Date.now().toString());
+}
+
+/**
+ * Carrega l'estat del preview pendent
+ */
+function loadPendingInDocPreview() {
+  const props = PropertiesService.getDocumentProperties();
+  const json = props.getProperty('PENDING_INDOC_PREVIEW');
+  if (!json) return null;
+
+  // Verificar timeout (5 minuts)
+  const timeStr = props.getProperty('PENDING_INDOC_PREVIEW_TIME');
+  if (timeStr) {
+    const elapsed = Date.now() - parseInt(timeStr, 10);
+    if (elapsed > 5 * 60 * 1000) {
+      // Preview expirat, netejar
+      clearPendingInDocPreview();
+      return null;
+    }
+  }
+
+  try {
+    return JSON.parse(json);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Neteja l'estat del preview pendent
+ */
+function clearPendingInDocPreview() {
+  const props = PropertiesService.getDocumentProperties();
+  props.deleteProperty('PENDING_INDOC_PREVIEW');
+  props.deleteProperty('PENDING_INDOC_PREVIEW_TIME');
+}
+
+/**
+ * Comprova si hi ha un preview pendent
+ */
+function hasPendingInDocPreview() {
+  const previews = loadPendingInDocPreview();
+  return previews && previews.length > 0;
 }
 
 // --- RENDERING HELPERS ---

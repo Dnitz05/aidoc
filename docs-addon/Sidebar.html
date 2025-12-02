@@ -582,7 +582,173 @@
       }
 
       /* ═══════════════════════════════════════════════════════════
-         PREVIEW MODE (v3.2) - Visual Diff
+         IN-DOCUMENT PREVIEW BAR (v3.8) - Track Changes Actions
+         ═══════════════════════════════════════════════════════════ */
+
+      .in-doc-preview-bar {
+        position: fixed;
+        bottom: 60px;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+        border-top: 2px solid var(--accent);
+        padding: var(--space-md);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+        animation: slideUp 0.3s ease;
+        z-index: 100;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+      }
+
+      .in-doc-preview-bar.hidden {
+        display: none;
+      }
+
+      @keyframes slideUp {
+        from { transform: translateY(100%); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+
+      .preview-bar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .preview-bar-status {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-primary);
+      }
+
+      .preview-bar-status .icon {
+        font-size: 16px;
+      }
+
+      .preview-bar-status .count {
+        background: var(--accent);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .preview-bar-hint {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .preview-legend {
+        display: flex;
+        gap: 12px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .legend-item.delete {
+        background: rgba(183, 28, 28, 0.15);
+        color: #B71C1C;
+      }
+
+      .legend-item.add {
+        background: rgba(27, 94, 32, 0.15);
+        color: #1B5E20;
+      }
+
+      .preview-bar-actions {
+        display: flex;
+        gap: var(--space-sm);
+        margin-top: var(--space-xs);
+      }
+
+      .preview-bar-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-xs);
+        padding: var(--space-sm) var(--space-md);
+        border: none;
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .preview-bar-btn.commit {
+        background: linear-gradient(135deg, #43A047, #66BB6A);
+        color: white;
+        box-shadow: 0 2px 8px rgba(67, 160, 71, 0.3);
+      }
+
+      .preview-bar-btn.commit:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(67, 160, 71, 0.4);
+      }
+
+      .preview-bar-btn.cancel {
+        background: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+      }
+
+      .preview-bar-btn.cancel:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--text-muted);
+      }
+
+      .preview-bar-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .preview-bar-btn .icon {
+        font-size: 14px;
+      }
+
+      /* Indicador de processament */
+      .preview-bar-btn.loading {
+        position: relative;
+        color: transparent;
+      }
+
+      .preview-bar-btn.loading::after {
+        content: '';
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         PREVIEW MODE (v3.2) - Visual Diff (LEGACY - sidebar preview)
          ═══════════════════════════════════════════════════════════ */
 
       .preview-panel {
@@ -2644,8 +2810,8 @@
         <button class="tab active" data-tab="chat" onclick="switchTab('chat')" title="Xat">
           <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </button>
-        <button class="tab" data-tab="tools" onclick="switchTab('tools')" title="Eines">
-          <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <button class="tab" data-tab="structure" onclick="switchTab('structure')" title="Estructura">
+          <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3zM21 9H3M9 21V9"/></svg>
         </button>
         <button class="tab" data-tab="docs" onclick="switchTab('docs')" title="Coneixement">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -2680,86 +2846,78 @@
       </div>
     </div>
 
-    <!-- Tools Panel -->
-    <div id="toolsPanel" class="panel">
-      <!-- Auto-Structure Section -->
-      <div class="section-title">Estructura del Document</div>
-      <div class="tool-card" id="skeletonCard">
-        <div class="tool-card-header">
-          <span class="icon">🗂️</span>
-          <div>
-            <div class="title">Document Skeleton</div>
-            <div class="subtitle" id="skeletonStatus">Carregant...</div>
+    <!-- Structure Panel (v3.9 - Document Structure) -->
+    <div id="structurePanel" class="panel">
+      <!-- Stats Overview -->
+      <div class="structure-overview">
+        <div class="structure-stats">
+          <div class="stat-card">
+            <div class="stat-value" id="statChars">--</div>
+            <div class="stat-label">caràcters</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statParagraphs">--</div>
+            <div class="stat-label">paràgrafs</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statHeadings">--</div>
+            <div class="stat-label">headings</div>
           </div>
         </div>
-        <div id="skeletonSuggestion" class="skeleton-suggestion hidden"></div>
-        <div id="skeletonPreview" class="skeleton-preview hidden">
-          <!-- Dynamic skeleton content -->
-        </div>
-        <div class="tool-actions">
-          <button class="btn btn-secondary btn-sm" onclick="refreshSkeleton()">
-            🔄 Escanejar
-          </button>
-          <button class="btn btn-primary btn-sm" onclick="runAutoStructure()">
-            ✨ Auto-Structure
-          </button>
+        <div class="structure-meta" id="structureMeta">
+          <span class="meta-item">Últim escaneig: mai</span>
         </div>
       </div>
 
-      <!-- Edit History Section (v3.0) -->
-      <div class="section-title" style="margin-top: var(--space-lg);">Historial d'Edicions</div>
-      <div class="tool-card" id="historyCard">
-        <div class="tool-card-header">
-          <span class="icon">📜</span>
-          <div>
-            <div class="title">Últimes Edicions</div>
-            <div class="subtitle" id="historyStatus">Carregant...</div>
+      <!-- Document Outline -->
+      <div class="structure-section">
+        <div class="structure-section-header">
+          <span class="section-title-icon">📑</span>
+          <span class="section-title-text">Document Outline</span>
+        </div>
+        <div class="structure-search">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="structure-search-input" id="structureSearch" placeholder="Cerca al document..." oninput="filterOutline()">
+        </div>
+        <div class="outline-tree" id="outlineTree">
+          <div class="outline-empty">
+            <span class="outline-empty-icon">📄</span>
+            <span>Clica "Escanejar" per veure l'estructura</span>
           </div>
-        </div>
-        <div id="historyList" class="history-list">
-          <!-- Dynamic history content -->
-        </div>
-        <div class="tool-actions">
-          <button class="btn btn-secondary btn-sm" onclick="refreshHistory()">
-            🔄 Actualitzar
-          </button>
         </div>
       </div>
 
-      <div class="section-title" style="margin-top: var(--space-lg);">Les Teves Receptes</div>
-      <div class="receipts-grid" id="receiptsList">
-        <!-- Dynamic content -->
+      <!-- Entities Detected -->
+      <div class="structure-section" id="entitiesSection">
+        <div class="structure-section-header">
+          <span class="section-title-icon">🏷️</span>
+          <span class="section-title-text">Entitats Detectades</span>
+        </div>
+        <div class="entities-grid" id="entitiesGrid">
+          <!-- Dynamic entities -->
+        </div>
       </div>
-      <button class="add-receipt-card" onclick="toggleNewReceiptForm()">
-        <span>+</span> Nova Recepta
-      </button>
 
-      <div id="newReceiptForm" class="receipt-form hidden">
-        <div class="form-group">
-          <label class="form-label">Icona</label>
-          <div class="emoji-picker" id="emojiPicker">
-            <button type="button" onclick="selectEmoji('⚡')">⚡</button>
-            <button type="button" onclick="selectEmoji('🚀')">🚀</button>
-            <button type="button" onclick="selectEmoji('✨')">✨</button>
-            <button type="button" onclick="selectEmoji('📝')">📝</button>
-            <button type="button" onclick="selectEmoji('🎯')">🎯</button>
-            <button type="button" onclick="selectEmoji('💡')">💡</button>
-            <button type="button" onclick="selectEmoji('🔥')">🔥</button>
-            <button type="button" onclick="selectEmoji('💎')">💎</button>
+      <!-- Suggestion Card -->
+      <div id="structureSuggestion" class="structure-suggestion hidden">
+        <div class="suggestion-icon">💡</div>
+        <div class="suggestion-content">
+          <div class="suggestion-text" id="suggestionText"></div>
+          <div class="suggestion-actions">
+            <button class="suggestion-btn apply" onclick="applySuggestion()">Aplicar</button>
+            <button class="suggestion-btn dismiss" onclick="dismissSuggestion()">Ignorar</button>
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Nom del Boto</label>
-          <input type="text" class="form-input" id="receiptLabel" placeholder="Ex: Fes-ho Epic">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Instruccio per la IA</label>
-          <textarea class="form-input" id="receiptInstruction" rows="3" placeholder="Ex: Reescriu el text amb un to epic i dramatic..."></textarea>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-secondary" onclick="toggleNewReceiptForm()">Cancel·lar</button>
-          <button class="btn btn-primary" onclick="saveNewReceipt()">Guardar</button>
-        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="structure-actions">
+        <button class="btn btn-secondary" onclick="refreshStructure()">
+          <span>🔄</span> Escanejar
+        </button>
+        <button class="btn btn-primary" onclick="runAutoStructure()">
+          <span>✨</span> Auto-Structure
+        </button>
       </div>
     </div>
 
@@ -2999,6 +3157,32 @@
       <div id="saveStatus" class="save-status">Guardat correctament!</div>
     </div>
 
+    <!-- In-Document Preview Bar - v3.8 -->
+    <div id="inDocPreviewBar" class="in-doc-preview-bar hidden">
+      <div class="preview-bar-header">
+        <div class="preview-bar-status">
+          <span class="icon">🔍</span>
+          <span>Preview actiu al document</span>
+          <span class="count" id="previewCount">1</span>
+        </div>
+      </div>
+      <div class="preview-bar-hint">
+        Mira el document per veure els canvis proposats
+        <span class="preview-legend">
+          <span class="legend-item delete">✗ Eliminar</span>
+          <span class="legend-item add">✓ Afegir</span>
+        </span>
+      </div>
+      <div class="preview-bar-actions">
+        <button class="preview-bar-btn commit" onclick="commitInDocPreview()">
+          <span class="icon">✓</span> Aplicar canvis
+        </button>
+        <button class="preview-bar-btn cancel" onclick="cancelInDocPreview()">
+          <span class="icon">✗</span> Cancel·lar
+        </button>
+      </div>
+    </div>
+
     <!-- Input Area (Footer) - v3.2 Redesign -->
     <div id="inputArea" class="input-area">
       <!-- Header: Mode selector + Credits -->
@@ -3096,6 +3280,127 @@
         previewModeEnabled = saved !== 'false';
         const toggle = document.getElementById('previewModeToggle');
         if (toggle) toggle.checked = previewModeEnabled;
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // IN-DOCUMENT PREVIEW (v3.8)
+      // ═══════════════════════════════════════════════════════════
+
+      function showInDocPreviewBar(count) {
+        const bar = document.getElementById('inDocPreviewBar');
+        const countEl = document.getElementById('previewCount');
+        if (bar) {
+          bar.classList.remove('hidden');
+          if (countEl) countEl.textContent = count || 1;
+        }
+        // Disable input while preview is active
+        document.getElementById('userInput').disabled = true;
+        document.getElementById('sendBtn').disabled = true;
+      }
+
+      function hideInDocPreviewBar() {
+        const bar = document.getElementById('inDocPreviewBar');
+        if (bar) bar.classList.add('hidden');
+        // Re-enable input
+        document.getElementById('userInput').disabled = false;
+        document.getElementById('sendBtn').disabled = false;
+      }
+
+      function commitInDocPreview() {
+        const commitBtn = document.querySelector('.preview-bar-btn.commit');
+        const cancelBtn = document.querySelector('.preview-bar-btn.cancel');
+
+        // Disable buttons during operation
+        if (commitBtn) {
+          commitBtn.disabled = true;
+          commitBtn.innerHTML = '<span class="icon">⏳</span> Aplicant...';
+        }
+        if (cancelBtn) cancelBtn.disabled = true;
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            hideInDocPreviewBar();
+            if (result && result.ok) {
+              showToast('✅ ' + (result.message || 'Canvis aplicats!'));
+              addMessage('assistant', '✅ S\'han aplicat ' + result.applied + ' canvis al document.');
+            } else {
+              showToast('⚠️ ' + (result?.message || 'Error aplicant canvis'));
+              addMessage('assistant', '⚠️ Error: ' + (result?.message || 'No s\'han pogut aplicar els canvis'));
+            }
+            // Reset buttons
+            if (commitBtn) {
+              commitBtn.disabled = false;
+              commitBtn.innerHTML = '<span class="icon">✓</span> Aplicar canvis';
+            }
+            if (cancelBtn) cancelBtn.disabled = false;
+          })
+          .withFailureHandler(function(error) {
+            hideInDocPreviewBar();
+            showToast('❌ Error: ' + error.message);
+            addMessage('assistant', '❌ Error aplicant canvis: ' + error.message);
+            // Reset buttons
+            if (commitBtn) {
+              commitBtn.disabled = false;
+              commitBtn.innerHTML = '<span class="icon">✓</span> Aplicar canvis';
+            }
+            if (cancelBtn) cancelBtn.disabled = false;
+          })
+          .commitInDocumentPreview();
+      }
+
+      function cancelInDocPreview() {
+        const commitBtn = document.querySelector('.preview-bar-btn.commit');
+        const cancelBtn = document.querySelector('.preview-bar-btn.cancel');
+
+        // Disable buttons during operation
+        if (cancelBtn) {
+          cancelBtn.disabled = true;
+          cancelBtn.innerHTML = '<span class="icon">⏳</span> Cancel·lant...';
+        }
+        if (commitBtn) commitBtn.disabled = true;
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            hideInDocPreviewBar();
+            if (result && result.ok) {
+              showToast('↩️ ' + (result.message || 'Canvis cancel·lats'));
+              addMessage('assistant', '↩️ S\'han cancel·lat ' + result.cancelled + ' canvis. Document restaurat.');
+            } else {
+              showToast('⚠️ ' + (result?.message || 'Error cancel·lant'));
+            }
+            // Reset buttons
+            if (commitBtn) commitBtn.disabled = false;
+            if (cancelBtn) {
+              cancelBtn.disabled = false;
+              cancelBtn.innerHTML = '<span class="icon">✗</span> Cancel·lar';
+            }
+          })
+          .withFailureHandler(function(error) {
+            hideInDocPreviewBar();
+            showToast('❌ Error: ' + error.message);
+            // Reset buttons
+            if (commitBtn) commitBtn.disabled = false;
+            if (cancelBtn) {
+              cancelBtn.disabled = false;
+              cancelBtn.innerHTML = '<span class="icon">✗</span> Cancel·lar';
+            }
+          })
+          .cancelInDocumentPreview();
+      }
+
+      // Check if there's a pending in-doc preview on page load
+      function checkPendingInDocPreview() {
+        google.script.run
+          .withSuccessHandler(function(hasPending) {
+            if (hasPending) {
+              showInDocPreviewBar(1); // Show bar, count unknown
+              addMessage('system', '⚠️ Hi ha un preview pendent al document. Aplica o cancel·la els canvis.');
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.log('[InDocPreview] Check failed:', error.message);
+          })
+          .hasPendingInDocPreview();
       }
 
       function applyTheme(isDark) {
@@ -3478,6 +3783,9 @@
         // Initialize preview mode (v3.2)
         initPreviewMode();
 
+        // v3.8: Check for pending in-document preview
+        checkPendingInDocPreview();
+
         // Initialize mode selector
         initModeSelector();
 
@@ -3713,6 +4021,26 @@
         // Handle preview with 0 changes (fallback - IDs didn't match)
         if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
           addBubble('ai', res.ai_response + '\n\n⚠️ No s\'han pogut identificar els canvis específics.', true);
+          if (res.credits !== undefined) {
+            document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+          }
+          return;
+        }
+
+        // v3.8: Handle In-Document Preview (Track Changes style)
+        if (res.status === 'in_doc_preview') {
+          const previewCount = res.changes_count || res.preview_info?.count || 1;
+          addBubble('ai', res.ai_response + '\n\n🔍 **Preview actiu al document** - Mira el document per veure els canvis proposats.', false);
+          showInDocPreviewBar(previewCount);
+          if (res.credits !== undefined) {
+            document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+          }
+          return;
+        }
+
+        // Handle in_doc_preview with error
+        if (res.status === 'in_doc_preview_error') {
+          addBubble('ai', res.ai_response + '\n\n⚠️ ' + (res.preview_error || 'Error aplicant preview al document'), true);
           if (res.credits !== undefined) {
             document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
           }

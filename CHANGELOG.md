@@ -6,6 +6,43 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.8] - 2024-12-02
+
+### Added
+- **In-Document Preview** - Track Changes style preview directament al document
+  - `applyInDocumentPreview()` - Aplica preview visual: original (vermell+strikethrough) → nou (verd+underline)
+  - `commitInDocumentPreview()` - Confirma els canvis: elimina original + separador, neteja format del nou text
+  - `cancelInDocumentPreview()` - Cancel·la: elimina separador + nou text, restaura format de l'original
+  - Separador visual ` → ` entre text original i nou
+  - Colors: vermell (#FFCDD2/#B71C1C) per eliminar, verd (#C8E6C9/#1B5E20) per afegir
+  - Timeout de 5 minuts per previews abandonats
+
+- **Preview Action Bar** (Sidebar UI)
+  - Barra flotant amb botons "Aplicar canvis" i "Cancel·lar"
+  - Llegenda visual: ✗ Eliminar (vermell), ✓ Afegir (verd)
+  - Comptador de canvis pendents
+  - Input desactivat mentre hi ha preview actiu
+  - Animació slide-up d'entrada
+
+- **Pending Preview Recovery**
+  - `hasPendingInDocPreview()` - Detecta si hi ha preview pendent
+  - Auto-detecció al carregar la pàgina
+  - Mostra warning si hi ha canvis pendents d'aplicar/cancel·lar
+
+### Changed
+- `processUserCommand()` retorna `status: 'in_doc_preview'` en lloc de `'preview'`
+- Preview mode ara s'aplica directament al document en comptes del sidebar
+- Millor feedback visual de l'estat dels canvis proposats
+
+### Technical
+- `PREVIEW_COLORS` - Constants de colors per preview
+- `PREVIEW_SEPARATOR` - Separador ` → ` entre textos
+- `buildElementMap()` - Mapa id→element per accés ràpid
+- `savePendingInDocPreview()` / `loadPendingInDocPreview()` - Persistència a DocumentProperties
+- `preview_info` al response amb detalls dels canvis
+
+---
+
 ## [3.7] - 2024-12-02
 
 ### Added
