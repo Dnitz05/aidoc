@@ -685,6 +685,8 @@
       let conversationMessageCount = 0; // Track for auto-title trigger
       const SAVE_DEBOUNCE_MS = 1500; // Save 1.5s after last message
 
+      console.log('[Docmile v5.2] Loaded - Enhanced Conversations System');
+
       const MODES = {
         edit: { icon: 'edit', label: 'Edit' },
         chat: { icon: 'messageCircle', label: 'Xat' }
@@ -1288,9 +1290,9 @@
         // Update pill position
         updateNavPill();
 
-        // Show/hide input area (hide for settings/recipes/structure panels)
+        // Show/hide input area (hide for settings/recipes/structure/timeline panels)
         const inputArea = document.getElementById('inputArea');
-        if (tabName === 'brain' || tabName === 'docs' || tabName === 'recipes' || tabName === 'structure') {
+        if (tabName === 'brain' || tabName === 'docs' || tabName === 'recipes' || tabName === 'structure' || tabName === 'timeline') {
           inputArea.classList.add('hidden');
         } else {
           inputArea.classList.remove('hidden');
@@ -1468,8 +1470,12 @@
       // ═══════════════════════════════════════════════════════════
 
       function showSaveIndicator(state) {
+        console.log('[v5.2] showSaveIndicator:', state);
         const indicator = document.getElementById('saveIndicator');
-        if (!indicator) return;
+        if (!indicator) {
+          console.warn('[v5.2] saveIndicator element not found!');
+          return;
+        }
 
         indicator.className = 'save-indicator ' + state;
         switch (state) {
@@ -1494,6 +1500,7 @@
       }
 
       function queueMessageForSave(userMessage, aiResponse, mode) {
+        console.log('[v5.2] queueMessageForSave called:', { userMessage: userMessage?.substring(0, 50), mode });
         if (!userMessage) return;
 
         const now = new Date().toISOString();
@@ -1527,6 +1534,7 @@
       }
 
       async function flushPendingMessages() {
+        console.log('[v5.2] flushPendingMessages, pending:', pendingSaveMessages.length);
         if (pendingSaveMessages.length === 0) return;
 
         const messagesToSave = [...pendingSaveMessages];
