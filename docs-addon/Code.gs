@@ -382,8 +382,8 @@ function uploadFileToWorker(base64Data, mimeType, fileName) {
   }
 }
 
-// --- NUCLI DEL PROCESSAMENT (v3.7 amb instrumentació) ---
-function processUserCommand(instruction, chatHistory, userMode, previewMode, clientIntentClassification) {
+// --- NUCLI DEL PROCESSAMENT (v3.10 simplificat - 2 modes) ---
+function processUserCommand(instruction, chatHistory, userMode, previewMode) {
   // v3.7: Iniciar col·lector de mètriques
   const metrics = createMetricsCollector();
 
@@ -462,7 +462,7 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cli
     instruction_length: instruction ? instruction.length : 0,
     instruction_preview: instruction ? instruction.substring(0, 100) : '',
     has_selection: isSelection,
-    user_mode: userMode || 'auto',
+    user_mode: userMode || 'edit',
     preview_mode: previewMode || false,
     content_payload_chars: contentPayload.length,
     content_payload_is_empty: isDocumentEmpty,
@@ -477,11 +477,7 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cli
     has_footer: captureStats.captured_footer,
     footnotes_count: captureStats.footnotes_count,
     has_images: captureStats.has_images,
-    has_drawings: captureStats.has_drawings,
-    // v3.7: Classificació d'intenció del client
-    client_intent: clientIntentClassification ? clientIntentClassification.intent : null,
-    client_intent_confidence: clientIntentClassification ? clientIntentClassification.confidence : null,
-    client_intent_reason: clientIntentClassification ? clientIntentClassification.reason : null
+    has_drawings: captureStats.has_drawings
   };
   metrics.setRequestInfo(requestInfo);
 
@@ -510,7 +506,7 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cli
     has_selection: isSelection,
     chat_history: chatHistory || [],
     last_edit: lastEdit,
-    user_mode: userMode || 'auto',
+    user_mode: userMode || 'edit',
     negative_constraints: bannedWords, // v2.8: Paraules prohibides
     doc_skeleton: docSkeleton, // v2.9: Estructura del document
     // v3.7: UNIVERSAL DOC READER - Estadístiques COMPLETES
@@ -532,14 +528,7 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cli
       language: 'ca',
       tone: 'tècnic però entenedor',
       style_notes: settings.style_guide || ''
-    },
-    // v3.7: Classificació d'intenció del client (frontend)
-    client_intent: clientIntentClassification ? {
-      intent: clientIntentClassification.intent,
-      confidence: clientIntentClassification.confidence,
-      reason: clientIntentClassification.reason,
-      scores: clientIntentClassification.scores
-    } : null
+    }
   };
 
   const options = {

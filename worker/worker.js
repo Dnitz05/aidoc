@@ -323,7 +323,7 @@ async function handleLogDiagnostic(body, env, corsHeaders) {
     instruction_length: diagnostic.request?.instruction_length || null,
     instruction_preview: diagnostic.request?.instruction_preview || null,
     has_selection: diagnostic.request?.has_selection || false,
-    user_mode: diagnostic.request?.user_mode || 'auto',
+    user_mode: diagnostic.request?.user_mode || 'edit',
     preview_mode: diagnostic.request?.preview_mode || false,
 
     // Response info
@@ -927,11 +927,10 @@ async function handleChat(body, env, corsHeaders) {
     has_selection,
     chat_history,  // Conversational memory
     last_edit,     // v2.6: Last edit memory for "una altra" cases
-    user_mode,     // v2.6.2: User-selected mode (auto | edit | chat)
+    user_mode,     // v3.10: User-selected mode (edit | chat)
     negative_constraints,  // v2.8: Banned words/phrases
     doc_skeleton,  // v2.9: Document structure (headings, sections, entities)
-    doc_stats,     // v3.7: Universal Doc Reader stats
-    client_intent  // v3.7: Frontend intent classification
+    doc_stats      // v3.7: Universal Doc Reader stats
   } = body;
 
   if (!license_key) throw new Error("missing_license");
@@ -1157,13 +1156,8 @@ INSTRUCCIÓ DE L'USUARI:
     _meta.warnings = lastValidation.warnings;
   }
 
-  // 5.1 Mode enforcement (v3.7: Enhanced with client_intent)
-  const effectiveMode = user_mode || 'auto';
-
-  // v3.7: Log intent classification for debugging
-  if (client_intent) {
-    console.log('[Intent] Client classification:', JSON.stringify(client_intent));
-  }
+  // 5.1 Mode enforcement (v3.10: Simplified - only edit/chat)
+  const effectiveMode = user_mode || 'edit';
 
   if (effectiveMode === 'chat') {
     // Force CHAT_ONLY: Never edit, convert any edit response to chat

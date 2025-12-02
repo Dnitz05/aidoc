@@ -402,23 +402,16 @@
       <div class="input-header">
         <div class="mode-selector" id="modeSelector">
           <button class="mode-btn" onclick="toggleModeDropdown()" type="button">
-            <span class="mode-icon" id="modeIcon">✨</span>
-            <span id="modeLabel">Auto</span>
+            <span class="mode-icon" id="modeIcon">✏️</span>
+            <span id="modeLabel">Edit</span>
             <svg class="mode-arrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="mode-dropdown">
-            <button class="mode-option selected" data-mode="auto" onclick="selectMode('auto')">
-              <span class="icon">✨</span>
-              <div class="details">
-                <div class="name">Auto</div>
-                <div class="desc">La IA decideix si editar o xatejar</div>
-              </div>
-            </button>
-            <button class="mode-option" data-mode="edit" onclick="selectMode('edit')">
+            <button class="mode-option selected" data-mode="edit" onclick="selectMode('edit')">
               <span class="icon">✏️</span>
               <div class="details">
                 <div class="name">Edit</div>
-                <div class="desc">Sempre edita el document</div>
+                <div class="desc">La IA interpreta i edita el document</div>
               </div>
             </button>
             <button class="mode-option" data-mode="chat" onclick="selectMode('chat')">
@@ -450,7 +443,7 @@
       let currentSettings = {};
       let selectedEmoji = '⚡';
       let currentTab = 'chat';
-      let currentMode = 'auto'; // auto | edit | chat
+      let currentMode = 'edit'; // edit | chat
       let bannedWords = []; // v2.8: Banned expressions
       let pendingUndo = null; // v2.6 Sprint: Snapshot per Optimistic UI Undo
       let pendingPreviewChanges = null; // v3.2: Canvis pendents d'aprovar
@@ -458,7 +451,6 @@
       let previewModeEnabled = true;    // v3.2: Toggle per activar/desactivar preview
 
       const MODES = {
-        auto: { icon: '✨', label: 'Auto' },
         edit: { icon: '✏️', label: 'Edit' },
         chat: { icon: '💬', label: 'Xat' }
       };
@@ -624,254 +616,6 @@
         }
       }
 
-      // ═══════════════════════════════════════════════════════════
-      // INTENT CLASSIFICATION v3.7 - Detectar intenció localment
-      // ═══════════════════════════════════════════════════════════
-
-      const INTENT_PATTERNS = {
-        // EDIT patterns - verbs d'acció sobre text
-        edit: {
-          strong: [
-            /^(corregeix|corregir|tradueix|traduir|millora|millorar)/i,
-            /^(canvia|canviar|modifica|modificar|edita|editar)/i,
-            /^(reescriu|reescriure|reformula|reformular)/i,
-            /^(escurça|escurçar|amplia|ampliar|resumeix|resumir)/i,
-            /^(simplifica|simplificar|formalitza|formalitzar)/i,
-            /^(arregla|arreglar|fixa|fixar|repara|reparar)/i,
-            /fes[- ]?ho\s+(més|menys)/i,
-            /^una\s+altra$/i,  // Referència a edició anterior
-            /^(aquesta\s+)?no\s+m'agrada$/i,
-            /^diferent$/i,
-            /^canvia[- ]?la$/i
-          ],
-          weak: [
-            /(corregeix|tradueix|millora|canvia|modifica)/i,
-            /(reescriu|reformula|escurça|amplia|resumeix)/i,
-            /pots\s+(corregir|traduir|millorar|canviar)/i,
-            /vull\s+que\s+(corregeixis|tradueixis|milloris)/i
-          ]
-        },
-        // CHAT patterns - preguntes i consultes
-        chat: {
-          strong: [
-            /^(què|que)\s+(és|significa|vol\s+dir)/i,
-            /^(com|per\s+què|perquè)\s+/i,
-            /^(explica|explica'm|diga'm|digues)/i,
-            /^(quin|quina|quins|quines)\s+/i,
-            /^(pots\s+)?(explicar|dir|descriure)/i,
-            /^\?/,  // Comença amb interrogant
-            /\?$/   // Acaba amb interrogant
-          ],
-          weak: [
-            /(què|com|per\s+què|quant|on|qui)/i,
-            /(opines|creus|penses|sembla)/i,
-            /(resum|anàlisi|opinió)\s+de/i
-          ]
-        }
-      };
-
-      /**
-       * Classifica la intenció de l'usuari basant-se en la instrucció
-       * @param {string} instruction - La instrucció de l'usuari
-       * @param {boolean} hasSelection - Si hi ha text seleccionat
-       * @returns {Object} { intent: 'edit'|'chat'|'ambiguous', confidence: number, reason: string }
-       */
-      function classifyIntent(instruction, hasSelection) {
-        if (!instruction || instruction.trim().length === 0) {
-          return { intent: 'ambiguous', confidence: 0, reason: 'Instrucció buida' };
-        }
-
-        const text = instruction.trim().toLowerCase();
-        let editScore = 0;
-        let chatScore = 0;
-        let matchedPatterns = [];
-
-        // Check EDIT patterns
-        for (const pattern of INTENT_PATTERNS.edit.strong) {
-          if (pattern.test(text)) {
-            editScore += 3;
-            matchedPatterns.push('edit_strong');
-          }
-        }
-        for (const pattern of INTENT_PATTERNS.edit.weak) {
-          if (pattern.test(text)) {
-            editScore += 1;
-            matchedPatterns.push('edit_weak');
-          }
-        }
-
-        // Check CHAT patterns
-        for (const pattern of INTENT_PATTERNS.chat.strong) {
-          if (pattern.test(text)) {
-            chatScore += 3;
-            matchedPatterns.push('chat_strong');
-          }
-        }
-        for (const pattern of INTENT_PATTERNS.chat.weak) {
-          if (pattern.test(text)) {
-            chatScore += 1;
-            matchedPatterns.push('chat_weak');
-          }
-        }
-
-        // Context modifiers
-        if (hasSelection) {
-          editScore += 1;  // Selecció suggereix edició
-        }
-
-        // Very short instructions are likely edits if they match edit patterns
-        if (text.length < 20 && editScore > 0) {
-          editScore += 1;
-        }
-
-        // Calculate result
-        const totalScore = editScore + chatScore;
-        const editRatio = totalScore > 0 ? editScore / totalScore : 0.5;
-
-        if (editScore >= 3 && editRatio > 0.7) {
-          return {
-            intent: 'edit',
-            confidence: Math.min(editRatio, 0.95),
-            reason: 'Verbs d\'edició detectats',
-            scores: { edit: editScore, chat: chatScore }
-          };
-        } else if (chatScore >= 3 && editRatio < 0.3) {
-          return {
-            intent: 'chat',
-            confidence: Math.min(1 - editRatio, 0.95),
-            reason: 'Patrons de pregunta detectats',
-            scores: { edit: editScore, chat: chatScore }
-          };
-        } else {
-          return {
-            intent: 'ambiguous',
-            confidence: 0.5,
-            reason: 'No es pot determinar clarament',
-            scores: { edit: editScore, chat: chatScore }
-          };
-        }
-      }
-
-      /**
-       * Determina el mode efectiu a usar
-       * @param {string} userMode - Mode seleccionat per l'usuari (auto/edit/chat)
-       * @param {Object} classification - Resultat de classifyIntent()
-       * @returns {string} 'edit' | 'chat'
-       */
-      function determineEffectiveMode(userMode, classification) {
-        if (userMode === 'edit') return 'edit';
-        if (userMode === 'chat') return 'chat';
-
-        // Mode auto - usar classificació
-        if (classification.intent === 'edit') return 'edit';
-        if (classification.intent === 'chat') return 'chat';
-
-        // Ambiguo - default a chat (més segur)
-        return 'chat';
-      }
-
-      // ═══════════════════════════════════════════════════════════
-      // CLARIFICATION PROMPT v3.7 - Per intencions ambigües
-      // ═══════════════════════════════════════════════════════════
-
-      let pendingClarification = null;  // Guarda instrucció pendent
-
-      /**
-       * Mostra el prompt de clarificació quan la intenció és ambigua
-       * @param {string} instruction - La instrucció de l'usuari
-       * @param {Object} classification - El resultat de classifyIntent()
-       */
-      function showClarificationPrompt(instruction, classification) {
-        hideClarificationPrompt();  // Amaga qualsevol prompt anterior
-
-        const container = document.getElementById('chatHistory');
-        const prompt = document.createElement('div');
-        prompt.className = 'clarification-prompt';
-        prompt.id = 'clarificationPrompt';
-
-        // Escapar la instrucció per mostrar-la de forma segura
-        const escapedInstruction = instruction.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-        prompt.innerHTML = `
-          <div class="prompt-text">
-            <span class="icon">🤔</span>
-            No estic segur si vols editar el document o fer una pregunta:
-          </div>
-          <div class="prompt-instruction">"${escapedInstruction}"</div>
-          <div class="prompt-buttons">
-            <button class="prompt-btn edit" onclick="resolveClarification('edit')">
-              <span class="icon">✏️</span> Editar
-            </button>
-            <button class="prompt-btn chat" onclick="resolveClarification('chat')">
-              <span class="icon">💬</span> Preguntar
-            </button>
-          </div>
-        `;
-
-        container.appendChild(prompt);
-        container.scrollTop = container.scrollHeight;
-
-        // Guardar la instrucció pendent
-        pendingClarification = {
-          instruction: instruction,
-          classification: classification
-        };
-      }
-
-      /**
-       * Amaga el prompt de clarificació
-       */
-      function hideClarificationPrompt() {
-        const prompt = document.getElementById('clarificationPrompt');
-        if (prompt) prompt.remove();
-        pendingClarification = null;
-      }
-
-      /**
-       * Resol la clarificació i envia el missatge amb el mode forçat
-       * @param {string} forcedMode - 'edit' o 'chat'
-       */
-      function resolveClarification(forcedMode) {
-        if (!pendingClarification) return;
-
-        const instruction = pendingClarification.instruction;
-        const classification = pendingClarification.classification;
-
-        hideClarificationPrompt();
-
-        // Enviar amb el mode forçat
-        sendMessageWithMode(instruction, forcedMode, classification);
-      }
-
-      /**
-       * Envia un missatge amb un mode específic (bypass de clarification)
-       * @param {string} instruction - La instrucció
-       * @param {string} mode - 'edit' o 'chat' (forçat)
-       * @param {Object} classification - La classificació original
-       */
-      function sendMessageWithMode(instruction, mode, classification) {
-        // Forçar la classificació al mode escollit
-        const forcedClassification = {
-          ...classification,
-          intent: mode,
-          confidence: 1.0,
-          reason: 'Clarificat per usuari'
-        };
-
-        addBubble('user', instruction);
-
-        const btn = document.getElementById('sendBtn');
-        btn.disabled = true;
-
-        showThinking();
-
-        // Enviar amb mode forçat
-        google.script.run
-          .withSuccessHandler(handleSendSuccess)
-          .withFailureHandler(handleSendFailure)
-          .processUserCommand(instruction, getRecentHistory(), mode, previewModeEnabled, forcedClassification);
-      }
-
       window.onload = function() {
         // Initialize theme
         initTheme();
@@ -948,7 +692,9 @@
       // ═══════════════════════════════════════════════════════════
 
       function initModeSelector() {
-        const savedMode = localStorage.getItem('docmile-mode') || 'auto';
+        let savedMode = localStorage.getItem('docmile-mode') || 'edit';
+        // Migrar usuaris antics de 'auto' a 'edit'
+        if (savedMode === 'auto') savedMode = 'edit';
         selectMode(savedMode, false);
 
         // Close dropdown when clicking outside
@@ -1185,26 +931,7 @@
         const text = input.value.trim();
         if (!text) return;
 
-        // v3.7: Classificar intenció localment ABANS d'enviar
-        const userMode = getCurrentMode();
-        const intentClassification = classifyIntent(text, false); // hasSelection es determina al backend
-
-        // Debug log
-        console.log('[Intent Classification]', {
-          text: text.substring(0, 50),
-          userMode,
-          classification: intentClassification
-        });
-
-        // v3.7: Si mode AUTO i intenció ambigua amb baixa confiança, mostrar clarificació
-        if (userMode === 'auto' && intentClassification.intent === 'ambiguous') {
-          input.value = '';  // Esborrar input
-          input.style.height = 'auto';
-          showClarificationPrompt(text, intentClassification);
-          return;  // No enviar encara - esperar decisió usuari
-        }
-
-        // Netejar input i enviar normalment
+        // v3.10: Simplificat - només 2 modes (edit/chat), sense classificació
         addBubble('user', text);
         input.value = '';
         input.style.height = 'auto';
@@ -1217,7 +944,7 @@
         google.script.run
           .withSuccessHandler(handleSendSuccess)
           .withFailureHandler(handleSendFailure)
-          .processUserCommand(text, getRecentHistory(), getCurrentMode(), previewModeEnabled, intentClassification);
+          .processUserCommand(text, getRecentHistory(), getCurrentMode(), previewModeEnabled);
       }
 
       function addBubble(type, text, isEdit, lastEditWord) {
