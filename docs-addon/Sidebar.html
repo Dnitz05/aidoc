@@ -427,7 +427,14 @@
       </div>
 
       <!-- v4.0: Banned Words Chips (visible constraints) -->
-      <div class="constraints-chips" id="constraintsChips"></div>
+      <div class="constraints-area">
+        <div class="constraints-chips" id="constraintsChips"></div>
+        <button class="constraint-add-btn" id="constraintAddBtn" onclick="showConstraintInput()" title="Afegir paraula prohibida">+</button>
+        <div class="constraint-input-wrapper hidden" id="constraintInputWrapper">
+          <input type="text" class="constraint-input" id="constraintInput" placeholder="Paraula..." onkeydown="handleConstraintInputKey(event)">
+          <button class="constraint-input-confirm" onclick="addConstraintFromInput()">✓</button>
+        </div>
+      </div>
 
       <!-- Input wrapper amb textarea i send button flotant -->
       <div class="input-wrapper">
@@ -1777,6 +1784,79 @@
           .withFailureHandler(function(err) {
             bannedWords.splice(index, 0, removed); // Rollback
             console.error('Error removing constraint:', err);
+          })
+          .saveBannedWords(bannedWords);
+      }
+
+      // v4.0.1: Afegir paraula directament des del xat
+      function showConstraintInput() {
+        const wrapper = document.getElementById('constraintInputWrapper');
+        const btn = document.getElementById('constraintAddBtn');
+        const input = document.getElementById('constraintInput');
+
+        if (wrapper && btn) {
+          wrapper.classList.remove('hidden');
+          btn.style.display = 'none';
+          if (input) {
+            input.value = '';
+            input.focus();
+          }
+        }
+      }
+
+      function hideConstraintInput() {
+        const wrapper = document.getElementById('constraintInputWrapper');
+        const btn = document.getElementById('constraintAddBtn');
+
+        if (wrapper && btn) {
+          wrapper.classList.add('hidden');
+          btn.style.display = 'flex';
+        }
+      }
+
+      function handleConstraintInputKey(event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          addConstraintFromInput();
+        } else if (event.key === 'Escape') {
+          hideConstraintInput();
+        }
+      }
+
+      function addConstraintFromInput() {
+        const input = document.getElementById('constraintInput');
+        if (!input) return;
+
+        const word = input.value.trim().toLowerCase();
+
+        if (!word) {
+          hideConstraintInput();
+          return;
+        }
+
+        if (word.length < 2) {
+          showToast('⚠️ Mínim 2 caràcters');
+          return;
+        }
+
+        if (bannedWords.includes(word)) {
+          showToast('⚠️ "' + word + '" ja està prohibida');
+          hideConstraintInput();
+          return;
+        }
+
+        bannedWords.push(word);
+        hideConstraintInput();
+
+        google.script.run
+          .withSuccessHandler(function() {
+            renderBannedWordsList();
+            renderConstraintChips();
+            showToast('🚫 "' + word + '" afegit');
+          })
+          .withFailureHandler(function(err) {
+            bannedWords.pop(); // Rollback
+            showToast('❌ Error afegint paraula');
           })
           .saveBannedWords(bannedWords);
       }

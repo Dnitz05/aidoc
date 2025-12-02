@@ -3042,18 +3042,90 @@
          ═══════════════════════════════════════════════════════════ */
 
       /* Sprint 1: Chips container sobre l'input */
+      .constraints-area {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 var(--space-sm);
+        margin-bottom: var(--space-xs);
+        min-height: 28px;
+      }
+
       .constraints-chips {
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
-        padding: 0 var(--space-sm);
-        margin-bottom: var(--space-xs);
+        flex: 1;
         max-height: 60px;
         overflow-y: auto;
       }
 
-      .constraints-chips:empty {
+      .constraint-add-btn {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 1px dashed var(--border);
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 16px;
+        font-weight: 300;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+      }
+
+      .constraint-add-btn:hover {
+        border-color: var(--error);
+        color: var(--error);
+        background: var(--error-muted);
+      }
+
+      .constraint-input-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        animation: chipAppear 0.15s ease-out;
+      }
+
+      .constraint-input-wrapper.hidden {
         display: none;
+      }
+
+      .constraint-input {
+        width: 100px;
+        padding: 4px 8px;
+        border: 1px solid var(--error);
+        border-radius: var(--radius-sm);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 11px;
+        outline: none;
+      }
+
+      .constraint-input:focus {
+        box-shadow: 0 0 0 2px var(--error-muted);
+      }
+
+      .constraint-input-confirm {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: none;
+        background: var(--error);
+        color: white;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+      }
+
+      .constraint-input-confirm:hover {
+        transform: scale(1.1);
       }
 
       .constraint-chip {
