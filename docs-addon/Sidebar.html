@@ -1288,29 +1288,15 @@
         google.script.run
           .withSuccessHandler(function(data) {
             if (data && data.length > 0 && data[0].recipes) {
-              // Already folder format
-              userFolders = data;
-            } else if (data && data.length > 0) {
-              // Migrate old flat recipes to folders
-              userFolders = JSON.parse(JSON.stringify(DEFAULT_FOLDERS));
-              const migratedFolder = {
-                id: 'imported_' + Date.now(),
-                name: 'Importades',
-                icon: '📥',
-                collapsed: false,
-                recipes: data.map(function(r, i) {
-                  return {
-                    id: 'imp_' + i,
-                    name: r.name || 'Sense nom',
-                    emoji: r.emoji || '•',
-                    instruction: r.instruction || ''
-                  };
-                })
-              };
-              userFolders.push(migratedFolder);
-              saveRecipes();
+              // Already folder format - filter out "Importades" if exists
+              userFolders = data.filter(function(f) {
+                return !f.id.startsWith('imported_') && f.name !== 'Importades';
+              });
+              if (userFolders.length !== data.length) {
+                saveRecipes(); // Save without Importades
+              }
             } else {
-              // First time: load defaults
+              // First time or old format: load defaults
               userFolders = JSON.parse(JSON.stringify(DEFAULT_FOLDERS));
               saveRecipes();
             }
