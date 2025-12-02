@@ -555,6 +555,104 @@ function uploadFileToWorker(base64Data, mimeType, fileName) {
   }
 }
 
+// --- CAPTURA DE SELECCIÓ (v5.2) ---
+// Guarda la selecció actual al cache abans que l'usuari interactuï amb la sidebar
+function captureCurrentSelection() {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const selection = doc.getSelection();
+
+    if (!selection) {
+      return { captured: false, reason: 'no_selection' };
+    }
+
+    const ranges = selection.getRangeElements() || [];
+    if (ranges.length === 0) {
+      return { captured: false, reason: 'empty_ranges' };
+    }
+
+    // Serialitzar la selecció (guardem índexs dels elements)
+    const body = doc.getBody();
+    const selectionData = [];
+
+    ranges.forEach(range => {
+      const element = range.getElement();
+      const parent = element.getType() === DocumentApp.ElementType.TEXT ?
+                     element.getParent() : element;
+
+      // Buscar l'índex de l'element al body
+      const numChildren = body.getNumChildren();
+      for (let i = 0; i < numChildren; i++) {
+        if (body.getChild(i).equals && body.getChild(i).equals(parent)) {
+          selectionData.push({
+            index: i,
+            startOffset: range.getStartOffset(),
+            endOffset: range.getEndOffsetInclusive(),
+            isPartial: range.isPartial()
+          });
+          break;
+        }
+        // Per elements niuats (dins taules, etc.)
+        if (body.getChild(i) === parent) {
+          selectionData.push({ index: i });
+          break;
+        }
+      }
+    });
+
+    if (selectionData.length === 0) {
+      return { captured: false, reason: 'no_indexable_elements' };
+    }
+
+    // Guardar al cache (60 segons de vida)
+    const cache = CacheService.getUserCache();
+    cache.put('docmile_selection', JSON.stringify({
+      docId: doc.getId(),
+      timestamp: Date.now(),
+      elements: selectionData
+    }), 60);
+
+    return { captured: true, elements: selectionData.length };
+
+  } catch (e) {
+    return { captured: false, reason: 'error', error: e.message };
+  }
+}
+
+// Recupera la selecció guardada del cache
+function getCachedSelection(doc, body) {
+  try {
+    const cache = CacheService.getUserCache();
+    const cached = cache.get('docmile_selection');
+
+    if (!cached) return null;
+
+    const data = JSON.parse(cached);
+
+    // Verificar que és del mateix document i no ha expirat (30 segons màxim)
+    if (data.docId !== doc.getId()) return null;
+    if (Date.now() - data.timestamp > 30000) return null;
+
+    // Reconstruir els elements
+    const elements = [];
+    const numChildren = body.getNumChildren();
+
+    data.elements.forEach(sel => {
+      if (sel.index >= 0 && sel.index < numChildren) {
+        elements.push(body.getChild(sel.index));
+      }
+    });
+
+    // Netejar cache després d'usar
+    cache.remove('docmile_selection');
+
+    return elements.length > 0 ? elements : null;
+
+  } catch (e) {
+    return null;
+  }
+}
+
 // --- NUCLI DEL PROCESSAMENT (v3.10 simplificat - 2 modes) ---
 function processUserCommand(instruction, chatHistory, userMode, previewMode) {
   // v3.7: Iniciar col·lector de mètriques
@@ -607,9 +705,12 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
   const knowledgeFileUri = fileProps.getProperty('DOCMILE_FILE_URI');
   const knowledgeFileMime = fileProps.getProperty('DOCMILE_FILE_MIME');
 
-  // v3.7: Preparar elements per la captura
+  // v5.2: Preparar elements per la captura (amb fallback a cache)
   let selectedElements = null;
+  let selectionSource = 'none';
+
   if (selection) {
+    // Selecció activa directa del document
     const ranges = selection.getRangeElements() || [];
     selectedElements = [];
     ranges.forEach(r => {
@@ -619,6 +720,15 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
     });
     selectedElements = [...new Set(selectedElements)];
     isSelection = true;
+    selectionSource = 'direct';
+  } else {
+    // v5.2: Intentar recuperar selecció del cache (capturada abans del focus change)
+    const cachedElements = getCachedSelection(doc, body);
+    if (cachedElements && cachedElements.length > 0) {
+      selectedElements = cachedElements;
+      isSelection = true;
+      selectionSource = 'cache';
+    }
   }
 
   // v3.7: UNIVERSAL DOC READER - Captura TOTAL del document
@@ -658,6 +768,7 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
     instruction: instruction ? instruction.substring(0, 200) : null,
     user_mode: userMode,
     has_selection: isSelection,
+    selection_source: selectionSource, // v5.2: direct, cache, o none
     doc_is_empty: isDocumentEmpty,
     captured_ids: contentIndex,
     total_chars: contentPayload.length,

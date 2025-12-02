@@ -1158,6 +1158,13 @@
           }
         });
 
+        // v5.2: Capturar selecció del document quan el ratolí entra a l'àrea d'input
+        // Això permet detectar seleccions fetes amb el ratolí abans que el focus canviï
+        const inputArea = document.getElementById('inputArea');
+        inputArea.addEventListener('mouseenter', function() {
+          google.script.run.captureCurrentSelection();
+        });
+
         // Select first icon
         selectIcon('zap');
       };
