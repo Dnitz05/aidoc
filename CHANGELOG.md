@@ -9,12 +9,12 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [3.8] - 2024-12-02
 
 ### Added
-- **In-Document Preview** - Track Changes style preview directament al document
-  - `applyInDocumentPreview()` - Aplica preview visual: original (vermell+strikethrough) → nou (verd+underline)
+- **In-Document Preview** - Preview visual directament al document
+  - `applyInDocumentPreview()` - Aplica preview visual: original (sombreig vermell) → nou (sombreig verd)
   - `commitInDocumentPreview()` - Confirma els canvis: elimina original + separador, neteja format del nou text
   - `cancelInDocumentPreview()` - Cancel·la: elimina separador + nou text, restaura format de l'original
   - Separador visual ` → ` entre text original i nou
-  - Colors: vermell (#FFCDD2/#B71C1C) per eliminar, verd (#C8E6C9/#1B5E20) per afegir
+  - Colors de fons: vermell clar (#FFCDD2) per eliminar, verd clar (#C8E6C9) per afegir
   - Timeout de 5 minuts per previews abandonats
 
 - **Preview Action Bar** (Sidebar UI)

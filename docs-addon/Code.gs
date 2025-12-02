@@ -1031,19 +1031,17 @@ function applyInDocumentPreview(changes) {
       const separator = '  →  ';
       textObj.appendText(separator + cleanNewText);
 
-      // 2. Formatar text ORIGINAL com "a eliminar"
+      // 2. Formatar text ORIGINAL com "a eliminar" (només sombreig vermell)
       if (originalLength > 0) {
         textObj.setBackgroundColor(0, originalLength - 1, PREVIEW_COLORS.DELETE_BG);
-        textObj.setStrikethrough(0, originalLength - 1, true);
         textObj.setForegroundColor(0, originalLength - 1, PREVIEW_COLORS.DELETE_TEXT);
       }
 
-      // 3. Formatar text NOU com "a afegir"
+      // 3. Formatar text NOU com "a afegir" (només sombreig verd)
       const newStart = originalLength + separator.length;
       const newEnd = newStart + cleanNewText.length - 1;
       if (newEnd >= newStart) {
         textObj.setBackgroundColor(newStart, newEnd, PREVIEW_COLORS.ADD_BG);
-        textObj.setUnderline(newStart, newEnd, true);
         textObj.setForegroundColor(newStart, newEnd, PREVIEW_COLORS.ADD_TEXT);
       }
 
