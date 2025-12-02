@@ -11,6 +11,41 @@
   </head>
   <body>
 
+    <!-- Conversations Drawer (v5.0) -->
+    <div class="conversations-drawer-backdrop" id="drawerBackdrop" onclick="closeConversationsDrawer()"></div>
+    <div class="conversations-drawer" id="conversationsDrawer">
+      <div class="drawer-header">
+        <span class="drawer-title">
+          <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+          Historial
+        </span>
+        <button class="drawer-close-btn" onclick="closeConversationsDrawer()">
+          <span class="i i--sm"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>
+        </button>
+      </div>
+
+      <button class="new-conversation-btn" onclick="createNewConversation()">
+        <span class="i i--sm"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        Nova conversa
+      </button>
+
+      <div class="conversations-search">
+        <div class="conversations-search-wrapper">
+          <span class="conversations-search-icon"><span class="i i--sm"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span></span>
+          <input type="text" id="conversationsSearchInput" placeholder="Cerca converses..." oninput="filterConversations()">
+        </div>
+      </div>
+
+      <div class="conversations-list" id="conversationsList">
+        <!-- Conversations will be rendered here -->
+        <div class="conversations-empty" id="conversationsEmpty">
+          <div class="conversations-empty-icon"><span class="i i--xl i--muted"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span></div>
+          <div class="conversations-empty-text">Cap conversa encara</div>
+          <div class="conversations-empty-hint">Escriu un missatge per crear la primera conversa</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Navigation -->
     <nav class="nav">
       <div class="nav-tabs">
@@ -19,13 +54,13 @@
           <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </button>
         <button class="tab" data-tab="structure" onclick="switchTab('structure')" title="Estructura">
-          <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3zM21 9H3M9 21V9"/></svg>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="16" y2="6"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="8" y1="14" x2="20" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg>
         </button>
         <button class="tab" data-tab="docs" onclick="switchTab('docs')" title="Coneixement">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         </button>
         <button class="tab" data-tab="recipes" onclick="switchTab('recipes')" title="Receptes">
-          <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="12" y1="6" x2="16" y2="6"/><line x1="12" y1="10" x2="16" y2="10"/><line x1="8" y1="6" x2="8" y2="6"/><line x1="8" y1="10" x2="8" y2="10"/></svg>
+          <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         </button>
         <button class="tab" data-tab="brain" onclick="switchTab('brain')" title="Configuracio">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -35,6 +70,16 @@
 
     <!-- Chat Panel -->
     <div id="chatPanel" class="panel active">
+      <!-- Chat Header with History Button -->
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <button class="chat-history-btn" onclick="openConversationsDrawer()" title="Historial de converses">
+            <span class="i i--sm"><svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
+          </button>
+          <span class="chat-current-title" id="chatCurrentTitle">Nova conversa</span>
+        </div>
+        <button class="chat-new-btn" onclick="createNewConversation()">+ Nova</button>
+      </div>
       <div class="chat-messages" id="chatHistory">
         <div class="msg system">Hola! Soc Docmile, el teu assistent d'escriptura.</div>
       </div>
@@ -115,26 +160,53 @@
       </div>
     </div>
 
-    <!-- Docs Panel (Knowledge) -->
+    <!-- Docs Panel (Knowledge) v5.1 - Library System -->
     <div id="docsPanel" class="panel">
-      <div class="settings-card">
+      <!-- Active File Section -->
+      <div class="settings-card" id="activeFileSection">
         <div class="settings-card-header">
-          <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
+          <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
           <div>
-            <div class="title">Fitxer de Coneixement</div>
-            <div class="subtitle">PDF o TXT com a referència per la IA</div>
+            <div class="title">Fitxer Actiu</div>
+            <div class="subtitle" id="activeFileStatus">Cap fitxer seleccionat</div>
           </div>
         </div>
-        <div class="file-upload" id="fileUploadArea">
-          <label class="file-upload-label">
-            <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md" onchange="handleFileSelect()">
-            <span class="i i--muted i--lg"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
-            <span class="text">Clica per seleccionar un fitxer</span>
-          </label>
+        <div id="activeFileDisplay" class="knowledge-active-file hidden">
+          <span class="knowledge-file-name" id="activeFileName"></span>
+          <button class="knowledge-file-remove" onclick="removeActiveFile()" title="Treure">×</button>
         </div>
-        <div id="fileStatusContainer"></div>
       </div>
 
+      <!-- Library Section -->
+      <div class="settings-card knowledge-library-card">
+        <div class="settings-card-header">
+          <span class="i i--default"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+          <div>
+            <div class="title">Biblioteca</div>
+            <div class="subtitle">Fitxers pujats anteriorment</div>
+          </div>
+          <button class="knowledge-refresh-btn" onclick="refreshKnowledgeLibrary()" title="Actualitzar">
+            <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
+          </button>
+        </div>
+        <div id="knowledgeLibraryList" class="knowledge-library-list">
+          <div class="knowledge-empty">
+            <span class="i i--muted"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            <span>Cap fitxer a la biblioteca</span>
+          </div>
+        </div>
+        <!-- Upload New File -->
+        <div class="knowledge-upload-section">
+          <label class="knowledge-upload-btn">
+            <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md" onchange="handleFileSelect()">
+            <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+            Pujar nou fitxer
+          </label>
+          <div id="fileStatusContainer"></div>
+        </div>
+      </div>
+
+      <!-- Strict Mode Toggle -->
       <div class="toggle-row">
         <div class="toggle-label">
           <span class="i i--default"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
@@ -148,22 +220,6 @@
           <span class="toggle-slider"></span>
         </label>
       </div>
-
-      <div class="settings-card" style="margin-top: var(--space-lg);">
-        <div class="settings-card-header">
-          <span class="i i--warning"><svg viewBox="0 0 24 24"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></span>
-          <div>
-            <div class="title">Com funciona</div>
-            <div class="subtitle">Consells d'ús</div>
-          </div>
-        </div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
-          <p>• Puja un <strong>PDF</strong> o <strong>TXT</strong> amb informació de referència</p>
-          <p>• La IA usarà aquest context per respondre millor</p>
-          <p>• Activa <strong>Mode Estricte</strong> per limitar respostes al contingut del fitxer</p>
-          <p>• Els fitxers expiren després d'un temps - torna a pujar si cal</p>
-        </div>
-      </div>
     </div>
 
     <!-- Recipes Panel (v3.6 - Folder System) -->
@@ -171,7 +227,7 @@
       <div class="recipes-panel-content">
         <!-- Search Bar -->
         <div class="recipes-search-wrapper">
-          <span class="recipes-search-icon">🔍</span>
+          <span class="recipes-search-icon"><span class="i i--sm i--default"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span></span>
           <input type="text" class="recipes-search" id="recipesSearch" placeholder="Cerca receptes..." oninput="filterRecipes()">
         </div>
 
@@ -182,7 +238,7 @@
 
         <!-- Empty State -->
         <div id="recipesEmptyState" class="recipes-empty hidden">
-          <div class="recipes-empty-icon">📁</div>
+          <div class="recipes-empty-icon"><span class="i i--xl i--accent"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span></div>
           <div class="recipes-empty-title">No tens cap carpeta</div>
           <div class="recipes-empty-subtitle">Crea una carpeta per organitzar les teves receptes</div>
           <button class="btn btn-primary" onclick="showNewFolderModal()">+ Nova Carpeta</button>
@@ -190,7 +246,7 @@
 
         <!-- No Results State -->
         <div id="recipesNoResults" class="recipes-no-results hidden">
-          <div class="recipes-no-results-icon">🔍</div>
+          <div class="recipes-no-results-icon"><span class="i i--xl i--accent"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span></div>
           <div>Cap recepta coincideix amb la cerca</div>
         </div>
 
@@ -388,20 +444,20 @@
       <div class="input-header">
         <div class="mode-selector" id="modeSelector">
           <button class="mode-btn" onclick="toggleModeDropdown()" type="button">
-            <span class="mode-icon" id="modeIcon">✏️</span>
+            <span class="mode-icon" id="modeIcon"><span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></span></span>
             <span id="modeLabel">Edit</span>
             <svg class="mode-arrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="mode-dropdown">
             <button class="mode-option selected" data-mode="edit" onclick="selectMode('edit')">
-              <span class="icon">✏️</span>
+              <span class="i"><svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></span>
               <div class="details">
                 <div class="name">Edit</div>
                 <div class="desc">La IA interpreta i edita el document</div>
               </div>
             </button>
             <button class="mode-option" data-mode="chat" onclick="selectMode('chat')">
-              <span class="icon">💬</span>
+              <span class="i"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span>
               <div class="details">
                 <div class="name">Xat</div>
                 <div class="desc">Només conversa, mai edita</div>
@@ -418,7 +474,7 @@
         <button class="constraint-add-btn" id="constraintAddBtn" onclick="showConstraintInput()" title="Afegir paraula prohibida">+</button>
         <div class="constraint-input-wrapper hidden" id="constraintInputWrapper">
           <input type="text" class="constraint-input" id="constraintInput" placeholder="Paraula..." onkeydown="handleConstraintInputKey(event)">
-          <button class="constraint-input-confirm" onclick="addConstraintFromInput()">✓</button>
+          <button class="constraint-input-confirm" onclick="addConstraintFromInput()"><span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span></button>
         </div>
       </div>
 
@@ -482,7 +538,30 @@
         messageSquare: '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
         send: '<svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
         undo: '<svg viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>',
-        refresh: '<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>'
+        refresh: '<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>',
+        // Additional icons for recipes and entities
+        wand: '<svg viewBox="0 0 24 24"><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></svg>',
+        star: '<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+        globe: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+        ruler: '<svg viewBox="0 0 24 24"><path d="M22 8.5V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2.5"/><path d="M22 15.5V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2.5"/><path d="M6 4v4"/><path d="M10 4v2"/><path d="M14 4v2"/><path d="M18 4v4"/></svg>',
+        target: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+        briefcase: '<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+        clipboard: '<svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>',
+        rocket: '<svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>',
+        pin: '<svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
+        circle: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>',
+        messageCircle: '<svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
+        type: '<svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
+        minimize: '<svg viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>',
+        maximize: '<svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
+        clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+        calendar: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+        dollarSign: '<svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+        percent: '<svg viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>',
+        hash: '<svg viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>',
+        mail: '<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',
+        link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+        loader: '<svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>'
       };
 
       // Helper function to render icons
@@ -497,7 +576,7 @@
       // ═══════════════════════════════════════════════════════════
 
       let currentSettings = {};
-      let selectedEmoji = '⚡';
+      let selectedIcon = 'zap';
       let currentTab = 'chat';
       let currentMode = 'edit'; // edit | chat
       let bannedWords = []; // v2.8: Banned expressions
@@ -506,10 +585,284 @@
       let pendingDocSnapshot = null;    // v3.3: Snapshot per detectar race conditions
       let previewModeEnabled = true;    // v3.2: Toggle per activar/desactivar preview
 
+      // v5.0: Conversations System
+      let currentConversationId = null;
+      let conversationsList = [];
+      let conversationsLoaded = false;
+
       const MODES = {
-        edit: { icon: '✏️', label: 'Edit' },
-        chat: { icon: '💬', label: 'Xat' }
+        edit: { icon: 'edit', label: 'Edit' },
+        chat: { icon: 'messageCircle', label: 'Xat' }
       };
+
+      // ═══════════════════════════════════════════════════════════
+      // CONVERSATIONS SYSTEM (v5.0)
+      // ═══════════════════════════════════════════════════════════
+
+      function openConversationsDrawer() {
+        document.getElementById('conversationsDrawer').classList.add('open');
+        document.getElementById('drawerBackdrop').classList.add('visible');
+        if (!conversationsLoaded) {
+          loadConversations();
+        }
+      }
+
+      function closeConversationsDrawer() {
+        document.getElementById('conversationsDrawer').classList.remove('open');
+        document.getElementById('drawerBackdrop').classList.remove('visible');
+      }
+
+      function loadConversations() {
+        const listEl = document.getElementById('conversationsList');
+        const emptyEl = document.getElementById('conversationsEmpty');
+
+        // Show loading skeleton
+        listEl.innerHTML = `
+          <div class="conversation-skeleton">
+            <div class="skeleton-avatar"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line short"></div>
+            </div>
+          </div>
+          <div class="conversation-skeleton">
+            <div class="skeleton-avatar"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line short"></div>
+            </div>
+          </div>
+        `;
+        emptyEl.classList.add('hidden');
+
+        const settings = JSON.parse(getSettings() || '{}');
+        if (!settings.license_key) {
+          listEl.innerHTML = '';
+          emptyEl.classList.remove('hidden');
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            conversationsLoaded = true;
+            if (res.status === 'ok' && res.conversations && res.conversations.length > 0) {
+              conversationsList = res.conversations;
+              renderConversationsList(res.conversations);
+              emptyEl.classList.add('hidden');
+            } else {
+              listEl.innerHTML = '';
+              emptyEl.classList.remove('hidden');
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.error('Error loading conversations:', err);
+            listEl.innerHTML = '';
+            emptyEl.classList.remove('hidden');
+          })
+          .callWorker({
+            action: 'list_conversations',
+            license_key: settings.license_key,
+            limit: 50
+          });
+      }
+
+      function renderConversationsList(conversations) {
+        const listEl = document.getElementById('conversationsList');
+
+        // Group by date
+        const groups = groupConversationsByDate(conversations);
+        let html = '';
+
+        for (const group of groups) {
+          html += '<div class="conversation-group">';
+          html += '<div class="conversation-group-title">' + group.label + '</div>';
+
+          for (const conv of group.conversations) {
+            const isActive = conv.id === currentConversationId ? ' active' : '';
+            const pinnedBadge = conv.pinned ? '<span class="conversation-pinned">' + icon('pin', 'i--sm') + '</span>' : '';
+
+            html += `
+              <div class="conversation-item${isActive}" data-id="${conv.id}" onclick="switchConversation('${conv.id}')">
+                <div class="conversation-item-icon">
+                  ${icon('messageCircle', 'i--sm')}
+                </div>
+                <div class="conversation-item-content">
+                  <div class="conversation-item-title">${escapeHtml(conv.title)}</div>
+                  <div class="conversation-item-preview">${escapeHtml(conv.preview || '')}</div>
+                  <div class="conversation-item-meta">
+                    ${pinnedBadge}
+                    <span>${conv.message_count} missatges</span>
+                  </div>
+                </div>
+                <div class="conversation-item-actions">
+                  <button class="conversation-action-btn delete" onclick="event.stopPropagation(); deleteConversation('${conv.id}')" title="Eliminar">
+                    ${icon('trash', 'i--sm')}
+                  </button>
+                </div>
+              </div>
+            `;
+          }
+          html += '</div>';
+        }
+
+        listEl.innerHTML = html;
+      }
+
+      function groupConversationsByDate(conversations) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+        const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+        const groups = {
+          today: { label: 'Avui', conversations: [] },
+          yesterday: { label: 'Ahir', conversations: [] },
+          lastWeek: { label: 'Aquesta setmana', conversations: [] },
+          older: { label: 'Més antic', conversations: [] }
+        };
+
+        for (const conv of conversations) {
+          const date = new Date(conv.updated_at);
+          if (date >= today) {
+            groups.today.conversations.push(conv);
+          } else if (date >= yesterday) {
+            groups.yesterday.conversations.push(conv);
+          } else if (date >= lastWeek) {
+            groups.lastWeek.conversations.push(conv);
+          } else {
+            groups.older.conversations.push(conv);
+          }
+        }
+
+        // Return only non-empty groups
+        return Object.values(groups).filter(g => g.conversations.length > 0);
+      }
+
+      function switchConversation(conversationId) {
+        currentConversationId = conversationId;
+        closeConversationsDrawer();
+
+        // Clear chat and show loading
+        const chatHistory = document.getElementById('chatHistory');
+        chatHistory.innerHTML = '<div class="msg system">Carregant conversa...</div>';
+
+        const settings = JSON.parse(getSettings() || '{}');
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.status === 'ok' && res.conversation) {
+              loadConversationMessages(res.conversation);
+              updateConversationTitle(res.conversation.title);
+              // Update active state in drawer
+              updateActiveConversation(conversationId);
+            } else {
+              chatHistory.innerHTML = '<div class="msg system">Error carregant la conversa</div>';
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.error('Error loading conversation:', err);
+            chatHistory.innerHTML = '<div class="msg system">Error: ' + err.message + '</div>';
+          })
+          .callWorker({
+            action: 'get_conversation',
+            license_key: settings.license_key,
+            conversation_id: conversationId
+          });
+      }
+
+      function loadConversationMessages(conversation) {
+        const chatHistory = document.getElementById('chatHistory');
+        chatHistory.innerHTML = '';
+
+        if (conversation.messages && conversation.messages.length > 0) {
+          for (const msg of conversation.messages) {
+            addBubble(msg.role === 'ai' ? 'ai' : 'user', msg.content, false);
+          }
+        } else {
+          chatHistory.innerHTML = '<div class="msg system">Conversa buida. Escriu un missatge!</div>';
+        }
+      }
+
+      function updateConversationTitle(title) {
+        document.getElementById('chatCurrentTitle').textContent = title || 'Nova conversa';
+      }
+
+      function updateActiveConversation(activeId) {
+        document.querySelectorAll('.conversation-item').forEach(function(el) {
+          if (el.dataset.id === activeId) {
+            el.classList.add('active');
+          } else {
+            el.classList.remove('active');
+          }
+        });
+      }
+
+      function createNewConversation() {
+        currentConversationId = null;
+        updateConversationTitle('Nova conversa');
+        closeConversationsDrawer();
+
+        // Clear chat
+        const chatHistory = document.getElementById('chatHistory');
+        chatHistory.innerHTML = '<div class="msg system">Hola! Soc Docmile, el teu assistent d\'escriptura.</div>';
+
+        // Update drawer if open
+        updateActiveConversation(null);
+      }
+
+      function deleteConversation(conversationId) {
+        if (!confirm('Eliminar aquesta conversa?')) return;
+
+        const settings = JSON.parse(getSettings() || '{}');
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.status === 'ok') {
+              showToast('Conversa eliminada', 'success');
+              // Remove from list
+              conversationsList = conversationsList.filter(c => c.id !== conversationId);
+              renderConversationsList(conversationsList);
+              // If deleted current, start new
+              if (currentConversationId === conversationId) {
+                createNewConversation();
+              }
+            }
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error: ' + err.message, 'error');
+          })
+          .callWorker({
+            action: 'delete_conversation',
+            license_key: settings.license_key,
+            conversation_id: conversationId
+          });
+      }
+
+      function filterConversations() {
+        const searchTerm = document.getElementById('conversationsSearchInput').value.toLowerCase().trim();
+
+        if (!searchTerm) {
+          renderConversationsList(conversationsList);
+          return;
+        }
+
+        const filtered = conversationsList.filter(function(conv) {
+          return conv.title.toLowerCase().includes(searchTerm) ||
+                 (conv.preview && conv.preview.toLowerCase().includes(searchTerm));
+        });
+
+        if (filtered.length > 0) {
+          renderConversationsList(filtered);
+          document.getElementById('conversationsEmpty').classList.add('hidden');
+        } else {
+          document.getElementById('conversationsList').innerHTML = `
+            <div class="conversations-empty">
+              <div class="conversations-empty-icon">${icon('search', 'i--xl i--muted')}</div>
+              <div class="conversations-empty-text">Cap resultat per "${escapeHtml(searchTerm)}"</div>
+            </div>
+          `;
+        }
+      }
 
       // ═══════════════════════════════════════════════════════════
       // THEME MANAGEMENT
@@ -742,8 +1095,8 @@
           }
         });
 
-        // Select first emoji
-        selectEmoji('⚡');
+        // Select first icon
+        selectIcon('zap');
       };
 
       // ═══════════════════════════════════════════════════════════
@@ -837,6 +1190,13 @@
             refreshHistory();
           }
         }
+
+        // v5.1: Load knowledge library when opening docs panel
+        if (tabName === 'docs') {
+          if (typeof initKnowledgePanel === 'function') {
+            initKnowledgePanel();
+          }
+        }
       }
 
       function updateNavPill() {
@@ -865,21 +1225,20 @@
           }
 
           if (msg.classList.contains('user')) {
-            // Get text without emoji prefix from receipts
+            // Get text - icons render as empty spans so innerText is clean
             let text = msg.innerText.trim();
-            if (text.startsWith('🎯 ')) text = text.substring(3);
             history.push({ role: 'user', text: text });
           } else if (msg.classList.contains('ai')) {
             // v3.3: Get text, removing entire edit badge block if present
             let text = msg.innerText.trim();
 
             // Remove complete badge line (Document modificat + Desfer + Prohibir)
-            // The badge appears as: "Document modificatDesfer🚫 Prohibir" in innerText
-            text = text.replace(/^Document modificat\s*(Desfer)?\s*(🚫 Prohibir)?\s*/i, '');
+            // Note: Icons render as empty spans, so innerText has just button text
+            text = text.replace(/^Document modificat\s*(Desfer)?\s*(Prohibir)?\s*/i, '');
 
             // Also clean any remaining button artifacts
             text = text.replace(/^Desfer\s*/i, '');
-            text = text.replace(/^🚫 Prohibir\s*/i, '');
+            text = text.replace(/^Prohibir\s*/i, '');
 
             // Remove leading newlines
             text = text.replace(/^\s*\n+/, '').trim();
@@ -916,16 +1275,16 @@
           }
           showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
           if (res.credits !== undefined) {
-            document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+            document.getElementById('creditsDisplay').innerHTML = '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
           }
           return;
         }
 
         // Handle preview with 0 changes (fallback - IDs didn't match)
         if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-          addBubble('ai', res.ai_response + '\n\n⚠️ No s\'han pogut identificar els canvis específics.', true);
+          addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No s\'han pogut identificar els canvis específics.', true);
           if (res.credits !== undefined) {
-            document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+            document.getElementById('creditsDisplay').innerHTML = '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
           }
           return;
         }
@@ -933,19 +1292,19 @@
         // v3.8: Handle In-Document Preview (Track Changes style)
         if (res.status === 'in_doc_preview') {
           const previewCount = res.changes_count || res.preview_info?.count || 1;
-          addBubble('ai', res.ai_response + '\n\n🔍 **Preview actiu al document** - Mira el document per veure els canvis proposats.', false);
+          addBubble('ai', res.ai_response + '\n\n' + icon('search', 'i--sm i--accent') + ' **Preview actiu al document** - Mira el document per veure els canvis proposats.', false);
           showInDocPreviewBar(previewCount);
           if (res.credits !== undefined) {
-            document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+            document.getElementById('creditsDisplay').innerHTML = '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
           }
           return;
         }
 
         // Handle in_doc_preview with error
         if (res.status === 'in_doc_preview_error') {
-          addBubble('ai', res.ai_response + '\n\n⚠️ ' + (res.preview_error || 'Error aplicant preview al document'), true);
+          addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' ' + (res.preview_error || 'Error aplicant preview al document'), true);
           if (res.credits !== undefined) {
-            document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+            document.getElementById('creditsDisplay').innerHTML = '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
           }
           return;
         }
@@ -967,7 +1326,7 @@
         }
 
         if (res.credits !== undefined) {
-          document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+          document.getElementById('creditsDisplay').innerHTML = '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
         }
         // v2.6 Sprint: Show undo bar if edit was made
         if (res.mode === 'edit' && res.undo_snapshot) {
@@ -976,6 +1335,77 @@
         }
         // v2.5: Check and show structure hint (one-time)
         checkAndShowStructureHint();
+
+        // v5.0: Auto-save to conversation
+        saveMessageToConversation(lastSentMessage, res.ai_response, res.mode);
+      }
+
+      // v5.0: Save message pair to conversation (auto-save)
+      async function saveMessageToConversation(userMessage, aiResponse, mode) {
+        if (!userMessage) return;
+
+        const now = new Date().toISOString();
+        const userMsg = {
+          id: 'msg_' + Date.now() + '_u',
+          role: 'user',
+          content: userMessage,
+          timestamp: now
+        };
+        const aiMsg = {
+          id: 'msg_' + Date.now() + '_a',
+          role: 'ai',
+          content: aiResponse,
+          timestamp: now,
+          metadata: { mode: mode || 'chat' }
+        };
+
+        try {
+          if (!currentConversationId) {
+            // Create new conversation
+            const title = userMessage.length > 47
+              ? userMessage.substring(0, 47) + '...'
+              : userMessage;
+
+            const result = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .callWorker({
+                  action: 'create_conversation',
+                  title: title,
+                  messages: [userMsg, aiMsg]
+                });
+            });
+
+            if (result.conversation_id) {
+              currentConversationId = result.conversation_id;
+              // Update drawer if open
+              if (conversationsLoaded) {
+                loadConversations();
+              }
+            }
+          } else {
+            // Append to existing conversation
+            await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .callWorker({
+                  action: 'append_messages',
+                  conversation_id: currentConversationId,
+                  messages: [userMsg, aiMsg]
+                });
+            });
+            // Update active conversation in list
+            updateActiveConversation(currentConversationId);
+          }
+        } catch (e) {
+          console.error('[Conversation Save Error]', e);
+          // Silent fail - don't interrupt user experience
+        }
+
+        // Clear the stored message
+        lastSentMessage = null;
       }
 
       // v3.7: Handler d'error per processUserCommand
@@ -984,16 +1414,22 @@
         document.getElementById('sendBtn').disabled = false;
         // Handle expired knowledge file error
         if (err.message && err.message.includes('KNOWLEDGE_FILE_EXPIRED')) {
-          addBubble('error', '⚠️ El fitxer de coneixement ha expirat. <button onclick="clearKnowledgeFileAndRetry()" style="margin-left:8px;padding:4px 8px;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;">Esborrar fitxer</button>');
+          addBubble('error', icon('alertTriangle', 'i--sm i--warning') + ' El fitxer de coneixement ha expirat. <button onclick="clearKnowledgeFileAndRetry()" style="margin-left:8px;padding:4px 8px;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;">Esborrar fitxer</button>');
         } else {
           addBubble('error', 'Error: ' + err.message);
         }
       }
 
+      // v5.0: Temp storage for last sent message (for conversation save)
+      let lastSentMessage = null;
+
       function sendMessage() {
         const input = document.getElementById('userInput');
         const text = input.value.trim();
         if (!text) return;
+
+        // v5.0: Store message for later saving to conversation
+        lastSentMessage = text;
 
         // v3.10: Simplificat - només 2 modes (edit/chat), sense classificació
         addBubble('user', text);
@@ -1078,12 +1514,12 @@
         undoBar.id = 'undoBar';
         undoBar.innerHTML = `
           <div class="undo-bar-text">
-            <span class="icon">⚡</span>
+            <span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
             <span>Canvi aplicat</span>
           </div>
           <div class="undo-bar-actions">
-            <button class="btn-icon confirm" onclick="commitChange()">✓ Acceptar</button>
-            <button class="btn-icon undo" onclick="triggerUndo()">↩ Desfer</button>
+            <button class="btn-icon confirm" onclick="commitChange()"><span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> Acceptar</button>
+            <button class="btn-icon undo" onclick="triggerUndo()"><span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></span> Desfer</button>
           </div>
         `;
         container.appendChild(undoBar);
@@ -1099,7 +1535,7 @@
         // L'usuari accepta el canvi - simplement amaguem la barra
         pendingUndo = null;
         hideUndoBar();
-        addBubble('system', '✓ Canvi confirmat');
+        addBubble('system', icon('check', 'i--sm i--success') + ' Canvi confirmat');
       }
 
       function triggerUndo() {
@@ -1122,7 +1558,7 @@
             hideUndoBar();
             if (res.status === 'restored') {
               pendingUndo = null;
-              addBubble('system', '↩ Text original restaurat');
+              addBubble('system', icon('undo', 'i--sm i--accent') + ' Text original restaurat');
             } else {
               addBubble('error', 'Error: ' + (res.error || 'No s\'ha pogut restaurar'));
             }
@@ -1150,10 +1586,11 @@
                 const card = document.createElement('div');
                 card.className = 'receipt-card';
                 card.style.animationDelay = (index * 50) + 'ms';
+                const recipeIconName = mapEmojiToIcon(r.icon || r.emoji || 'zap');
                 card.innerHTML = `
-                  <span class="icon">${r.icon}</span>
+                  <span class="i i--accent">${ICONS[recipeIconName] || ICONS.circle}</span>
                   <span class="label">${r.label}</span>
-                  <button class="delete-btn" onclick="event.stopPropagation(); deleteReceipt('${r.id}')">✕</button>
+                  <button class="delete-btn" onclick="event.stopPropagation(); deleteReceipt('${r.id}')"><span class="i i--sm"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>
                 `;
                 card.onclick = function() { runReceipt(r.instruction, r.label); };
                 container.appendChild(card);
@@ -1174,15 +1611,15 @@
         if (!form.classList.contains('hidden')) {
           document.getElementById('receiptLabel').value = '';
           document.getElementById('receiptInstruction').value = '';
-          selectEmoji('⚡');
+          selectIcon('zap');
         }
       }
 
-      function selectEmoji(emoji) {
-        selectedEmoji = emoji;
-        document.querySelectorAll('.emoji-picker button').forEach(function(btn) {
+      function selectIcon(iconName) {
+        selectedIcon = iconName;
+        document.querySelectorAll('.icon-picker-btn').forEach(function(btn) {
           btn.classList.remove('selected');
-          if (btn.innerText === emoji) btn.classList.add('selected');
+          if (btn.dataset.icon === iconName) btn.classList.add('selected');
         });
       }
 
@@ -1201,7 +1638,7 @@
           .withFailureHandler(function(err) {
             alert('Error: ' + err.message);
           })
-          .saveReceiptToWorker(label, instruction, selectedEmoji);
+          .saveReceiptToWorker(label, instruction, selectedIcon);
       }
 
       function deleteReceipt(receiptId) {
@@ -1219,7 +1656,7 @@
 
       function runReceipt(instruction, label) {
         switchTab('chat');
-        addBubble('user', '🎯 ' + label);
+        addBubble('user', icon('target', 'i--sm i--accent') + ' ' + label);
         showThinking();
 
         document.getElementById('sendBtn').disabled = true;
@@ -1234,17 +1671,17 @@
               showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
               if (res.credits !== undefined) {
                 document.getElementById('creditsDisplay').innerHTML =
-                  '<span class="icon">⚡</span> ' + res.credits + ' credits';
+                  '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
               }
               return;
             }
 
             // Handle preview with 0 changes (fallback)
             if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-              addBubble('ai', res.ai_response + '\n\n⚠️ No s\'han pogut identificar els canvis específics.', true);
+              addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No s\'han pogut identificar els canvis específics.', true);
               if (res.credits !== undefined) {
                 document.getElementById('creditsDisplay').innerHTML =
-                  '<span class="icon">⚡</span> ' + res.credits + ' credits';
+                  '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
               }
               return;
             }
@@ -1253,7 +1690,7 @@
             addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
             if (res.credits !== undefined) {
               document.getElementById('creditsDisplay').innerHTML =
-                '<span class="icon">⚡</span> ' + res.credits + ' credits';
+                '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
             }
             // v3.3: Show undo bar if edit was made
             if (res.mode === 'edit' && res.undo_snapshot) {
@@ -1487,17 +1924,17 @@
               showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
               if (res.credits !== undefined) {
                 document.getElementById('creditsDisplay').innerHTML =
-                  '<span class="icon">⚡</span> ' + res.credits + ' credits';
+                  '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
               }
               return;
             }
 
             // Handle preview with 0 changes (fallback)
             if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-              addBubble('ai', res.ai_response + '\n\n⚠️ No s\'han pogut identificar els canvis específics.', true);
+              addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No s\'han pogut identificar els canvis específics.', true);
               if (res.credits !== undefined) {
                 document.getElementById('creditsDisplay').innerHTML =
-                  '<span class="icon">⚡</span> ' + res.credits + ' credits';
+                  '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
               }
               return;
             }
@@ -1506,7 +1943,7 @@
             addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
             if (res.credits !== undefined) {
               document.getElementById('creditsDisplay').innerHTML =
-                '<span class="icon">⚡</span> ' + res.credits + ' credits';
+                '<span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> ' + res.credits + ' credits';
             }
             if (res.mode === 'edit' && res.undo_snapshot) {
               pendingUndo = res.undo_snapshot;
@@ -1719,6 +2156,155 @@
         }).saveSettings(JSON.stringify(newSettings));
       }
 
+      // ═══════════════════════════════════════════════════════════
+      // KNOWLEDGE LIBRARY (v5.1)
+      // ═══════════════════════════════════════════════════════════
+
+      let knowledgeLibrary = [];
+      let activeKnowledgeFileId = null;
+
+      function initKnowledgePanel() {
+        loadActiveKnowledgeFile();
+        refreshKnowledgeLibrary();
+      }
+
+      function loadActiveKnowledgeFile() {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.hasFile) {
+              activeKnowledgeFileId = result.id;
+              showActiveFile(result.name);
+            } else {
+              activeKnowledgeFileId = null;
+              hideActiveFile();
+            }
+          })
+          .getActiveKnowledgeFile();
+      }
+
+      function refreshKnowledgeLibrary() {
+        const listEl = document.getElementById('knowledgeLibraryList');
+        listEl.innerHTML = '<div class="knowledge-empty"><span>Carregant...</span></div>';
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.files) {
+              knowledgeLibrary = result.files;
+              renderKnowledgeLibrary();
+            }
+          })
+          .withFailureHandler(function(err) {
+            listEl.innerHTML = '<div class="knowledge-empty"><span>Error carregant biblioteca</span></div>';
+          })
+          .getKnowledgeLibrary();
+      }
+
+      function renderKnowledgeLibrary() {
+        const listEl = document.getElementById('knowledgeLibraryList');
+
+        if (knowledgeLibrary.length === 0) {
+          listEl.innerHTML = `
+            <div class="knowledge-empty">
+              <span class="i i--muted"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+              <span>Cap fitxer a la biblioteca</span>
+            </div>
+          `;
+          return;
+        }
+
+        let html = '';
+        knowledgeLibrary.forEach(function(file) {
+          const isActive = file.id === activeKnowledgeFileId;
+          const docsCount = (file.used_in_docs || []).length;
+          const sizeKB = Math.round(file.size / 1024);
+
+          html += `
+            <div class="knowledge-file-item ${isActive ? 'active' : ''}" onclick="selectKnowledgeFile('${file.id}')">
+              <span class="file-icon i i--sm"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+              <div class="file-info">
+                <div class="file-name">${escapeHtml(file.name)}</div>
+                <div class="file-meta">${sizeKB}KB · ${docsCount} doc${docsCount !== 1 ? 's' : ''}</div>
+              </div>
+              <div class="file-actions">
+                <button class="file-action-btn" onclick="event.stopPropagation(); deleteKnowledgeFile('${file.id}')" title="Eliminar">
+                  <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+                </button>
+              </div>
+            </div>
+          `;
+        });
+
+        listEl.innerHTML = html;
+      }
+
+      function selectKnowledgeFile(fileId) {
+        if (fileId === activeKnowledgeFileId) {
+          // Already active, do nothing
+          return;
+        }
+
+        showActiveFile('Carregant...', true);
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.status === 'ok') {
+              activeKnowledgeFileId = fileId;
+              showActiveFile(result.file_name);
+              renderKnowledgeLibrary();
+            }
+          })
+          .withFailureHandler(function(err) {
+            alert('Error: ' + err.message);
+            hideActiveFile();
+          })
+          .linkKnowledgeFile(fileId);
+      }
+
+      function removeActiveFile() {
+        google.script.run
+          .withSuccessHandler(function() {
+            activeKnowledgeFileId = null;
+            hideActiveFile();
+            renderKnowledgeLibrary();
+          })
+          .unlinkKnowledgeFile();
+      }
+
+      function deleteKnowledgeFile(fileId) {
+        if (!confirm('Eliminar aquest fitxer de la biblioteca?')) return;
+
+        google.script.run
+          .withSuccessHandler(function() {
+            if (fileId === activeKnowledgeFileId) {
+              activeKnowledgeFileId = null;
+              hideActiveFile();
+            }
+            refreshKnowledgeLibrary();
+          })
+          .withFailureHandler(function(err) {
+            alert('Error: ' + err.message);
+          })
+          .deleteFromKnowledgeLibrary(fileId);
+      }
+
+      function showActiveFile(name, loading) {
+        const displayEl = document.getElementById('activeFileDisplay');
+        const nameEl = document.getElementById('activeFileName');
+        const statusEl = document.getElementById('activeFileStatus');
+
+        nameEl.textContent = (loading ? '⏳ ' : '📄 ') + name;
+        displayEl.classList.remove('hidden');
+        statusEl.textContent = loading ? 'Carregant...' : 'Fitxer actiu';
+      }
+
+      function hideActiveFile() {
+        const displayEl = document.getElementById('activeFileDisplay');
+        const statusEl = document.getElementById('activeFileStatus');
+
+        displayEl.classList.add('hidden');
+        statusEl.textContent = 'Cap fitxer seleccionat';
+      }
+
       function handleFileSelect() {
         const fileInput = document.getElementById('fileInput');
         if (fileInput.files.length === 0) return;
@@ -1736,13 +2322,18 @@
           const base64 = e.target.result.split(',')[1];
           google.script.run
             .withSuccessHandler(function(res) {
-              showFileStatus(res.name);
+              showFileStatus(null);
+              if (res && res.status === 'ok' && res.file) {
+                activeKnowledgeFileId = res.file.id;
+                showActiveFile(res.file.name);
+                refreshKnowledgeLibrary();
+              }
             })
             .withFailureHandler(function(err) {
               showFileStatus(null);
               alert('Error: ' + err.message);
             })
-            .uploadFileToWorker(base64, file.type, file.name);
+            .uploadToKnowledgeLibrary(base64, file.type, file.name);
         };
         reader.readAsDataURL(file);
       }
@@ -1755,20 +2346,15 @@
         }
 
         container.innerHTML = `
-          <div class="file-status">
-            <span class="name">${uploading ? 'Pujant... ' : ''}${name}</span>
-            ${!uploading ? `
-              <div class="actions">
-                <button class="danger" onclick="clearFile()">Esborrar</button>
-              </div>
-            ` : ''}
+          <div style="padding: 8px; text-align: center; color: var(--text-muted); font-size: 12px;">
+            ⏳ Pujant ${name}...
           </div>
         `;
       }
 
       function clearFile() {
         google.script.run.withSuccessHandler(function() {
-          showFileStatus(null);
+          hideActiveFile();
         }).clearKnowledgeFile();
       }
 
@@ -1802,7 +2388,7 @@
         container.innerHTML = bannedWords.map(function(word, index) {
           return '<span class="banned-word-tag">' +
             '<span>' + escapeHtml(word) + '</span>' +
-            '<button class="remove-btn" onclick="removeBannedWord(' + index + ')">✕</button>' +
+            '<button class="remove-btn" onclick="removeBannedWord(' + index + ')"><span class="i i--sm"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>' +
             '</span>';
         }).join('');
       }
@@ -2544,12 +3130,6 @@
         outlineTree.innerHTML = html;
       }
 
-      function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-      }
-
       function renderEntities(skeleton) {
         const entitiesGrid = document.getElementById('entitiesGrid');
         const entitiesSection = document.getElementById('entitiesSection');
@@ -2640,18 +3220,17 @@
       }
 
       function scrollToElement(idx) {
-        google.script.run
-          .withSuccessHandler(function() {
-            // Highlight the item temporarily
-            const items = document.querySelectorAll('.outline-item');
-            items.forEach(function(item) {
-              item.classList.remove('active');
-              if (item.dataset.idx == idx) {
-                item.classList.add('active');
-              }
-            });
-          })
-          .scrollToParagraph(idx);
+        // Highlight UI instantly (before backend call)
+        const items = document.querySelectorAll('.outline-item');
+        items.forEach(function(item) {
+          item.classList.remove('active');
+          if (item.dataset.idx == idx) {
+            item.classList.add('active');
+          }
+        });
+
+        // Then scroll in document
+        google.script.run.scrollToParagraph(idx);
       }
 
       // Legacy function alias for compatibility
@@ -2717,7 +3296,7 @@
               html += '<div class="skeleton-entities">└─ ' + item.entities.slice(0, 3).join(', ') + '</div>';
             }
           } else if (item.type === 'WARNING') {
-            html += '<div class="skeleton-item" style="color: var(--warning);">⚠️ ' + item.text + '</div>';
+            html += '<div class="skeleton-item" style="color: var(--warning);">' + icon('alertTriangle', 'i--sm i--warning') + ' ' + item.text + '</div>';
           } else {
             // Heading types
             const isVisual = (item.type === 'VISUAL_H' || item.type === 'BOLD_H');
@@ -2735,12 +3314,12 @@
 
             const indentClass = currentIndent > 1 ? ' indent-' + (currentIndent - 1) : '';
             const badgeClass = isVisual ? 'visual' : 'heading';
-            const icon = isVisual ? '⚡' : '📌';
+            const itemIcon = isVisual ? icon('zap', 'i--sm i--warning') : icon('pin', 'i--sm i--accent');
             const badgeText = item.type.replace('_H', '').replace('HEADING', 'H');
 
             html += '<div class="skeleton-item heading' + indentClass + '">';
             html += '<span class="skeleton-badge ' + badgeClass + '">' + badgeText + '</span>';
-            html += icon + ' ' + item.text.substring(0, 40) + (item.text.length > 40 ? '...' : '');
+            html += itemIcon + ' ' + item.text.substring(0, 40) + (item.text.length > 40 ? '...' : '');
             html += '</div>';
           }
         });
@@ -2752,7 +3331,7 @@
         if (suggestionEl) {
           if (nativeHeadings === 0 && visualHeadings > 0) {
             suggestionEl.innerHTML =
-              '<span class="suggestion-text">⚡ Detectats ' + visualHeadings + ' títols sense format natiu</span>' +
+              '<span class="suggestion-text">' + icon('zap', 'i--sm i--warning') + ' Detectats ' + visualHeadings + ' títols sense format natiu</span>' +
               '<button class="suggestion-btn" onclick="runAutoStructure()">Auto-Structure</button>';
             suggestionEl.classList.remove('hidden');
           } else {

@@ -106,7 +106,169 @@ function clearKnowledgeFile() {
   props.deleteProperty('DOCMILE_FILE_URI');
   props.deleteProperty('DOCMILE_FILE_NAME');
   props.deleteProperty('DOCMILE_FILE_MIME');
+  props.deleteProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
   return "Fitxer oblidat.";
+}
+
+// --- KNOWLEDGE LIBRARY (v5.1) ---
+
+/**
+ * Get all files from the knowledge library
+ */
+function getKnowledgeLibrary() {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) return { files: [] };
+
+  try {
+    const result = callWorker({
+      action: 'get_knowledge_library',
+      license_key: settings.license_key
+    });
+    return result;
+  } catch (e) {
+    return { files: [], error: e.message };
+  }
+}
+
+/**
+ * Upload a file to the knowledge library
+ */
+function uploadToKnowledgeLibrary(base64Data, mimeType, fileName) {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) throw new Error("Falta la llicència API.");
+
+  const doc = DocumentApp.getActiveDocument();
+  const docId = doc ? doc.getId() : null;
+
+  const result = callWorker({
+    action: 'upload_to_library',
+    license_key: settings.license_key,
+    file_data: base64Data,
+    mime_type: mimeType,
+    file_name: fileName,
+    doc_id: docId
+  });
+
+  if (result.status === 'ok' && result.file) {
+    // Save as active file for this doc
+    const props = PropertiesService.getUserProperties();
+    props.setProperty('DOCMILE_FILE_URI', result.file.file_uri);
+    props.setProperty('DOCMILE_FILE_NAME', result.file.name);
+    props.setProperty('DOCMILE_FILE_MIME', mimeType);
+    props.setProperty('DOCMILE_ACTIVE_LIBRARY_FILE', result.file.id);
+  }
+
+  return result;
+}
+
+/**
+ * Link a library file to the current document
+ */
+function linkKnowledgeFile(fileId) {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) throw new Error("Falta la llicència API.");
+
+  const doc = DocumentApp.getActiveDocument();
+  if (!doc) throw new Error("No hi ha document actiu.");
+
+  const result = callWorker({
+    action: 'link_knowledge',
+    license_key: settings.license_key,
+    file_id: fileId,
+    doc_id: doc.getId()
+  });
+
+  if (result.status === 'ok') {
+    // Save as active file for this doc
+    const props = PropertiesService.getUserProperties();
+    props.setProperty('DOCMILE_FILE_URI', result.file_uri);
+    props.setProperty('DOCMILE_FILE_NAME', result.file_name);
+    props.setProperty('DOCMILE_FILE_MIME', result.mime_type);
+    props.setProperty('DOCMILE_ACTIVE_LIBRARY_FILE', fileId);
+  }
+
+  return result;
+}
+
+/**
+ * Unlink the current knowledge file from this document
+ */
+function unlinkKnowledgeFile() {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) throw new Error("Falta la llicència API.");
+
+  const doc = DocumentApp.getActiveDocument();
+  if (!doc) throw new Error("No hi ha document actiu.");
+
+  const props = PropertiesService.getUserProperties();
+  const activeFileId = props.getProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
+
+  if (activeFileId) {
+    callWorker({
+      action: 'unlink_knowledge',
+      license_key: settings.license_key,
+      file_id: activeFileId,
+      doc_id: doc.getId()
+    });
+  }
+
+  // Clear local properties
+  props.deleteProperty('DOCMILE_FILE_URI');
+  props.deleteProperty('DOCMILE_FILE_NAME');
+  props.deleteProperty('DOCMILE_FILE_MIME');
+  props.deleteProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
+
+  return { success: true };
+}
+
+/**
+ * Delete a file from the library completely
+ */
+function deleteFromKnowledgeLibrary(fileId) {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) throw new Error("Falta la llicència API.");
+
+  const result = callWorker({
+    action: 'delete_from_library',
+    license_key: settings.license_key,
+    file_id: fileId
+  });
+
+  // If this was the active file, clear it
+  const props = PropertiesService.getUserProperties();
+  const activeFileId = props.getProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
+  if (activeFileId === fileId) {
+    props.deleteProperty('DOCMILE_FILE_URI');
+    props.deleteProperty('DOCMILE_FILE_NAME');
+    props.deleteProperty('DOCMILE_FILE_MIME');
+    props.deleteProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
+  }
+
+  return result;
+}
+
+/**
+ * Get info about the currently active knowledge file for this doc
+ */
+function getActiveKnowledgeFile() {
+  const props = PropertiesService.getUserProperties();
+  const fileId = props.getProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
+  const fileName = props.getProperty('DOCMILE_FILE_NAME');
+  const fileUri = props.getProperty('DOCMILE_FILE_URI');
+
+  if (fileId && fileName && fileUri) {
+    return {
+      hasFile: true,
+      id: fileId,
+      name: fileName
+    };
+  }
+  return { hasFile: false };
 }
 
 // --- LAST EDIT MEMORY (v2.6) ---
@@ -2064,7 +2226,22 @@ function scrollToParagraph(paragraphIndex) {
       return { success: false, error: 'Índex fora de rang' };
     }
 
+    // Netejar ressaltat anterior
+    clearStructureHighlight();
+
     const element = body.getChild(paragraphIndex);
+
+    // Ressaltar amb verd clar (igual que la UI)
+    if (element.getType() === DocumentApp.ElementType.PARAGRAPH ||
+        element.getType() === DocumentApp.ElementType.LIST_ITEM) {
+      const text = element.editAsText();
+      const len = text.getText().length;
+      if (len > 0) {
+        text.setBackgroundColor(0, len - 1, '#d1fae5');
+        // Guardar l'índex per netejar després
+        PropertiesService.getDocumentProperties().setProperty('highlightedParagraph', String(paragraphIndex));
+      }
+    }
 
     // Seleccionar l'element per fer scroll fins a ell
     const rangeBuilder = doc.newRange();
@@ -2074,6 +2251,37 @@ function scrollToParagraph(paragraphIndex) {
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Neteja el ressaltat de l'estructura anterior
+ */
+function clearStructureHighlight() {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    const prevIdx = props.getProperty('highlightedParagraph');
+
+    if (prevIdx !== null) {
+      const doc = DocumentApp.getActiveDocument();
+      const body = doc.getBody();
+      const idx = parseInt(prevIdx, 10);
+
+      if (idx >= 0 && idx < body.getNumChildren()) {
+        const element = body.getChild(idx);
+        if (element.getType() === DocumentApp.ElementType.PARAGRAPH ||
+            element.getType() === DocumentApp.ElementType.LIST_ITEM) {
+          const text = element.editAsText();
+          const len = text.getText().length;
+          if (len > 0) {
+            text.setBackgroundColor(0, len - 1, null);
+          }
+        }
+      }
+      props.deleteProperty('highlightedParagraph');
+    }
+  } catch (e) {
+    // Ignorar errors de neteja
   }
 }
 
@@ -2249,5 +2457,54 @@ function revertEditById(eventId) {
     return { success: true, restored: false };
   } catch (e) {
     return { success: false, error: e.message };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GENERIC WORKER CALL (v5.0 - Conversations)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Generic function to call worker endpoints
+ * Used for conversations and other simple API calls
+ * @param {Object} payload - The payload to send to the worker
+ * @return {Object} - The response from the worker
+ */
+function callWorker(payload) {
+  // Add license_key_hash from user properties
+  const props = PropertiesService.getUserProperties();
+  const licenseKey = props.getProperty('LICENSE_KEY');
+
+  if (!licenseKey) {
+    throw new Error("Llicència no configurada");
+  }
+
+  // Hash the license key for privacy
+  const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, licenseKey);
+  const licenseKeyHash = hash.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+
+  const fullPayload = {
+    ...payload,
+    license_key_hash: licenseKeyHash
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(fullPayload),
+    'muteHttpExceptions': true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const json = JSON.parse(response.getContentText());
+
+    if (response.getResponseCode() !== 200) {
+      throw new Error(json.error_code || "Error comunicant amb el servidor");
+    }
+
+    return json;
+  } catch (e) {
+    throw new Error("Error: " + e.message);
   }
 }

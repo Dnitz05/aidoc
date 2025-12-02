@@ -936,6 +936,43 @@ export default {
         return await handleLogDiagnostic(body, env, corsHeaders);
       }
 
+      // v5.0: Conversations endpoints
+      if (body.action === 'list_conversations') {
+        return await handleListConversations(body, env, corsHeaders);
+      }
+      if (body.action === 'get_conversation') {
+        return await handleGetConversation(body, env, corsHeaders);
+      }
+      if (body.action === 'create_conversation') {
+        return await handleCreateConversation(body, env, corsHeaders);
+      }
+      if (body.action === 'append_messages') {
+        return await handleAppendMessages(body, env, corsHeaders);
+      }
+      if (body.action === 'update_conversation') {
+        return await handleUpdateConversation(body, env, corsHeaders);
+      }
+      if (body.action === 'delete_conversation') {
+        return await handleDeleteConversation(body, env, corsHeaders);
+      }
+
+      // v5.1: Knowledge Library endpoints
+      if (body.action === 'get_knowledge_library') {
+        return await handleGetKnowledgeLibrary(body, env, corsHeaders);
+      }
+      if (body.action === 'upload_to_library') {
+        return await handleUploadToLibrary(body, env, corsHeaders);
+      }
+      if (body.action === 'link_knowledge') {
+        return await handleLinkKnowledge(body, env, corsHeaders);
+      }
+      if (body.action === 'unlink_knowledge') {
+        return await handleUnlinkKnowledge(body, env, corsHeaders);
+      }
+      if (body.action === 'delete_from_library') {
+        return await handleDeleteFromLibrary(body, env, corsHeaders);
+      }
+
       // Default: Chat handler
       return await handleChat(body, env, corsHeaders);
 
@@ -1582,4 +1619,739 @@ async function handleRevertEdit(body, env, corsHeaders) {
     restore_text: originalEvent.before_text,  // The text to restore in the document
     target_id: originalEvent.target_id
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONVERSATIONS HANDLERS (v5.0 - Chat History)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Generate conversation title from first message
+ */
+function generateConversationTitle(content) {
+  if (!content) return 'Nova conversa';
+  const trimmed = content.trim();
+  if (trimmed.length > 50) {
+    return trimmed.substring(0, 47) + '...';
+  }
+  return trimmed;
+}
+
+/**
+ * Generate unique message ID
+ */
+function generateMessageId() {
+  return 'msg_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7);
+}
+
+/**
+ * LIST conversations for a user
+ * body: { license_key, limit?, offset?, doc_id?, include_archived? }
+ */
+async function handleListConversations(body, env, corsHeaders) {
+  const { license_key, license_key_hash, limit = 20, offset = 0, doc_id = null, include_archived = false } = body;
+
+  // Support both license_key and license_key_hash
+  const licenseHash = license_key_hash || (license_key ? await hashKey(license_key) : null);
+  if (!licenseHash) throw new Error("missing_license");
+
+  // Build query
+  let url = `${env.SUPABASE_URL}/rest/v1/conversations?license_key_hash=eq.${licenseHash}&order=pinned.desc,updated_at.desc&limit=${limit}&offset=${offset}`;
+
+  if (!include_archived) {
+    url += '&archived=eq.false';
+  }
+  if (doc_id) {
+    url += `&doc_id=eq.${doc_id}`;
+  }
+
+  // Select only needed fields (not full messages array)
+  url += '&select=id,title,message_count,pinned,doc_id,created_at,updated_at,messages->0->content';
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const conversations = await response.json();
+
+  // Get total count for pagination
+  const countResponse = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/conversations?license_key_hash=eq.${licenseHash}${!include_archived ? '&archived=eq.false' : ''}&select=count`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'count=exact'
+      }
+    }
+  );
+
+  const totalCount = parseInt(countResponse.headers.get('content-range')?.split('/')[1] || '0', 10);
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    conversations: conversations.map(c => ({
+      id: c.id,
+      title: c.title,
+      preview: c.content ? (c.content.length > 80 ? c.content.substring(0, 77) + '...' : c.content) : '',
+      message_count: c.message_count,
+      pinned: c.pinned,
+      doc_id: c.doc_id,
+      created_at: c.created_at,
+      updated_at: c.updated_at
+    })),
+    total: totalCount,
+    has_more: offset + limit < totalCount
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * GET a single conversation with all messages
+ * body: { license_key, conversation_id }
+ */
+async function handleGetConversation(body, env, corsHeaders) {
+  const { license_key, license_key_hash, conversation_id } = body;
+
+  // Support both license_key and license_key_hash
+  const licenseHash = license_key_hash || (license_key ? await hashKey(license_key) : null);
+  if (!licenseHash) throw new Error("missing_license");
+  if (!conversation_id) throw new Error("missing_conversation_id");
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/conversations?id=eq.${conversation_id}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const conversations = await response.json();
+
+  if (conversations.length === 0) {
+    throw new Error("conversation_not_found");
+  }
+
+  const conv = conversations[0];
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    conversation: {
+      id: conv.id,
+      title: conv.title,
+      doc_id: conv.doc_id,
+      messages: conv.messages || [],
+      message_count: conv.message_count,
+      pinned: conv.pinned,
+      created_at: conv.created_at,
+      updated_at: conv.updated_at
+    }
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * CREATE a new conversation
+ * body: { license_key, doc_id?, title?, first_message? }
+ */
+async function handleCreateConversation(body, env, corsHeaders) {
+  const { license_key, license_key_hash, doc_id = null, title = null, first_message = null, messages: inputMessages = null } = body;
+
+  // Support both license_key and license_key_hash
+  const licenseHash = license_key_hash || (license_key ? await hashKey(license_key) : null);
+  if (!licenseHash) throw new Error("missing_license");
+
+  // Build initial messages array - support both single and array format
+  let messages = [];
+  if (inputMessages && Array.isArray(inputMessages)) {
+    // v5.0: Accept messages array directly
+    messages = inputMessages;
+  } else if (first_message && first_message.content) {
+    messages.push({
+      id: generateMessageId(),
+      role: first_message.role || 'user',
+      content: first_message.content,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Generate title from first message or use provided
+  const conversationTitle = title || (messages[0]?.content ? generateConversationTitle(messages[0].content) : 'Nova conversa');
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/conversations`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        license_key_hash: licenseHash,
+        doc_id: doc_id,
+        title: conversationTitle,
+        messages: messages,
+        message_count: messages.length
+      })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const [newConversation] = await response.json();
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    conversation_id: newConversation.id,  // v5.0: For frontend compatibility
+    conversation: {
+      id: newConversation.id,
+      title: newConversation.title,
+      doc_id: newConversation.doc_id,
+      message_count: newConversation.message_count,
+      created_at: newConversation.created_at
+    }
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * APPEND messages to a conversation
+ * body: { license_key, conversation_id, messages: [{role, content, metadata?}] }
+ */
+async function handleAppendMessages(body, env, corsHeaders) {
+  const { license_key, license_key_hash, conversation_id, messages } = body;
+
+  // Support both license_key and license_key_hash
+  const licenseHash = license_key_hash || (license_key ? await hashKey(license_key) : null);
+  if (!licenseHash) throw new Error("missing_license");
+  if (!conversation_id) throw new Error("missing_conversation_id");
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    throw new Error("missing_messages");
+  }
+
+  // Format messages with IDs and timestamps
+  const formattedMessages = messages.map(msg => ({
+    id: generateMessageId(),
+    role: msg.role,
+    content: msg.content,
+    timestamp: new Date().toISOString(),
+    ...(msg.metadata && { metadata: msg.metadata })
+  }));
+
+  // First, get current conversation to append to messages array
+  const getResponse = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/conversations?id=eq.${conversation_id}&license_key_hash=eq.${licenseHash}&select=messages,message_count`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!getResponse.ok) {
+    throw new Error("supabase_error: " + await getResponse.text());
+  }
+
+  const conversations = await getResponse.json();
+  if (conversations.length === 0) {
+    throw new Error("conversation_not_found");
+  }
+
+  const currentMessages = conversations[0].messages || [];
+  const currentCount = conversations[0].message_count || 0;
+  const updatedMessages = [...currentMessages, ...formattedMessages];
+
+  // Update the conversation
+  const updateResponse = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/conversations?id=eq.${conversation_id}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        messages: updatedMessages,
+        message_count: currentCount + formattedMessages.length,
+        updated_at: new Date().toISOString()
+      })
+    }
+  );
+
+  if (!updateResponse.ok) {
+    throw new Error("supabase_error: " + await updateResponse.text());
+  }
+
+  const [updated] = await updateResponse.json();
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    message_ids: formattedMessages.map(m => m.id),
+    message_count: updated.message_count,
+    updated_at: updated.updated_at
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * UPDATE conversation metadata (title, pinned, archived)
+ * body: { license_key, conversation_id, title?, pinned?, archived? }
+ */
+async function handleUpdateConversation(body, env, corsHeaders) {
+  const { license_key, license_key_hash, conversation_id, title, pinned, archived } = body;
+
+  // Support both license_key and license_key_hash
+  const licenseHash = license_key_hash || (license_key ? await hashKey(license_key) : null);
+  if (!licenseHash) throw new Error("missing_license");
+  if (!conversation_id) throw new Error("missing_conversation_id");
+
+  // Build update object with only provided fields
+  const updateData = { updated_at: new Date().toISOString() };
+  if (title !== undefined) updateData.title = title;
+  if (pinned !== undefined) updateData.pinned = pinned;
+  if (archived !== undefined) updateData.archived = archived;
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/conversations?id=eq.${conversation_id}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(updateData)
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const [updated] = await response.json();
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    conversation: {
+      id: updated.id,
+      title: updated.title,
+      pinned: updated.pinned,
+      archived: updated.archived,
+      updated_at: updated.updated_at
+    }
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * DELETE a conversation
+ * body: { license_key, conversation_id }
+ */
+async function handleDeleteConversation(body, env, corsHeaders) {
+  const { license_key, license_key_hash, conversation_id } = body;
+
+  // Support both license_key and license_key_hash
+  const licenseHash = license_key_hash || (license_key ? await hashKey(license_key) : null);
+  if (!licenseHash) throw new Error("missing_license");
+  if (!conversation_id) throw new Error("missing_conversation_id");
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/conversations?id=eq.${conversation_id}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    deleted: true
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KNOWLEDGE LIBRARY HANDLERS (v5.1)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Get all knowledge files for the user
+ */
+async function handleGetKnowledgeLibrary(body, env, corsHeaders) {
+  const { license_key } = body;
+  if (!license_key) throw new Error("missing_license");
+
+  const licenseHash = await hashKey(license_key);
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library?license_key_hash=eq.${licenseHash}&order=last_used_at.desc&select=id,file_name,mime_type,file_size,gemini_file_uri,gemini_expires_at,used_in_docs,created_at`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const files = await response.json();
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    files: files.map(f => ({
+      id: f.id,
+      name: f.file_name,
+      mime_type: f.mime_type,
+      size: f.file_size,
+      has_valid_uri: f.gemini_file_uri && new Date(f.gemini_expires_at) > new Date(),
+      used_in_docs: f.used_in_docs || [],
+      created_at: f.created_at
+    }))
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Upload a new file to the library (stores file_data for re-upload)
+ */
+async function handleUploadToLibrary(body, env, corsHeaders) {
+  const { license_key, file_data, mime_type, file_name, doc_id } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!file_data) throw new Error("missing_file_data");
+  if (!mime_type) throw new Error("missing_mime_type");
+
+  const licenseHash = await hashKey(license_key);
+
+  // 1. Upload to Gemini first
+  const geminiResult = await uploadToGemini(file_data, mime_type, file_name, env);
+
+  // 2. Calculate expiry (47h from now for safety margin)
+  const expiresAt = new Date(Date.now() + 47 * 60 * 60 * 1000).toISOString();
+
+  // 3. Save to Supabase with file_data for future re-uploads
+  const usedInDocs = doc_id ? [doc_id] : [];
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        license_key_hash: licenseHash,
+        file_name: file_name,
+        mime_type: mime_type,
+        file_size: file_data.length,
+        file_data: file_data,
+        gemini_file_uri: geminiResult.file_uri,
+        gemini_expires_at: expiresAt,
+        used_in_docs: usedInDocs
+      })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const [newFile] = await response.json();
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    file: {
+      id: newFile.id,
+      name: newFile.file_name,
+      file_uri: geminiResult.file_uri
+    }
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Link a library file to a document (and refresh Gemini URI if needed)
+ */
+async function handleLinkKnowledge(body, env, corsHeaders) {
+  const { license_key, file_id, doc_id } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!file_id) throw new Error("missing_file_id");
+  if (!doc_id) throw new Error("missing_doc_id");
+
+  const licenseHash = await hashKey(license_key);
+
+  // 1. Get the file from library
+  const getResponse = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library?id=eq.${file_id}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!getResponse.ok) {
+    throw new Error("supabase_error: " + await getResponse.text());
+  }
+
+  const files = await getResponse.json();
+  if (files.length === 0) {
+    throw new Error("file_not_found");
+  }
+
+  const file = files[0];
+  let fileUri = file.gemini_file_uri;
+
+  // 2. Check if Gemini URI expired - refresh if needed
+  const isExpired = !file.gemini_expires_at || new Date(file.gemini_expires_at) < new Date();
+
+  if (isExpired && file.file_data) {
+    // Re-upload to Gemini
+    const geminiResult = await uploadToGemini(file.file_data, file.mime_type, file.file_name, env);
+    fileUri = geminiResult.file_uri;
+
+    // Update the URI in Supabase
+    const expiresAt = new Date(Date.now() + 47 * 60 * 60 * 1000).toISOString();
+    await fetch(
+      `${env.SUPABASE_URL}/rest/v1/knowledge_library?id=eq.${file_id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          gemini_file_uri: fileUri,
+          gemini_expires_at: expiresAt
+        })
+      }
+    );
+  }
+
+  // 3. Add doc_id to used_in_docs if not already there
+  const usedInDocs = file.used_in_docs || [];
+  if (!usedInDocs.includes(doc_id)) {
+    usedInDocs.push(doc_id);
+  }
+
+  // 4. Update used_in_docs and last_used_at
+  await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library?id=eq.${file_id}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        used_in_docs: usedInDocs,
+        last_used_at: new Date().toISOString()
+      })
+    }
+  );
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    file_uri: fileUri,
+    file_name: file.file_name,
+    mime_type: file.mime_type,
+    refreshed: isExpired
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Unlink a file from a document
+ */
+async function handleUnlinkKnowledge(body, env, corsHeaders) {
+  const { license_key, file_id, doc_id } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!file_id) throw new Error("missing_file_id");
+  if (!doc_id) throw new Error("missing_doc_id");
+
+  const licenseHash = await hashKey(license_key);
+
+  // Get current used_in_docs
+  const getResponse = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library?id=eq.${file_id}&license_key_hash=eq.${licenseHash}&select=used_in_docs`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!getResponse.ok) {
+    throw new Error("supabase_error: " + await getResponse.text());
+  }
+
+  const files = await getResponse.json();
+  if (files.length === 0) {
+    throw new Error("file_not_found");
+  }
+
+  // Remove doc_id from used_in_docs
+  const usedInDocs = (files[0].used_in_docs || []).filter(id => id !== doc_id);
+
+  await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library?id=eq.${file_id}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        used_in_docs: usedInDocs
+      })
+    }
+  );
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    unlinked: true
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Delete a file from the library completely
+ */
+async function handleDeleteFromLibrary(body, env, corsHeaders) {
+  const { license_key, file_id } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!file_id) throw new Error("missing_file_id");
+
+  const licenseHash = await hashKey(license_key);
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library?id=eq.${file_id}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    deleted: true
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Helper: Upload file to Gemini File API
+ */
+async function uploadToGemini(base64Data, mimeType, fileName, env) {
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  const numBytes = bytes.length;
+  const displayName = fileName || `knowledge_file_${Date.now()}`;
+
+  // Start resumable upload
+  const startUploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${env.GEMINI_API_KEY}`;
+
+  const startResp = await fetch(startUploadUrl, {
+    method: 'POST',
+    headers: {
+      'X-Goog-Upload-Protocol': 'resumable',
+      'X-Goog-Upload-Command': 'start',
+      'X-Goog-Upload-Header-Content-Length': numBytes.toString(),
+      'X-Goog-Upload-Header-Content-Type': mimeType,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      file: { displayName: displayName }
+    })
+  });
+
+  if (!startResp.ok) {
+    throw new Error("gemini_upload_start_error: " + await startResp.text());
+  }
+
+  const uploadUrl = startResp.headers.get('X-Goog-Upload-URL');
+  if (!uploadUrl) {
+    throw new Error("gemini_no_upload_url");
+  }
+
+  // Upload bytes
+  const uploadResp = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'X-Goog-Upload-Command': 'upload, finalize',
+      'X-Goog-Upload-Offset': '0',
+      'Content-Length': numBytes.toString()
+    },
+    body: bytes
+  });
+
+  if (!uploadResp.ok) {
+    throw new Error("gemini_upload_error: " + await uploadResp.text());
+  }
+
+  const fileInfo = await uploadResp.json();
+
+  return {
+    file_uri: fileInfo.file?.uri || null,
+    file_name: fileInfo.file?.displayName || displayName,
+    file_state: fileInfo.file?.state || "PROCESSING"
+  };
 }
