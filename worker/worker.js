@@ -1846,12 +1846,22 @@ async function handleConfirmEdit(body, env, corsHeaders) {
  * Gets the timeline of edits for a document (both AI and manual gaps)
  */
 async function handleGetTimeline(body, env, corsHeaders) {
-  const { license_key, doc_id, limit = 50 } = body;
+  const { license_key, doc_id, client_hash, word_count, limit = 50 } = body;
 
   if (!license_key) throw new Error("missing_license");
   if (!doc_id) throw new Error("missing_doc_id");
 
   const licenseHash = await hashKey(license_key);
+
+  // v4.0: Detect gaps BEFORE fetching timeline (creates baseline or detects manual edits)
+  if (client_hash) {
+    try {
+      await detectAndRecordGap(env, licenseHash, doc_id, client_hash, word_count || 0);
+    } catch (gapError) {
+      console.error('Gap detection in timeline failed:', gapError.message);
+      // Non-blocking: continue even if gap detection fails
+    }
+  }
 
   // Fetch events ordered by created_at DESC
   const response = await fetch(

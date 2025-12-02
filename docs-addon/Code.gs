@@ -741,7 +741,10 @@ function getDocumentTimeline() {
   const payload = {
     action: 'get_timeline',
     license_key: settings.license_key,
-    doc_id: doc.getId()
+    doc_id: doc.getId(),
+    // v4.0: Send current hash to detect gaps on timeline load
+    client_hash: getDocumentStateHash(),
+    word_count: getDocumentWordCount()
   };
 
   const options = {
@@ -754,10 +757,10 @@ function getDocumentTimeline() {
   try {
     const response = UrlFetchApp.fetch(API_URL, options);
     const json = JSON.parse(response.getContentText());
-    return json.events || [];
+    return json;  // Return full response with status and timeline
   } catch (e) {
     Logger.log('Get timeline failed: ' + e.message);
-    return [];
+    return { status: 'error', timeline: [] };
   }
 }
 
