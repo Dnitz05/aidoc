@@ -915,6 +915,10 @@ export default {
       if (body.action === 'upload_file') {
         return await handleFileUpload(body, env, corsHeaders);
       }
+      // v5.1: Get credits info
+      if (body.action === 'get_credits') {
+        return await handleGetCredits(body, env, corsHeaders);
+      }
       if (body.action === 'get_receipts') {
         return await handleGetReceipts(body, env, corsHeaders);
       }
@@ -1406,6 +1410,53 @@ async function handleFileUpload(body, env, corsHeaders) {
     file_name: fileInfo.file?.displayName || displayName,
     file_state: fileInfo.file?.state || "PROCESSING",
     mime_type: fileInfo.file?.mimeType || mime_type
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CREDITS HANDLER (v5.1)
+// ═══════════════════════════════════════════════════════════════
+
+async function handleGetCredits(body, env, corsHeaders) {
+  const { license_key } = body;
+
+  if (!license_key) throw new Error("missing_license");
+
+  const licenseHash = await hashKey(license_key);
+
+  // Query license_keys table for credits info
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/license_keys?key_hash=eq.${licenseHash}&select=credits_remaining,credits_total,is_active`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const data = await response.json();
+
+  if (!data || data.length === 0) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error_code: "invalid_license"
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const license = data[0];
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    credits_remaining: license.credits_remaining || 0,
+    credits_total: license.credits_total || 100,
+    is_active: license.is_active
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 

@@ -110,6 +110,29 @@ function clearKnowledgeFile() {
   return "Fitxer oblidat.";
 }
 
+// --- CREDITS INFO (v5.1) ---
+
+/**
+ * Get credits info for the current user
+ */
+function getCreditsInfo() {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) {
+    return { credits_remaining: 0, credits_total: 100, is_active: false };
+  }
+
+  try {
+    const result = callWorker({
+      action: 'get_credits',
+      license_key: settings.license_key
+    });
+    return result;
+  } catch (e) {
+    return { credits_remaining: 0, credits_total: 100, is_active: false, error: e.message };
+  }
+}
+
 // --- KNOWLEDGE LIBRARY (v5.1) ---
 
 /**
