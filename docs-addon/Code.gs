@@ -18,14 +18,10 @@ function include(filename) {
  */
 function onOpen(e) {
   const ui = DocumentApp.getUi();
-  const menu = ui.createMenu('📄 Docmile')
-    .addItem('Obrir Docmile', 'showSidebar')
-    .addSeparator()
-    .addItem('Ajuda', 'showHelp');
-
-  // En AuthMode.NONE (abans d'autorització), el menú es mostra però
-  // les funcions que requereixen permisos no funcionaran fins autoritzar
-  menu.addToUi();
+  // Menú simplificat: un sol element per obertura directa
+  ui.createAddonMenu()
+    .addItem('Obrir', 'showSidebar')
+    .addToUi();
 }
 
 /**
