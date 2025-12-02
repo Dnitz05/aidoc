@@ -485,10 +485,22 @@
 
       <!-- Input wrapper amb textarea i send button flotant -->
       <div class="input-wrapper">
-        <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="2"></textarea>
-        <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Enviar">
-          <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-        </button>
+        <!-- v5.1: Chat attachment badge -->
+        <div class="chat-attachment-badge hidden" id="chatAttachmentBadge">
+          <span class="i i--sm i--accent"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+          <span class="chat-attachment-name" id="chatAttachmentName"></span>
+          <button class="chat-attachment-remove" onclick="removeChatAttachment()" title="Treure">×</button>
+        </div>
+        <div class="input-row">
+          <button class="attach-btn" id="attachBtn" onclick="triggerChatAttachment()" title="Adjuntar fitxer">
+            <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="2"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Enviar">
+            <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
+        </div>
+        <input type="file" id="chatFileInput" accept=".pdf,.txt,.csv,.md" onchange="handleChatFileSelect()" style="display: none;">
       </div>
     </div>
 
@@ -2238,9 +2250,12 @@
             if (result && result.hasFile) {
               activeKnowledgeFileId = result.id;
               showActiveFile(result.name);
+              // v5.1: Also show in chat badge
+              showChatAttachment(result.name, false);
             } else {
               activeKnowledgeFileId = null;
               hideActiveFile();
+              hideChatAttachment();
             }
           })
           .getActiveKnowledgeFile();
@@ -2414,6 +2429,78 @@
             ⏳ Pujant ${name}...
           </div>
         `;
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // CHAT FILE ATTACHMENT (v5.1)
+      // ═══════════════════════════════════════════════════════════
+
+      function triggerChatAttachment() {
+        document.getElementById('chatFileInput').click();
+      }
+
+      function handleChatFileSelect() {
+        const fileInput = document.getElementById('chatFileInput');
+        if (fileInput.files.length === 0) return;
+
+        const file = fileInput.files[0];
+        if (file.size > 10 * 1024 * 1024) {
+          alert('Màxim 10MB');
+          fileInput.value = '';
+          return;
+        }
+
+        // Show uploading state
+        showChatAttachment(file.name, true);
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const base64 = e.target.result.split(',')[1];
+          google.script.run
+            .withSuccessHandler(function(res) {
+              if (res && res.status === 'ok' && res.file) {
+                activeKnowledgeFileId = res.file.id;
+                showChatAttachment(res.file.name, false);
+                // Also update Knowledge panel
+                showActiveFile(res.file.name);
+                refreshKnowledgeLibrary();
+              } else {
+                hideChatAttachment();
+                alert('Error pujant fitxer');
+              }
+            })
+            .withFailureHandler(function(err) {
+              hideChatAttachment();
+              alert('Error: ' + err.message);
+            })
+            .uploadToKnowledgeLibrary(base64, file.type, file.name);
+        };
+        reader.readAsDataURL(file);
+
+        // Reset input so same file can be selected again
+        fileInput.value = '';
+      }
+
+      function showChatAttachment(name, uploading) {
+        const badge = document.getElementById('chatAttachmentBadge');
+        const nameEl = document.getElementById('chatAttachmentName');
+
+        nameEl.textContent = uploading ? 'Pujant ' + name + '...' : name;
+        badge.classList.remove('hidden');
+        badge.classList.toggle('uploading', uploading);
+      }
+
+      function hideChatAttachment() {
+        const badge = document.getElementById('chatAttachmentBadge');
+        badge.classList.add('hidden');
+      }
+
+      function removeChatAttachment() {
+        hideChatAttachment();
+        hideActiveFile();
+        activeKnowledgeFileId = null;
+        renderKnowledgeLibrary();
+        google.script.run.unlinkKnowledgeFile();
       }
 
       function clearFile() {
@@ -3297,36 +3384,9 @@
         google.script.run.scrollToParagraph(idx);
       }
 
-      // Legacy function alias for compatibility
+      // Legacy function alias for compatibility - redirects to new function
       function refreshSkeleton() {
-        const statusEl = document.getElementById('skeletonStatus');
-        const previewEl = document.getElementById('skeletonPreview');
-
-        statusEl.textContent = 'Escanejant...';
-        previewEl.classList.add('hidden');
-
-        google.script.run
-          .withSuccessHandler(function(skeleton) {
-            currentSkeleton = skeleton;
-            if (skeleton && skeleton.stats) {
-              const headings = skeleton.structure.filter(function(item) {
-                return item.type !== 'SECTION' && item.type !== 'WARNING';
-              }).length;
-              const sections = skeleton.structure.filter(function(item) {
-                return item.type === 'SECTION';
-              }).length;
-              statusEl.textContent = headings + ' headings, ' + sections + ' seccions (' + skeleton.stats.scan_time_ms + 'ms)';
-              renderSkeletonPreview(skeleton);
-            } else if (skeleton && skeleton.error) {
-              statusEl.textContent = 'Error: ' + skeleton.error;
-            } else {
-              statusEl.textContent = 'Document buit';
-            }
-          })
-          .withFailureHandler(function(err) {
-            statusEl.textContent = 'Error: ' + err.message;
-          })
-          .getDocSkeleton();
+        refreshStructure();
       }
 
       function renderSkeletonPreview(skeleton) {
@@ -3405,27 +3465,23 @@
       }
 
       function runAutoStructure() {
-        const statusEl = document.getElementById('skeletonStatus');
-        statusEl.textContent = 'Aplicant Auto-Structure...';
+        showToast('Aplicant Auto-Structure...', 'info');
 
         google.script.run
           .withSuccessHandler(function(result) {
             if (result && result.success) {
               if (result.converted > 0) {
                 showToast(result.converted + ' títols convertits a H2', 'success');
-                statusEl.textContent = result.converted + ' convertits!';
-                // Refresh skeleton to show new structure
-                setTimeout(refreshSkeleton, 500);
+                // Refresh structure to show new headings
+                setTimeout(refreshStructure, 500);
               } else {
-                showToast('Cap canvi necessari', 'info');
-                statusEl.textContent = 'Estructura correcta';
+                showToast('Cap canvi necessari - estructura correcta', 'info');
               }
             } else {
-              statusEl.textContent = 'Error: ' + (result ? result.error : 'Unknown');
+              showToast('Error: ' + (result ? result.error : 'Unknown'), 'error');
             }
           })
           .withFailureHandler(function(err) {
-            statusEl.textContent = 'Error: ' + err.message;
             showToast('Error: ' + err.message, 'error');
           })
           .applyAutoStructure();
