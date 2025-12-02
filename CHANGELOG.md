@@ -6,6 +6,56 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [5.0] - 2024-12-02
+
+### Added
+- **Chat History System** - Historial de converses persistent
+
+  **Base de Dades (Supabase)**
+  - Taula `conversations` amb JSONB per missatges
+  - Índexs optimitzats (user lookup, doc filter, active filter)
+  - Full-text search en títols
+  - Funcions SQL helpers: `append_conversation_messages`, `list_conversations`, `search_conversations`
+  - Cleanup automàtic: `cleanup_old_conversations`, `archive_inactive_conversations`
+
+  **API Worker (6 endpoints)**
+  - `list_conversations` - Llistat amb paginació i preview
+  - `get_conversation` - Recuperar conversa completa
+  - `create_conversation` - Crear nova conversa amb missatges inicials
+  - `append_messages` - Afegir missatges a conversa existent
+  - `update_conversation` - Actualitzar títol/pinned/archived
+  - `delete_conversation` - Eliminar conversa
+
+  **UI Drawer**
+  - Drawer lliscant des de l'esquerra amb backdrop
+  - Agrupació per dates: Avui, Ahir, Aquesta setmana, Més antic
+  - Loading skeleton durant càrrega
+  - Empty state quan no hi ha converses
+  - Cerca client-side per títol i preview
+  - Botó "Nova conversa" i botó eliminar
+
+  **Auto-save**
+  - `saveMessageToConversation()` - Guarda automàticament cada interacció
+  - Crea conversa nova si no n'hi ha cap activa
+  - Títol generat automàticament del primer missatge
+
+  **Chat Header**
+  - Botó historial (☰) per obrir drawer
+  - Títol de conversa actual
+  - Botó "+ Nova" per nova conversa
+
+### Changed
+- Nou `callWorker()` genèric a Code.gs per simplificar crides API
+- Suport dual `license_key` + `license_key_hash` a tots els endpoints
+
+### Technical
+- CSS: `.conversations-drawer`, `.conversation-item`, `.chat-header`, skeletons
+- JS: `openConversationsDrawer()`, `loadConversations()`, `switchConversation()`, `filterConversations()`
+- SQL: `supabase/conversations.sql` (taula + índexs + funcions)
+- Worker: 6 handlers nous + `generateMessageId()`, `generateConversationTitle()`
+
+---
+
 ## [4.0] - 2024-12-02
 
 ### Added

@@ -2,7 +2,7 @@
 
 **"Lovable for Google Docs"** - Motor d'Enginyeria Documental amb IA
 
-[![Version](https://img.shields.io/badge/version-3.2-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-5.0-blue.svg)]()
 [![Platform](https://img.shields.io/badge/platform-Google%20Docs-green.svg)]()
 [![AI](https://img.shields.io/badge/AI-Gemini%202.0-orange.svg)]()
 
@@ -25,10 +25,11 @@ Docmile         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 
 ## Features
 
-### Core (v3.1)
+### Core (v5.0)
 
 | Feature | Descripció |
 |---------|------------|
+| **Chat History** | Historial de converses persistent amb auto-save |
 | **Shadow Validator** | Sistema immunitari: valida i auto-corregeix respostes |
 | **Context Engine** | Entén l'estructura del document (headings, seccions, entitats) |
 | **Event Sourcing** | Historial complet d'edicions, revert qualsevol canvi |
@@ -48,7 +49,8 @@ Docmile         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 - Skeleton Preview amb badges de color
 - Historial d'edicions navegable
 - Indicador de "pensant"
-- Historial de xat (12 missatges)
+- **Drawer de converses** amb agrupació per data
+- Cerca de converses anteriors
 
 ---
 
