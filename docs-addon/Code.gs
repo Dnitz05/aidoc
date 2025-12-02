@@ -2086,6 +2086,35 @@ function deleteReceiptFromWorker(receiptId) {
   }
 }
 
+// --- SCROLL TO PARAGRAPH (v3.9) ---
+
+/**
+ * Fa scroll al document fins al paràgraf indicat
+ * @param {number} paragraphIndex - Índex del paràgraf (0-based)
+ */
+function scrollToParagraph(paragraphIndex) {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const numChildren = body.getNumChildren();
+
+    if (paragraphIndex < 0 || paragraphIndex >= numChildren) {
+      return { success: false, error: 'Índex fora de rang' };
+    }
+
+    const element = body.getChild(paragraphIndex);
+
+    // Seleccionar l'element per fer scroll fins a ell
+    const rangeBuilder = doc.newRange();
+    rangeBuilder.addElement(element);
+    doc.setSelection(rangeBuilder.build());
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
 // --- CONTEXT SUMMARY (v2.5) ---
 
 /**

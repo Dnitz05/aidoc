@@ -2272,6 +2272,334 @@
       .skeleton-item.indent-2 { padding-left: 24px; }
       .skeleton-item.indent-3 { padding-left: 36px; }
 
+      /* ═══════════════════════════════════════════════════════════
+         STRUCTURE PANEL (v3.9) - Professional Document Outline
+         ═══════════════════════════════════════════════════════════ */
+
+      #structurePanel {
+        padding: var(--space-md);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+        overflow-y: auto;
+      }
+
+      /* Stats Overview */
+      .structure-overview {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+      }
+
+      .structure-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-sm);
+      }
+
+      .stat-card {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.04);
+        border-radius: var(--radius-sm);
+        padding: var(--space-sm);
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--accent);
+        line-height: 1.2;
+      }
+
+      .stat-label {
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 2px;
+      }
+
+      .structure-meta {
+        margin-top: var(--space-sm);
+        padding-top: var(--space-sm);
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: center;
+      }
+
+      .meta-item {
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+
+      /* Structure Section */
+      .structure-section {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+      }
+
+      .structure-section-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
+        background: rgba(255,255,255,0.02);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .section-title-icon {
+        font-size: 14px;
+      }
+
+      .section-title-text {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      /* Structure Search */
+      .structure-search {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .structure-search .search-icon {
+        font-size: 12px;
+        opacity: 0.5;
+      }
+
+      .structure-search-input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: var(--text-primary);
+        font-size: 12px;
+        outline: none;
+      }
+
+      .structure-search-input::placeholder {
+        color: var(--text-muted);
+      }
+
+      /* Outline Tree */
+      .outline-tree {
+        padding: var(--space-sm);
+        max-height: 280px;
+        overflow-y: auto;
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .outline-tree::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .outline-tree::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: var(--radius-full);
+      }
+
+      .outline-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-xs);
+        padding: var(--space-lg);
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      .outline-empty-icon {
+        font-size: 24px;
+        opacity: 0.5;
+      }
+
+      .outline-item {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+        padding: 6px 8px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        margin-bottom: 2px;
+      }
+
+      .outline-item:hover {
+        background: rgba(16, 185, 129, 0.08);
+      }
+
+      .outline-item.active {
+        background: rgba(16, 185, 129, 0.12);
+        border-left: 2px solid var(--accent);
+        margin-left: -2px;
+      }
+
+      /* Type Badges - Color coded */
+      .outline-type {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        padding: 2px 6px;
+        border-radius: var(--radius-sm);
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+
+      .outline-type.h1 { background: rgba(129, 140, 248, 0.2); color: #818cf8; }
+      .outline-type.h2 { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
+      .outline-type.h3 { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+      .outline-type.bold { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+      .outline-type.p { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+      .outline-type.section { background: rgba(16, 185, 129, 0.15); color: var(--accent); }
+
+      .outline-text {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--text-secondary);
+      }
+
+      .outline-item:hover .outline-text {
+        color: var(--text-primary);
+      }
+
+      .outline-id {
+        font-size: 10px;
+        color: var(--text-muted);
+        opacity: 0.5;
+        flex-shrink: 0;
+      }
+
+      /* Indentation for hierarchy */
+      .outline-item[data-depth="1"] { padding-left: 20px; }
+      .outline-item[data-depth="2"] { padding-left: 36px; }
+      .outline-item[data-depth="3"] { padding-left: 52px; }
+
+      /* Entities Grid */
+      .entities-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+        padding: var(--space-sm) var(--space-md);
+      }
+
+      .entity-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-full);
+        font-size: 11px;
+        color: var(--text-secondary);
+        transition: all 0.15s ease;
+      }
+
+      .entity-tag:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .entity-icon {
+        font-size: 12px;
+      }
+
+      .entity-count {
+        font-weight: 600;
+        color: var(--accent);
+      }
+
+      /* Structure Suggestion */
+      .structure-suggestion {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+        background: rgba(16, 185, 129, 0.08);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        border-radius: var(--radius-md);
+      }
+
+      .structure-suggestion .suggestion-icon {
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+
+      .structure-suggestion .suggestion-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+      }
+
+      .structure-suggestion .suggestion-text {
+        font-size: 12px;
+        color: var(--accent);
+        line-height: 1.4;
+      }
+
+      .structure-suggestion .suggestion-actions {
+        display: flex;
+        gap: var(--space-xs);
+      }
+
+      .structure-suggestion .suggestion-btn {
+        padding: 4px 12px;
+        border-radius: var(--radius-sm);
+        font-size: 11px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .structure-suggestion .suggestion-btn.apply {
+        background: var(--accent);
+        color: white;
+      }
+
+      .structure-suggestion .suggestion-btn.apply:hover {
+        background: var(--accent-hover);
+      }
+
+      .structure-suggestion .suggestion-btn.dismiss {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+      }
+
+      .structure-suggestion .suggestion-btn.dismiss:hover {
+        border-color: var(--text-muted);
+      }
+
+      /* Structure Actions */
+      .structure-actions {
+        display: flex;
+        gap: var(--space-sm);
+        padding-top: var(--space-sm);
+      }
+
+      .structure-actions .btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-xs);
+      }
+
       /* History List (v3.0) */
       .history-list {
         max-height: 300px;
@@ -3101,6 +3429,25 @@
         <textarea class="form-input" id="styleGuide" rows="3" placeholder="Ex: Sigues formal, utilitza catala correcte..."></textarea>
       </div>
 
+      <!-- Edit History Section (v3.0 - Moved from Tools) -->
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <span class="icon">📜</span>
+          <div>
+            <div class="title">Historial d'Edicions</div>
+            <div class="subtitle" id="historyStatus">Carregant...</div>
+          </div>
+        </div>
+        <div id="historyList" class="history-list">
+          <!-- Dynamic history content -->
+        </div>
+        <div style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm);">
+          <button class="btn btn-secondary btn-sm" onclick="refreshHistory()" style="flex: 1;">
+            🔄 Actualitzar
+          </button>
+        </div>
+      </div>
+
       <div class="toggle-row">
         <div class="toggle-label">
           <span class="icon">🌙</span>
@@ -3919,25 +4266,26 @@
         // Update pill position
         updateNavPill();
 
-        // Show/hide input area (hide for settings/recipes panels)
+        // Show/hide input area (hide for settings/recipes/structure panels)
         const inputArea = document.getElementById('inputArea');
-        if (tabName === 'brain' || tabName === 'docs' || tabName === 'recipes') {
+        if (tabName === 'brain' || tabName === 'docs' || tabName === 'recipes' || tabName === 'structure') {
           inputArea.classList.add('hidden');
         } else {
           inputArea.classList.remove('hidden');
         }
 
-        // v2.9: Auto-refresh skeleton when opening tools panel
-        if (tabName === 'tools') {
-          if (typeof refreshSkeleton === 'function') {
-            refreshSkeleton();
+        // v3.9: Auto-refresh structure when opening structure panel
+        if (tabName === 'structure') {
+          if (typeof refreshStructure === 'function') {
+            refreshStructure();
           }
-          // v3.0: Auto-refresh history when opening tools panel
+        }
+
+        // v3.9: Auto-refresh history when opening brain/settings panel
+        if (tabName === 'brain') {
           if (typeof refreshHistory === 'function') {
             refreshHistory();
           }
-          // Load receipts
-          loadReceipts();
         }
       }
 
@@ -5261,12 +5609,246 @@
               sessionStorage.setItem(HINT_SHOWN_KEY, 'true');
               // Show hint in chat
               addBubble('system', '💡 Tip: El document té ' + summary.visual_headings +
-                ' títols visuals sense format. Ves a Eines > Auto-Structure per millorar-lo.');
+                ' títols visuals sense format. Ves a Estructura > Auto-Structure per millorar-lo.');
             }
           })
           .getContextSummary();
       }
 
+      // ═══════════════════════════════════════════════════════════
+      // STRUCTURE PANEL (v3.9)
+      // ═══════════════════════════════════════════════════════════
+
+      let currentStructure = null;
+      let lastScanTime = null;
+
+      function refreshStructure() {
+        const statsChars = document.getElementById('statChars');
+        const statsParagraphs = document.getElementById('statParagraphs');
+        const statsHeadings = document.getElementById('statHeadings');
+        const metaEl = document.getElementById('structureMeta');
+        const outlineTree = document.getElementById('outlineTree');
+        const entitiesGrid = document.getElementById('entitiesGrid');
+
+        // Show loading state
+        outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">⏳</span><span>Escanejant document...</span></div>';
+
+        google.script.run
+          .withSuccessHandler(function(skeleton) {
+            currentStructure = skeleton;
+            lastScanTime = new Date();
+
+            if (skeleton && skeleton.stats) {
+              // Update stats
+              statsChars.textContent = formatNumber(skeleton.stats.chars || 0);
+              statsParagraphs.textContent = skeleton.stats.paragraphs || 0;
+
+              const headings = skeleton.structure.filter(function(item) {
+                return item.type !== 'SECTION' && item.type !== 'WARNING';
+              }).length;
+              statsHeadings.textContent = headings;
+
+              // Update meta
+              metaEl.innerHTML = '<span class="meta-item">Escanejat en ' + skeleton.stats.scan_time_ms + 'ms</span>';
+
+              // Render outline tree
+              renderOutlineTree(skeleton);
+
+              // Render entities
+              renderEntities(skeleton);
+
+              // Check for suggestions
+              checkStructureSuggestions(skeleton);
+            } else if (skeleton && skeleton.error) {
+              outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">⚠️</span><span>' + skeleton.error + '</span></div>';
+            } else {
+              statsChars.textContent = '0';
+              statsParagraphs.textContent = '0';
+              statsHeadings.textContent = '0';
+              outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">📄</span><span>Document buit</span></div>';
+            }
+          })
+          .withFailureHandler(function(err) {
+            outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">❌</span><span>Error: ' + err.message + '</span></div>';
+          })
+          .getDocSkeleton();
+      }
+
+      function formatNumber(num) {
+        if (num >= 1000) {
+          return (num / 1000).toFixed(1) + 'k';
+        }
+        return num.toString();
+      }
+
+      function renderOutlineTree(skeleton) {
+        const outlineTree = document.getElementById('outlineTree');
+
+        if (!skeleton || !skeleton.structure || skeleton.structure.length === 0) {
+          outlineTree.innerHTML = '<div class="outline-empty"><span class="outline-empty-icon">📄</span><span>Cap estructura detectada</span></div>';
+          return;
+        }
+
+        let html = '';
+        let currentDepth = 0;
+
+        skeleton.structure.forEach(function(item, idx) {
+          // Determine depth based on type
+          let depth = 0;
+          let typeClass = 'p';
+          let typeLabel = 'P';
+
+          if (item.type === 'HEADING_1' || item.type === 'H1') {
+            depth = 0;
+            typeClass = 'h1';
+            typeLabel = 'H1';
+          } else if (item.type === 'HEADING_2' || item.type === 'H2') {
+            depth = 1;
+            typeClass = 'h2';
+            typeLabel = 'H2';
+          } else if (item.type === 'HEADING_3' || item.type === 'H3') {
+            depth = 2;
+            typeClass = 'h3';
+            typeLabel = 'H3';
+          } else if (item.type === 'BOLD_HEADER' || item.type === 'BOLD') {
+            depth = currentDepth;
+            typeClass = 'bold';
+            typeLabel = 'B';
+          } else if (item.type === 'SECTION') {
+            depth = currentDepth + 1;
+            typeClass = 'section';
+            typeLabel = '§';
+          } else {
+            depth = Math.min(currentDepth + 1, 3);
+            typeClass = 'p';
+            typeLabel = 'P';
+          }
+
+          currentDepth = depth;
+
+          const preview = item.preview ? item.preview.substring(0, 40) + (item.preview.length > 40 ? '...' : '') : 'Sense text';
+
+          html += '<div class="outline-item" data-depth="' + depth + '" data-idx="' + item.idx + '" onclick="scrollToElement(' + item.idx + ')">';
+          html += '<span class="outline-type ' + typeClass + '">' + typeLabel + '</span>';
+          html += '<span class="outline-text">' + escapeHtml(preview) + '</span>';
+          html += '<span class="outline-id">¶' + item.idx + '</span>';
+          html += '</div>';
+        });
+
+        outlineTree.innerHTML = html;
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      function renderEntities(skeleton) {
+        const entitiesGrid = document.getElementById('entitiesGrid');
+        const entitiesSection = document.getElementById('entitiesSection');
+
+        if (!skeleton || !skeleton.entities || Object.keys(skeleton.entities).length === 0) {
+          entitiesSection.style.display = 'none';
+          return;
+        }
+
+        entitiesSection.style.display = 'block';
+
+        const entityIcons = {
+          dates: '📅',
+          amounts: '💶',
+          percentages: '📊',
+          numbers: '🔢',
+          emails: '📧',
+          urls: '🔗'
+        };
+
+        let html = '';
+
+        for (const [type, items] of Object.entries(skeleton.entities)) {
+          if (items && items.length > 0) {
+            const icon = entityIcons[type] || '🏷️';
+            html += '<div class="entity-tag">';
+            html += '<span class="entity-icon">' + icon + '</span>';
+            html += '<span class="entity-count">' + items.length + '</span>';
+            html += '<span>' + type + '</span>';
+            html += '</div>';
+          }
+        }
+
+        entitiesGrid.innerHTML = html || '<span style="color: var(--text-muted); font-size: 11px;">Cap entitat detectada</span>';
+      }
+
+      function checkStructureSuggestions(skeleton) {
+        const suggestionEl = document.getElementById('structureSuggestion');
+        const suggestionText = document.getElementById('suggestionText');
+
+        if (!skeleton || !skeleton.structure) {
+          suggestionEl.classList.add('hidden');
+          return;
+        }
+
+        // Count native vs visual headings
+        let nativeHeadings = 0;
+        let visualHeadings = 0;
+
+        skeleton.structure.forEach(function(item) {
+          if (item.type === 'HEADING_1' || item.type === 'HEADING_2' || item.type === 'HEADING_3') {
+            nativeHeadings++;
+          } else if (item.type === 'BOLD_HEADER') {
+            visualHeadings++;
+          }
+        });
+
+        // Suggest if there are visual headings but few native ones
+        if (visualHeadings > 0 && nativeHeadings < visualHeadings) {
+          suggestionText.textContent = 'Hi ha ' + visualHeadings + ' títols visuals que podrien ser headings natius. Usa Auto-Structure per millorar l\'accessibilitat.';
+          suggestionEl.classList.remove('hidden');
+        } else {
+          suggestionEl.classList.add('hidden');
+        }
+      }
+
+      function applySuggestion() {
+        runAutoStructure();
+        document.getElementById('structureSuggestion').classList.add('hidden');
+      }
+
+      function dismissSuggestion() {
+        document.getElementById('structureSuggestion').classList.add('hidden');
+      }
+
+      function filterOutline() {
+        const searchValue = document.getElementById('structureSearch').value.toLowerCase();
+        const items = document.querySelectorAll('.outline-item');
+
+        items.forEach(function(item) {
+          const text = item.querySelector('.outline-text').textContent.toLowerCase();
+          if (text.includes(searchValue) || searchValue === '') {
+            item.style.display = 'flex';
+          } else {
+            item.style.display = 'none';
+          }
+        });
+      }
+
+      function scrollToElement(idx) {
+        google.script.run
+          .withSuccessHandler(function() {
+            // Highlight the item temporarily
+            const items = document.querySelectorAll('.outline-item');
+            items.forEach(function(item) {
+              item.classList.remove('active');
+              if (item.dataset.idx == idx) {
+                item.classList.add('active');
+              }
+            });
+          })
+          .scrollToParagraph(idx);
+      }
+
+      // Legacy function alias for compatibility
       function refreshSkeleton() {
         const statusEl = document.getElementById('skeletonStatus');
         const previewEl = document.getElementById('skeletonPreview');
