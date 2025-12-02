@@ -6,6 +6,51 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [5.2] - 2024-12-02
+
+### Added
+- **Debounced Save System** - Sistema de guardat amb debounce per millorar velocitat
+  - Agrupa missatges durant 1.5s abans de guardar
+  - Elimina múltiples crides a l'API
+  - Retry automàtic en cas d'error
+
+- **Save Indicator** - Indicador visual de guardat
+  - "Guardant..." (groc) mentre es guarda
+  - "Guardat" (verd) quan s'ha completat
+  - "Error" (vermell) si falla
+
+- **Auto-Title Generation** - Generació automàtica de títol amb IA
+  - Després del primer intercanvi (2 missatges usuari+IA)
+  - Gemini genera títol curt (3-6 paraules)
+  - Marcat amb `ai_title_generated` per no repetir
+
+- **Title Editing** - Edició de títols de conversa
+  - Click al títol del header per editar inline
+  - Click al títol a la llista de converses per editar
+  - Enter per guardar, Escape per cancel·lar
+
+- **Pin/Unpin Conversations** - Fixar converses importants
+  - Botó de pin a cada conversa a la llista
+  - Converses fixades apareixen primer
+  - Indicador visual de pin actiu
+
+### Changed
+- **Atomic Message Append** - Operació atòmica per evitar race conditions
+  - Stored procedure `append_conversation_messages`
+  - Usa `jsonb ||` per concatenació atòmica
+  - Evita pèrdua de missatges en envios ràpids
+
+- **Optimistic Updates** - Actualitzacions locals sense recàrrega
+  - Nova conversa s'afegeix a la llista local
+  - No recàrrega tota la llista després de crear
+
+### Fixed
+- Race condition en `append_messages` (GET + PATCH no atòmic)
+- Duplicació de missatges si s'enviaven molt ràpid
+- Recàrrega innecessària de la llista de converses
+
+---
+
 ## [5.1] - 2024-12-02
 
 ### Added

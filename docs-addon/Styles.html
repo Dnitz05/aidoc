@@ -3997,13 +3997,80 @@
         color: var(--accent);
       }
 
+      /* v5.2: Save Indicator */
+      .save-indicator {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-left: var(--space-xs);
+        transition: all 0.2s ease;
+      }
+
+      .save-indicator.saving {
+        color: var(--warning);
+      }
+
+      .save-indicator.saved {
+        color: var(--success);
+      }
+
+      .save-indicator.error {
+        color: var(--error);
+      }
+
+      /* v5.2: Editable Title in Header */
       .chat-current-title {
-        font-size: 12px;
-        color: var(--text-secondary);
-        max-width: 150px;
-        white-space: nowrap;
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: var(--radius-xs);
+        transition: background 0.15s ease;
+        max-width: 200px;
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .chat-current-title:hover {
+        background: var(--bg-tertiary);
+      }
+
+      .chat-current-title-input {
+        font-size: inherit;
+        font-family: inherit;
+        font-weight: 500;
+        border: 1px solid var(--accent);
+        border-radius: var(--radius-xs);
+        padding: 2px 4px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        width: 180px;
+        outline: none;
+      }
+
+      /* v5.2: Inline Title Edit in List */
+      .conversation-title-input {
+        font-size: 13px;
+        font-weight: 500;
+        border: 1px solid var(--accent);
+        border-radius: var(--radius-xs);
+        padding: 2px 4px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        width: 100%;
+        outline: none;
+      }
+
+      /* v5.2: Pin Button in List */
+      .conversation-action-btn.pin {
+        color: var(--text-muted);
+      }
+
+      .conversation-action-btn.pin.active {
+        color: var(--warning);
+      }
+
+      .conversation-action-btn.pin:hover {
+        background: var(--warning-muted, rgba(234, 179, 8, 0.1));
+        color: var(--warning);
       }
 
       .chat-new-btn {

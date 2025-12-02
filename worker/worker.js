@@ -959,6 +959,9 @@ export default {
       if (body.action === 'delete_conversation') {
         return await handleDeleteConversation(body, env, corsHeaders);
       }
+      if (body.action === 'generate_title') {
+        return await handleGenerateTitle(body, env, corsHeaders);
+      }
 
       // v5.1: Knowledge Library endpoints
       if (body.action === 'get_knowledge_library') {
@@ -1886,7 +1889,8 @@ async function handleCreateConversation(body, env, corsHeaders) {
 }
 
 /**
- * APPEND messages to a conversation
+ * APPEND messages to a conversation (v5.2 - Atomic version)
+ * Uses stored procedure to avoid race conditions
  * body: { license_key, conversation_id, messages: [{role, content, metadata?}] }
  */
 async function handleAppendMessages(body, env, corsHeaders) {
@@ -1902,16 +1906,63 @@ async function handleAppendMessages(body, env, corsHeaders) {
 
   // Format messages with IDs and timestamps
   const formattedMessages = messages.map(msg => ({
-    id: generateMessageId(),
+    id: msg.id || generateMessageId(),
     role: msg.role,
     content: msg.content,
-    timestamp: new Date().toISOString(),
+    timestamp: msg.timestamp || new Date().toISOString(),
     ...(msg.metadata && { metadata: msg.metadata })
   }));
 
-  // First, get current conversation to append to messages array
+  // v5.2: Use atomic stored procedure to avoid race conditions
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/rpc/append_conversation_messages`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        p_conversation_id: conversation_id,
+        p_license_hash: licenseHash,
+        p_messages: formattedMessages
+      })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const result = await response.json();
+
+  if (result.status === 'error') {
+    throw new Error(result.error || 'append_failed');
+  }
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    message_ids: formattedMessages.map(m => m.id),
+    message_count: result.message_count,
+    appended: result.appended
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * GENERATE auto-title for a conversation using AI (v5.2)
+ * body: { license_key, conversation_id }
+ */
+async function handleGenerateTitle(body, env, corsHeaders) {
+  const { license_key, license_key_hash, conversation_id } = body;
+
+  const licenseHash = license_key_hash || (license_key ? await hashKey(license_key) : null);
+  if (!licenseHash) throw new Error("missing_license");
+  if (!conversation_id) throw new Error("missing_conversation_id");
+
+  // Get conversation messages
   const getResponse = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/conversations?id=eq.${conversation_id}&license_key_hash=eq.${licenseHash}&select=messages,message_count`,
+    `${env.SUPABASE_URL}/rest/v1/conversations?id=eq.${conversation_id}&license_key_hash=eq.${licenseHash}&select=messages,title,metadata`,
     {
       method: 'GET',
       headers: {
@@ -1923,7 +1974,7 @@ async function handleAppendMessages(body, env, corsHeaders) {
   );
 
   if (!getResponse.ok) {
-    throw new Error("supabase_error: " + await getResponse.text());
+    throw new Error("supabase_error");
   }
 
   const conversations = await getResponse.json();
@@ -1931,25 +1982,76 @@ async function handleAppendMessages(body, env, corsHeaders) {
     throw new Error("conversation_not_found");
   }
 
-  const currentMessages = conversations[0].messages || [];
-  const currentCount = conversations[0].message_count || 0;
-  const updatedMessages = [...currentMessages, ...formattedMessages];
+  const conv = conversations[0];
 
-  // Update the conversation
-  const updateResponse = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/conversations?id=eq.${conversation_id}&license_key_hash=eq.${licenseHash}`,
+  // Skip if already has AI-generated title
+  if (conv.metadata?.ai_title_generated) {
+    return new Response(JSON.stringify({
+      status: "ok",
+      title: conv.title,
+      skipped: true
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  // Get first few messages for context
+  const msgs = (conv.messages || []).slice(0, 4);
+  if (msgs.length < 2) {
+    return new Response(JSON.stringify({
+      status: "ok",
+      title: conv.title,
+      skipped: true,
+      reason: "not_enough_messages"
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  // Generate title with Gemini
+  const prompt = `Genera un títol curt (3-6 paraules) per aquesta conversa. Només respon amb el títol, sense cometes ni explicacions.
+
+Conversa:
+${msgs.map(m => `${m.role === 'user' ? 'Usuari' : 'Assistent'}: ${m.content.substring(0, 200)}`).join('\n')}
+
+Títol:`;
+
+  const geminiResponse = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
     {
-      method: 'PATCH',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 30
+        }
+      })
+    }
+  );
+
+  if (!geminiResponse.ok) {
+    throw new Error("gemini_error");
+  }
+
+  const geminiResult = await geminiResponse.json();
+  let title = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || conv.title;
+
+  // Clean up title
+  title = title.replace(/^["']|["']$/g, '').trim();
+  if (title.length > 60) title = title.substring(0, 57) + '...';
+
+  // Save title using stored procedure
+  const updateResponse = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/rpc/set_conversation_ai_title`,
+    {
+      method: 'POST',
       headers: {
         'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
         'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        messages: updatedMessages,
-        message_count: currentCount + formattedMessages.length,
-        updated_at: new Date().toISOString()
+        p_conversation_id: conversation_id,
+        p_license_hash: licenseHash,
+        p_title: title
       })
     }
   );
@@ -1958,13 +2060,10 @@ async function handleAppendMessages(body, env, corsHeaders) {
     throw new Error("supabase_error: " + await updateResponse.text());
   }
 
-  const [updated] = await updateResponse.json();
-
   return new Response(JSON.stringify({
     status: "ok",
-    message_ids: formattedMessages.map(m => m.id),
-    message_count: updated.message_count,
-    updated_at: updated.updated_at
+    title: title,
+    generated: true
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
@@ -2400,9 +2499,35 @@ async function uploadToGemini(base64Data, mimeType, fileName, env) {
 
   const fileInfo = await uploadResp.json();
 
+  // v5.1: Wait for file to be ACTIVE (poll up to 10 seconds)
+  let fileUri = fileInfo.file?.uri || null;
+  let fileState = fileInfo.file?.state || "PROCESSING";
+  const geminiFileName = fileInfo.file?.name;
+
+  if (fileState === "PROCESSING" && geminiFileName) {
+    // Poll for file status
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 1000)); // Wait 1 second
+
+      const checkResp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${geminiFileName}?key=${env.GEMINI_API_KEY}`
+      );
+
+      if (checkResp.ok) {
+        const checkInfo = await checkResp.json();
+        fileState = checkInfo.state;
+        fileUri = checkInfo.uri;
+
+        if (fileState === "ACTIVE") {
+          break;
+        }
+      }
+    }
+  }
+
   return {
-    file_uri: fileInfo.file?.uri || null,
+    file_uri: fileUri,
     file_name: fileInfo.file?.displayName || displayName,
-    file_state: fileInfo.file?.state || "PROCESSING"
+    file_state: fileState
   };
 }

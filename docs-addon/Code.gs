@@ -171,6 +171,11 @@ function uploadToKnowledgeLibrary(base64Data, mimeType, fileName) {
   });
 
   if (result.status === 'ok' && result.file) {
+    // v5.1: Validate file_uri exists before saving
+    if (!result.file.file_uri) {
+      throw new Error("El fitxer s'està processant. Torna a provar en uns segons.");
+    }
+
     // Save as active file for this doc
     const props = PropertiesService.getUserProperties();
     props.setProperty('DOCMILE_FILE_URI', result.file.file_uri);

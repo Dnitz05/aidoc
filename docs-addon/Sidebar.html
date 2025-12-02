@@ -76,7 +76,8 @@
           <button class="chat-history-btn" onclick="openConversationsDrawer()" title="Historial de converses">
             <span class="i i--sm"><svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
           </button>
-          <span class="chat-current-title" id="chatCurrentTitle">Nova conversa</span>
+          <span class="chat-current-title" id="chatCurrentTitle" onclick="editCurrentTitle()" title="Clic per editar">Nova conversa</span>
+          <span class="save-indicator" id="saveIndicator"></span>
         </div>
         <button class="chat-new-btn" onclick="createNewConversation()">+ Nova</button>
       </div>
@@ -655,6 +656,12 @@
       let conversationsList = [];
       let conversationsLoaded = false;
 
+      // v5.2: Debounced save system
+      let pendingSaveMessages = [];
+      let saveDebounceTimer = null;
+      let conversationMessageCount = 0; // Track for auto-title trigger
+      const SAVE_DEBOUNCE_MS = 1500; // Save 1.5s after last message
+
       const MODES = {
         edit: { icon: 'edit', label: 'Edit' },
         chat: { icon: 'messageCircle', label: 'Xat' }
@@ -744,6 +751,7 @@
 
           for (const conv of group.conversations) {
             const isActive = conv.id === currentConversationId ? ' active' : '';
+            const pinnedClass = conv.pinned ? ' active' : '';
             const pinnedBadge = conv.pinned ? '<span class="conversation-pinned">' + icon('pin', 'i--sm') + '</span>' : '';
 
             html += `
@@ -752,7 +760,7 @@
                   ${icon('messageCircle', 'i--sm')}
                 </div>
                 <div class="conversation-item-content">
-                  <div class="conversation-item-title">${escapeHtml(conv.title)}</div>
+                  <div class="conversation-item-title" onclick="editTitleInline('${conv.id}', this, event)" title="Clic per editar">${escapeHtml(conv.title)}</div>
                   <div class="conversation-item-preview">${escapeHtml(conv.preview || '')}</div>
                   <div class="conversation-item-meta">
                     ${pinnedBadge}
@@ -760,6 +768,9 @@
                   </div>
                 </div>
                 <div class="conversation-item-actions">
+                  <button class="conversation-action-btn pin${pinnedClass}" onclick="togglePin('${conv.id}', event)" title="${conv.pinned ? 'Desfixar' : 'Fixar'}">
+                    ${icon('pin', 'i--sm')}
+                  </button>
                   <button class="conversation-action-btn delete" onclick="event.stopPropagation(); deleteConversation('${conv.id}')" title="Eliminar">
                     ${icon('trash', 'i--sm')}
                   </button>
@@ -818,6 +829,8 @@
             if (res.status === 'ok' && res.conversation) {
               loadConversationMessages(res.conversation);
               updateConversationTitle(res.conversation.title);
+              // v5.2: Track message count for auto-title
+              conversationMessageCount = res.conversation.message_count || 0;
               // Update active state in drawer
               updateActiveConversation(conversationId);
             } else {
@@ -864,6 +877,7 @@
 
       function createNewConversation() {
         currentConversationId = null;
+        conversationMessageCount = 0; // v5.2: Reset counter
         updateConversationTitle('Nova conversa');
         closeConversationsDrawer();
 
@@ -1209,7 +1223,7 @@
         currentMode = mode;
 
         // Update button display
-        document.getElementById('modeIcon').textContent = MODES[mode].icon;
+        document.getElementById('modeIcon').innerHTML = icon(MODES[mode].icon, 'i--sm');
         document.getElementById('modeLabel').textContent = MODES[mode].label;
 
         // Update selected state in dropdown
@@ -1418,35 +1432,89 @@
         // v2.5: Check and show structure hint (one-time)
         checkAndShowStructureHint();
 
-        // v5.0: Auto-save to conversation
-        saveMessageToConversation(lastSentMessage, res.ai_response, res.mode);
+        // v5.2: Queue message for debounced save
+        queueMessageForSave(lastSentMessage, res.ai_response, res.mode);
       }
 
-      // v5.0: Save message pair to conversation (auto-save)
-      async function saveMessageToConversation(userMessage, aiResponse, mode) {
+      // ═══════════════════════════════════════════════════════════
+      // v5.2: DEBOUNCED SAVE SYSTEM
+      // ═══════════════════════════════════════════════════════════
+
+      function showSaveIndicator(state) {
+        const indicator = document.getElementById('saveIndicator');
+        if (!indicator) return;
+
+        indicator.className = 'save-indicator ' + state;
+        switch (state) {
+          case 'saving':
+            indicator.textContent = 'Guardant...';
+            break;
+          case 'saved':
+            indicator.textContent = 'Guardat';
+            setTimeout(() => {
+              if (indicator.classList.contains('saved')) {
+                indicator.textContent = '';
+                indicator.className = 'save-indicator';
+              }
+            }, 2000);
+            break;
+          case 'error':
+            indicator.textContent = 'Error';
+            break;
+          default:
+            indicator.textContent = '';
+        }
+      }
+
+      function queueMessageForSave(userMessage, aiResponse, mode) {
         if (!userMessage) return;
 
         const now = new Date().toISOString();
-        const userMsg = {
+        pendingSaveMessages.push({
           id: 'msg_' + Date.now() + '_u',
           role: 'user',
           content: userMessage,
           timestamp: now
-        };
-        const aiMsg = {
+        });
+        pendingSaveMessages.push({
           id: 'msg_' + Date.now() + '_a',
           role: 'ai',
           content: aiResponse,
           timestamp: now,
           metadata: { mode: mode || 'chat' }
-        };
+        });
+
+        // Clear the stored message
+        lastSentMessage = null;
+
+        // Debounce the save
+        if (saveDebounceTimer) {
+          clearTimeout(saveDebounceTimer);
+        }
+
+        showSaveIndicator('saving');
+
+        saveDebounceTimer = setTimeout(() => {
+          flushPendingMessages();
+        }, SAVE_DEBOUNCE_MS);
+      }
+
+      async function flushPendingMessages() {
+        if (pendingSaveMessages.length === 0) return;
+
+        const messagesToSave = [...pendingSaveMessages];
+        pendingSaveMessages = [];
+        saveDebounceTimer = null;
 
         try {
           if (!currentConversationId) {
-            // Create new conversation
-            const title = userMessage.length > 47
-              ? userMessage.substring(0, 47) + '...'
-              : userMessage;
+            // Create new conversation with first message as title
+            const firstUserMsg = messagesToSave.find(m => m.role === 'user');
+            const title = firstUserMsg
+              ? (firstUserMsg.content.length > 47
+                  ? firstUserMsg.content.substring(0, 47) + '...'
+                  : firstUserMsg.content)
+              : 'Nova conversa';
 
             const result = await new Promise((resolve, reject) => {
               google.script.run
@@ -1455,15 +1523,28 @@
                 .callWorker({
                   action: 'create_conversation',
                   title: title,
-                  messages: [userMsg, aiMsg]
+                  messages: messagesToSave
                 });
             });
 
             if (result.conversation_id) {
               currentConversationId = result.conversation_id;
-              // Update drawer if open
+              conversationMessageCount = messagesToSave.length;
+              updateConversationTitle(title);
+
+              // Add to local list instead of reloading
               if (conversationsLoaded) {
-                loadConversations();
+                const newConv = {
+                  id: result.conversation_id,
+                  title: title,
+                  preview: messagesToSave[0]?.content?.substring(0, 80) || '',
+                  message_count: messagesToSave.length,
+                  pinned: false,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+                conversationsList.unshift(newConv);
+                renderConversationsList(conversationsList);
               }
             }
           } else {
@@ -1475,19 +1556,244 @@
                 .callWorker({
                   action: 'append_messages',
                   conversation_id: currentConversationId,
-                  messages: [userMsg, aiMsg]
+                  messages: messagesToSave
                 });
             });
-            // Update active conversation in list
-            updateActiveConversation(currentConversationId);
+
+            conversationMessageCount += messagesToSave.length;
+
+            // Trigger auto-title after first exchange (4 messages = 2 turns)
+            if (conversationMessageCount === 4) {
+              triggerAutoTitle();
+            }
           }
+
+          showSaveIndicator('saved');
+
         } catch (e) {
           console.error('[Conversation Save Error]', e);
-          // Silent fail - don't interrupt user experience
+          showSaveIndicator('error');
+          // Re-queue failed messages for retry
+          pendingSaveMessages = [...messagesToSave, ...pendingSaveMessages];
+        }
+      }
+
+      // Save on page unload
+      window.addEventListener('beforeunload', function() {
+        if (pendingSaveMessages.length > 0) {
+          flushPendingMessages();
+        }
+      });
+
+      // ═══════════════════════════════════════════════════════════
+      // v5.2: AUTO-TITLE GENERATION
+      // ═══════════════════════════════════════════════════════════
+
+      function triggerAutoTitle() {
+        if (!currentConversationId) return;
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.status === 'ok' && res.generated && res.title) {
+              updateConversationTitle(res.title);
+              // Update in list too
+              const conv = conversationsList.find(c => c.id === currentConversationId);
+              if (conv) {
+                conv.title = res.title;
+                renderConversationsList(conversationsList);
+              }
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.error('[Auto-title Error]', err);
+          })
+          .callWorker({
+            action: 'generate_title',
+            conversation_id: currentConversationId
+          });
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // v5.2: TITLE EDITING
+      // ═══════════════════════════════════════════════════════════
+
+      function editCurrentTitle() {
+        if (!currentConversationId) return;
+
+        const titleEl = document.getElementById('chatCurrentTitle');
+        const currentTitle = titleEl.textContent;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentTitle;
+        input.className = 'chat-current-title-input';
+
+        input.onblur = function() {
+          saveCurrentTitle(input.value);
+        };
+
+        input.onkeydown = function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+          } else if (e.key === 'Escape') {
+            titleEl.textContent = currentTitle;
+            titleEl.style.display = '';
+            input.remove();
+          }
+        };
+
+        titleEl.style.display = 'none';
+        titleEl.parentNode.insertBefore(input, titleEl);
+        input.focus();
+        input.select();
+      }
+
+      function saveCurrentTitle(newTitle) {
+        const titleEl = document.getElementById('chatCurrentTitle');
+        const input = titleEl.parentNode.querySelector('.chat-current-title-input');
+
+        if (!newTitle || !newTitle.trim()) {
+          titleEl.style.display = '';
+          if (input) input.remove();
+          return;
         }
 
-        // Clear the stored message
-        lastSentMessage = null;
+        newTitle = newTitle.trim();
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.status === 'ok') {
+              titleEl.textContent = newTitle;
+              // Update in list
+              const conv = conversationsList.find(c => c.id === currentConversationId);
+              if (conv) {
+                conv.title = newTitle;
+                renderConversationsList(conversationsList);
+              }
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.error('[Title Save Error]', err);
+            showToast('Error guardant títol', 'error');
+          })
+          .callWorker({
+            action: 'update_conversation',
+            conversation_id: currentConversationId,
+            title: newTitle
+          });
+
+        titleEl.textContent = newTitle;
+        titleEl.style.display = '';
+        if (input) input.remove();
+      }
+
+      function editTitleInline(convId, element, event) {
+        event.stopPropagation();
+
+        const currentTitle = element.textContent;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentTitle;
+        input.className = 'conversation-title-input';
+
+        input.onblur = function() {
+          saveTitleInline(convId, input.value, element);
+        };
+
+        input.onkeydown = function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+          } else if (e.key === 'Escape') {
+            element.textContent = currentTitle;
+            element.style.display = '';
+            input.remove();
+          }
+        };
+
+        input.onclick = function(e) {
+          e.stopPropagation();
+        };
+
+        element.style.display = 'none';
+        element.parentNode.insertBefore(input, element);
+        input.focus();
+        input.select();
+      }
+
+      function saveTitleInline(convId, newTitle, element) {
+        const input = element.parentNode.querySelector('.conversation-title-input');
+
+        if (!newTitle || !newTitle.trim()) {
+          element.style.display = '';
+          if (input) input.remove();
+          return;
+        }
+
+        newTitle = newTitle.trim();
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.status === 'ok') {
+              const conv = conversationsList.find(c => c.id === convId);
+              if (conv) {
+                conv.title = newTitle;
+              }
+              // Update header if this is current conversation
+              if (convId === currentConversationId) {
+                updateConversationTitle(newTitle);
+              }
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.error('[Title Save Error]', err);
+          })
+          .callWorker({
+            action: 'update_conversation',
+            conversation_id: convId,
+            title: newTitle
+          });
+
+        element.textContent = newTitle;
+        element.style.display = '';
+        if (input) input.remove();
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // v5.2: PIN/UNPIN TOGGLE
+      // ═══════════════════════════════════════════════════════════
+
+      function togglePin(convId, event) {
+        event.stopPropagation();
+
+        const conv = conversationsList.find(c => c.id === convId);
+        if (!conv) return;
+
+        const newPinned = !conv.pinned;
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.status === 'ok') {
+              conv.pinned = newPinned;
+              // Re-sort: pinned first
+              conversationsList.sort((a, b) => {
+                if (a.pinned && !b.pinned) return -1;
+                if (!a.pinned && b.pinned) return 1;
+                return new Date(b.updated_at) - new Date(a.updated_at);
+              });
+              renderConversationsList(conversationsList);
+              showToast(newPinned ? 'Conversa fixada' : 'Conversa desfixada', 'success');
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.error('[Pin Error]', err);
+          })
+          .callWorker({
+            action: 'update_conversation',
+            conversation_id: convId,
+            pinned: newPinned
+          });
       }
 
       // v3.7: Handler d'error per processUserCommand
