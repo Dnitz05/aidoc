@@ -2,6 +2,16 @@
 const API_URL = 'https://docmile-api.conteucontes.workers.dev';
 
 /**
+ * Inclou el contingut d'un fitxer HTML dins d'un altre.
+ * S'utilitza amb la sintaxi <?!= include('filename') ?> als templates.
+ * @param {string} filename - Nom del fitxer HTML (sense extensió .html)
+ * @return {string} - Contingut del fitxer
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
  * Crea el menú quan s'obre el document
  * Gestiona tant simple triggers com installable triggers
  * @param {Object} e - Event object amb authMode
