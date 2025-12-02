@@ -1,8 +1,8 @@
-# Arquitectura Tècnica - SideCar v3.1
+# Arquitectura Tècnica - Docmile v3.7
 
 ## Visió General
 
-SideCar és un **Motor d'Enginyeria Documental** que opera com a sidebar dins de Google Docs, permetent edicions intel·ligents de documents mitjançant instruccions en llenguatge natural.
+Docmile és un **Motor d'Enginyeria Documental** que opera com a sidebar dins de Google Docs, permetent edicions intel·ligents de documents mitjançant instruccions en llenguatge natural.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -455,7 +455,43 @@ Edit → saveEditEvent() → Supabase → getEditHistory() → UI
                                   → revertEdit() → Restore
 ```
 
-### 6. Mode Enforcement
+### 6. Universal Doc Reader (v3.7)
+Captura TOTAL del document, no només paràgrafs:
+```
+Document → captureFullDocument() → {
+  header: "Capçalera...",
+  body: [paragraphs, lists, tables (Markdown), images (placeholder)],
+  footer: "Peu de pàgina...",
+  footnotes: ["Nota 1...", "Nota 2..."],
+  stats: { paragraphs, tables, has_images, total_chars }
+}
+```
+
+### 7. Intent Classification (v3.7)
+Classificació local d'intenció ABANS d'enviar al servidor:
+```
+Instrucció → classifyIntent() → {
+  intent: 'edit' | 'chat' | 'ambiguous',
+  confidence: 0.0-1.0,
+  reason: "Patró detectat"
+}
+       ↓ ambiguous?
+  showClarificationPrompt() → Usuari escull → sendMessageWithMode()
+```
+
+### 8. Robust Execution (v3.7)
+Execució amb validació i recuperació d'errors:
+```
+UPDATE_BY_ID → for each update:
+  ├── Element exists? → No → EDIT_SKIP log
+  ├── Element editable? → No → EDIT_SKIP log
+  ├── try/catch → Error → EDIT_ERROR log
+  └── Apply + Validate → Mismatch → EDIT_VALIDATION log
+       ↓
+  edit_stats: { applied, skipped, errors, duration_ms }
+```
+
+### 9. Mode Enforcement
 El mode seleccionat per l'usuari s'aplica al prompt:
 - `auto`: IA decideix
 - `edit`: Força edició
@@ -491,4 +527,4 @@ Veure [ROADMAP.md](../ROADMAP.md) per plans de:
 
 ---
 
-*Última actualització: 2024-11-30 (v3.1)*
+*Última actualització: 2024-12-02 (v3.7)*

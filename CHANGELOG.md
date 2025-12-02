@@ -6,6 +6,49 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.7] - 2024-12-02
+
+### Added
+- **Universal Doc Reader** (FASE 1) - Captura TOTAL del document
+  - `captureFullDocument()` - Llegeix Header, Body, Footer, Footnotes, Taules
+  - Taules convertides a format Markdown per la IA
+  - Notes al peu capturades i incloses al context
+  - `DocStatusBar` UI - Mostra a l'usuari què veu la IA
+
+- **Intent Classification** (FASE 2) - Classificació local d'intenció
+  - `classifyIntent()` - Classificador basat en patrons (EDIT vs CHAT)
+  - `INTENT_PATTERNS` - Regex per detectar verbs d'edició i preguntes
+  - `ClarificationPrompt` - UI interactiva quan intenció és ambigua
+  - `client_intent` enviat al Worker per millor decisió
+  - Mode enforcement millorat amb detecció de mismatches
+
+- **Robust Execution** (FASE 3) - Execució d'edicions més robusta
+  - Try/catch per cada edició individual
+  - Validació pre-edició (element existeix, és editable)
+  - Validació post-edició (verifica que el canvi s'ha aplicat)
+  - Logging detallat: `EDIT_SKIP`, `EDIT_ERROR`, `EDIT_VALIDATION`, `EDIT_EXECUTION`
+  - Mètriques de timing per cada operació
+
+- **Enhanced Communication** (FASE 4) - Millor feedback a l'usuari
+  - `edit_stats` retornat al frontend (applied, skipped, errors, duration)
+  - Warnings automàtics quan edicions fallen o es salten
+  - Console logging detallat per debugging
+
+### Changed
+- `processUserCommand()` ara rep `clientIntentClassification` com a 5è paràmetre
+- Worker destructura `client_intent` del payload
+- Respostes inclouen estadístiques d'execució detallades
+- Handlers `handleSendSuccess/handleSendFailure` extrets com a funcions separades
+
+### Technical
+- `INTENT_PATTERNS.edit.strong/weak` - Patrons per detectar intents d'edició
+- `INTENT_PATTERNS.chat.strong/weak` - Patrons per detectar preguntes
+- `determineEffectiveMode()` - Decideix mode final basat en usuari + classificació
+- `showClarificationPrompt()` / `resolveClarification()` - UI de clarificació
+- `sendMessageWithMode()` - Envia amb mode forçat després de clarificació
+
+---
+
 ## [3.2] - 2024-11-30
 
 ### Added
