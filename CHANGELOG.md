@@ -6,6 +6,49 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [5.1] - 2024-12-02
+
+### Added
+- **Knowledge Library System** - Biblioteca de fitxers de coneixement compartida
+
+  **Base de Dades (Supabase)**
+  - Taula `knowledge_library` amb storage de fitxers base64
+  - Camps: `file_data`, `gemini_file_uri`, `gemini_expires_at`, `used_in_docs`
+  - Índex per `license_key_hash`
+
+  **API Worker (5 endpoints)**
+  - `get_knowledge_library` - Llistar tots els fitxers de l'usuari
+  - `upload_to_library` - Pujar fitxer nou a biblioteca
+  - `link_knowledge` - Associar fitxer a document (amb refresh Gemini automàtic)
+  - `unlink_knowledge` - Desassociar fitxer de document
+  - `delete_from_library` - Eliminar fitxer de biblioteca
+
+  **Refresh Automàtic Gemini**
+  - Detecta quan `gemini_file_uri` ha expirat (48h)
+  - Re-puja automàticament des de `file_data` guardat
+  - Actualitza `gemini_expires_at` amb marge de 47h
+
+  **UI Pestanya Coneixement**
+  - Secció "Fitxer Actiu" - fitxer vinculat al doc actual
+  - Secció "Biblioteca" - tots els fitxers pujats anteriorment
+  - Click per activar fitxer de biblioteca
+  - Comptador de docs que usen cada fitxer
+  - Botó eliminar amb confirmació
+
+  **GAS Proxy Functions**
+  - `getKnowledgeLibrary()` - Llistar biblioteca
+  - `uploadToKnowledgeLibrary()` - Pujar a biblioteca
+  - `linkKnowledgeFile()` - Vincular a doc
+  - `unlinkKnowledgeFile()` - Desvincular
+  - `deleteFromKnowledgeLibrary()` - Eliminar
+  - `getActiveKnowledgeFile()` - Fitxer actiu actual
+
+### Changed
+- Pestanya Coneixement redissenyada amb biblioteca + fitxer actiu
+- `handleFileSelect()` ara puja a biblioteca (no només sessió)
+
+---
+
 ## [5.0] - 2024-12-02
 
 ### Added
