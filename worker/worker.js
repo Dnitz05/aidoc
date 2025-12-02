@@ -272,6 +272,116 @@ async function markEventReverted(env, eventId, revertedByEventId) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// TIMELINE GAP DETECTION (v4.0)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * v4.0: Get last confirmed event for gap detection
+ */
+async function getLastConfirmedEvent(env, licenseHash, docId) {
+  try {
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/edit_events?` +
+      `license_key_hash=eq.${licenseHash}&` +
+      `doc_id=eq.${docId}&` +
+      `hash_confirmed=eq.true&` +
+      `order=created_at.desc&` +
+      `limit=1`,
+      {
+        method: 'GET',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) return null;
+    const events = await response.json();
+    return events.length > 0 ? events[0] : null;
+  } catch (e) {
+    console.error('Error getting last confirmed event:', e);
+    return null;
+  }
+}
+
+/**
+ * v4.0: Update event with confirmed hash
+ */
+async function confirmEventHash(env, eventId, finalHash, wordCount, prevWordCount) {
+  try {
+    const wordsChanged = prevWordCount != null ? (wordCount - prevWordCount) : null;
+
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/edit_events?id=eq.${eventId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          doc_hash: finalHash,
+          hash_confirmed: true,
+          word_count: wordCount,
+          words_changed: wordsChanged
+        })
+      }
+    );
+
+    return response.ok;
+  } catch (e) {
+    console.error('Error confirming hash:', e);
+    return false;
+  }
+}
+
+/**
+ * v4.0: Detect and record manual gaps
+ */
+async function detectAndRecordGap(env, licenseHash, docId, clientHash, wordCount) {
+  if (!clientHash) return null;
+
+  const lastEvent = await getLastConfirmedEvent(env, licenseHash, docId);
+
+  // First time? Create baseline
+  if (!lastEvent) {
+    const baseline = await saveEditEvent(env, {
+      license_key_hash: licenseHash,
+      doc_id: docId,
+      operation: 'baseline',
+      source: 'baseline',
+      doc_hash: clientHash,
+      hash_confirmed: true,
+      word_count: wordCount
+    });
+    console.log(`[Timeline] Baseline created for doc ${docId}`);
+    return { type: 'baseline', event: baseline };
+  }
+
+  // Gap detected?
+  if (lastEvent.doc_hash && lastEvent.doc_hash !== clientHash) {
+    const wordsChanged = wordCount - (lastEvent.word_count || 0);
+    const gapEvent = await saveEditEvent(env, {
+      license_key_hash: licenseHash,
+      doc_id: docId,
+      operation: 'manual_gap',
+      source: 'manual',
+      doc_hash: clientHash,
+      hash_confirmed: true,
+      word_count: wordCount,
+      words_changed: wordsChanged
+    });
+    console.log(`[Timeline] Gap detected: ${wordsChanged > 0 ? '+' : ''}${wordsChanged} words`);
+    return { type: 'gap', event: gapEvent, wordsChanged };
+  }
+
+  return { type: 'no_change', lastEvent };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // DIAGNOSTIC LOGGING (v3.7)
 // ═══════════════════════════════════════════════════════════════
 
@@ -939,6 +1049,13 @@ export default {
       if (body.action === 'log_diagnostic') {
         return await handleLogDiagnostic(body, env, corsHeaders);
       }
+      // v4.0: Timeline endpoints
+      if (body.action === 'confirm_edit') {
+        return await handleConfirmEdit(body, env, corsHeaders);
+      }
+      if (body.action === 'get_timeline') {
+        return await handleGetTimeline(body, env, corsHeaders);
+      }
 
       // v5.0: Conversations endpoints
       if (body.action === 'list_conversations') {
@@ -1013,7 +1130,9 @@ async function handleChat(body, env, corsHeaders) {
     user_mode,     // v3.10: User-selected mode (edit | chat)
     negative_constraints,  // v2.8: Banned words/phrases
     doc_skeleton,  // v2.9: Document structure (headings, sections, entities)
-    doc_stats      // v3.7: Universal Doc Reader stats
+    doc_stats,     // v3.7: Universal Doc Reader stats
+    client_hash,   // v4.0: Timeline - document hash before action
+    word_count     // v4.0: Timeline - word count for delta tracking
   } = body;
 
   if (!license_key) throw new Error("missing_license");
@@ -1025,6 +1144,18 @@ async function handleChat(body, env, corsHeaders) {
   // 1. License validation and credit usage
   const licenseHash = await hashKey(license_key);
   const creditsResult = await useCredits(env, licenseHash, doc_metadata);
+
+  // v4.0: Timeline Gap Detection - detect manual edits before AI processing
+  const docId = doc_metadata?.doc_id || 'unknown';
+  let gapResult = null;
+  if (client_hash && docId !== 'unknown') {
+    try {
+      gapResult = await detectAndRecordGap(env, licenseHash, docId, client_hash, word_count || 0);
+    } catch (gapError) {
+      console.error('Gap detection failed:', gapError.message);
+      // Non-blocking: continue even if gap detection fails
+    }
+  }
 
   // 2. Build system prompt (context-driven)
   // v3.7: Afegim doc_stats per UNIVERSAL DOC READER
@@ -1284,7 +1415,11 @@ INSTRUCCIÓ DE L'USUARI:
         after_text: afterText,
         user_instruction: user_instruction,
         thought: parsedResponse.thought,
-        ai_mode: effectiveMode
+        ai_mode: effectiveMode,
+        // v4.0: Timeline fields
+        source: 'ai',
+        hash_confirmed: false,
+        word_count: word_count || null
       };
 
       const savedEvent = await saveEditEvent(env, eventData);
@@ -1303,7 +1438,11 @@ INSTRUCCIÓ DE L'USUARI:
       after_text: JSON.stringify(parsedResponse.blocks),
       user_instruction: user_instruction,
       thought: parsedResponse.thought,
-      ai_mode: effectiveMode
+      ai_mode: effectiveMode,
+      // v4.0: Timeline fields
+      source: 'ai',
+      hash_confirmed: false,
+      word_count: word_count || null
     };
 
     const savedEvent = await saveEditEvent(env, eventData);
@@ -1672,6 +1811,86 @@ async function handleRevertEdit(body, env, corsHeaders) {
     revert_event: revertEvent ? { id: revertEvent.id } : null,
     restore_text: originalEvent.before_text,  // The text to restore in the document
     target_id: originalEvent.target_id
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TIMELINE HANDLERS (v4.0 - Forensic Timeline)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Confirms that an AI edit was successfully applied by storing the final hash
+ */
+async function handleConfirmEdit(body, env, corsHeaders) {
+  const { license_key, event_id, final_hash, word_count } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!event_id) throw new Error("missing_event_id");
+
+  const licenseHash = await hashKey(license_key);
+
+  // Get previous word count for delta calculation
+  const prevEvent = await getLastConfirmedEvent(env, licenseHash, null);
+  const prevWordCount = prevEvent?.word_count || 0;
+
+  // Confirm the hash
+  const success = await confirmEventHash(env, event_id, final_hash, word_count, prevWordCount);
+
+  return new Response(JSON.stringify({
+    status: success ? "ok" : "error",
+    confirmed: success
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Gets the timeline of edits for a document (both AI and manual gaps)
+ */
+async function handleGetTimeline(body, env, corsHeaders) {
+  const { license_key, doc_id, limit = 50 } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!doc_id) throw new Error("missing_doc_id");
+
+  const licenseHash = await hashKey(license_key);
+
+  // Fetch events ordered by created_at DESC
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/edit_events?license_key_hash=eq.${licenseHash}&doc_id=eq.${doc_id}&order=created_at.desc&limit=${limit}`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("timeline_fetch_failed");
+  }
+
+  const events = await response.json();
+
+  // Transform events for timeline display
+  const timeline = events.map(e => ({
+    id: e.id,
+    type: e.event_type,
+    source: e.source || (e.event_type === 'manual_gap' ? 'manual' : 'ai'),
+    operation: e.event_type === 'manual_gap' ? 'manual_gap' : e.event_type,
+    instruction: e.user_instruction,
+    thought: e.thought,
+    words_changed: e.words_changed,
+    word_count: e.word_count,
+    hash_confirmed: e.hash_confirmed,
+    created_at: e.created_at,
+    reverted_at: e.reverted_at
+  }));
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    timeline: timeline,
+    total: events.length
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 

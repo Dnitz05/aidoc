@@ -62,6 +62,9 @@
         <button class="tab" data-tab="recipes" onclick="switchTab('recipes')" title="Receptes">
           <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         </button>
+        <button class="tab" data-tab="timeline" onclick="switchTab('timeline')" title="Timeline">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
         <button class="tab" data-tab="brain" onclick="switchTab('brain')" title="Configuracio">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
@@ -310,6 +313,26 @@
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="hideNewRecipeModal()">Cancel·lar</button>
           <button class="btn btn-primary" onclick="saveNewRecipe()">Crear Recepta</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline Panel (v4.0 - Forensic Timeline) -->
+    <div id="timelinePanel" class="panel">
+      <div class="timeline-header">
+        <div class="timeline-title">
+          <span class="i i--accent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+          <span>Timeline d'Edicions</span>
+        </div>
+        <button class="btn btn-sm" onclick="loadTimeline()" title="Actualitzar">
+          <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span>
+        </button>
+      </div>
+      <div class="timeline-content" id="timelineContent">
+        <div class="timeline-empty">
+          <span class="i i--muted"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+          <span>No hi ha edicions registrades</span>
+          <span class="timeline-empty-hint">Les edicions apareixeran aquí automàticament</span>
         </div>
       </div>
     </div>
@@ -1429,6 +1452,10 @@
           pendingUndo = res.undo_snapshot;
           showUndoBar();
         }
+        // v4.0: Confirm hash after successful edit
+        if (res.mode === 'edit' && res.event_id) {
+          confirmEditHashAsync(res.event_id);
+        }
         // v2.5: Check and show structure hint (one-time)
         checkAndShowStructureHint();
 
@@ -2082,6 +2109,10 @@
               pendingUndo = res.undo_snapshot;
               showUndoBar();
             }
+            // v4.0: Confirm hash after successful edit
+            if (res.mode === 'edit' && res.event_id) {
+              confirmEditHashAsync(res.event_id);
+            }
           })
           .withFailureHandler(function(err) {
             hideThinking();
@@ -2089,6 +2120,127 @@
             addBubble('error', 'Error: ' + err.message);
           })
           .processUserCommand(instruction, getRecentHistory(), getCurrentMode(), previewModeEnabled);
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // TIMELINE (v4.0 - Forensic Timeline)
+      // ═══════════════════════════════════════════════════════════
+
+      function loadTimeline() {
+        const container = document.getElementById('timelineContent');
+        container.innerHTML = '<div class="loading-text">Carregant timeline...</div>';
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.status === 'ok' && result.timeline) {
+              renderTimeline(result.timeline);
+            } else {
+              container.innerHTML = '<div class="timeline-empty"><span class="i i--muted">' + ICONS.clock + '</span><span>No hi ha edicions registrades</span></div>';
+            }
+          })
+          .withFailureHandler(function(err) {
+            container.innerHTML = '<div class="timeline-empty" style="color: var(--error);">Error carregant timeline</div>';
+          })
+          .getDocumentTimeline();
+      }
+
+      function renderTimeline(events) {
+        const container = document.getElementById('timelineContent');
+        container.innerHTML = '';
+
+        if (!events || events.length === 0) {
+          container.innerHTML = '<div class="timeline-empty"><span class="i i--muted">' + ICONS.clock + '</span><span>No hi ha edicions registrades</span></div>';
+          return;
+        }
+
+        events.forEach(function(event, index) {
+          const card = document.createElement('div');
+          card.className = 'timeline-card ' + (event.source === 'manual' ? 'timeline-manual' : 'timeline-ai');
+          card.style.animationDelay = (index * 30) + 'ms';
+
+          // Determine icon and label based on source/type
+          let iconName = 'edit';
+          let sourceLabel = 'IA';
+          if (event.source === 'manual' || event.operation === 'manual_gap') {
+            iconName = 'user';
+            sourceLabel = 'Manual';
+          } else if (event.source === 'baseline') {
+            iconName = 'flag';
+            sourceLabel = 'Baseline';
+          } else if (event.type === 'REVERT') {
+            iconName = 'rotateCcw';
+            sourceLabel = 'Revert';
+          }
+
+          // Format time
+          const timeStr = formatTimelineTime(event.created_at);
+
+          // Words changed indicator
+          let wordsInfo = '';
+          if (event.words_changed !== null && event.words_changed !== undefined) {
+            const sign = event.words_changed >= 0 ? '+' : '';
+            const color = event.words_changed >= 0 ? 'var(--success)' : 'var(--error)';
+            wordsInfo = '<span class="timeline-words" style="color: ' + color + '">' + sign + event.words_changed + ' paraules</span>';
+          }
+
+          card.innerHTML =
+            '<div class="timeline-card-header">' +
+              '<span class="timeline-source ' + (event.source === 'manual' ? 'source-manual' : 'source-ai') + '">' +
+                '<span class="i i--xs">' + (ICONS[iconName] || ICONS.circle) + '</span> ' + sourceLabel +
+              '</span>' +
+              '<span class="timeline-time">' + timeStr + '</span>' +
+            '</div>' +
+            '<div class="timeline-card-body">' +
+              (event.instruction ? '<div class="timeline-instruction">' + escapeHtml(event.instruction.substring(0, 100)) + (event.instruction.length > 100 ? '...' : '') + '</div>' : '') +
+              (event.thought ? '<div class="timeline-thought">' + escapeHtml(event.thought.substring(0, 80)) + '</div>' : '') +
+              wordsInfo +
+            '</div>' +
+            (event.reverted_at ? '<div class="timeline-reverted">' + ICONS.rotateCcw + ' Revertit</div>' : '');
+
+          container.appendChild(card);
+        });
+      }
+
+      function formatTimelineTime(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Ara';
+        if (diffMins < 60) return 'Fa ' + diffMins + ' min';
+        if (diffHours < 24) return 'Fa ' + diffHours + 'h';
+        if (diffDays < 7) return 'Fa ' + diffDays + ' dies';
+
+        return date.toLocaleDateString('ca-ES', { day: 'numeric', month: 'short' });
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      /**
+       * v4.0: Confirms an edit hash asynchronously (fire-and-forget)
+       * Called after a successful edit to close the hash confirmation loop
+       */
+      function confirmEditHashAsync(eventId) {
+        if (!eventId) return;
+        // Fire-and-forget: no need to wait for response
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.confirmed) {
+              console.log('[Timeline] Hash confirmed for event:', eventId);
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.warn('[Timeline] Hash confirmation failed:', err.message);
+          })
+          .confirmEditHash(eventId);
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -2330,6 +2482,10 @@
             if (res.mode === 'edit' && res.undo_snapshot) {
               pendingUndo = res.undo_snapshot;
               showUndoBar();
+            }
+            // v4.0: Confirm hash after successful edit
+            if (res.mode === 'edit' && res.event_id) {
+              confirmEditHashAsync(res.event_id);
             }
           })
           .withFailureHandler(function(err) {

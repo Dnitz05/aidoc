@@ -654,6 +654,113 @@ function getCachedSelection(doc, body) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// TIMELINE HASH SYSTEM (v4.0)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Genera hash MD5 del contingut del document
+ * Inclou text + comptador d'estructura per detectar canvis de format
+ */
+function getDocumentStateHash() {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+
+    const content = {
+      t: body.getText(),
+      h: body.getParagraphs().filter(p =>
+        p.getHeading() !== DocumentApp.ParagraphHeading.NORMAL
+      ).length
+    };
+
+    const payload = JSON.stringify(content);
+    const digest = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.MD5,
+      payload,
+      Utilities.Charset.UTF_8
+    );
+
+    return digest.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+  } catch (e) {
+    Logger.log('Hash calculation failed: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Compta paraules del document
+ */
+function getDocumentWordCount() {
+  try {
+    const text = DocumentApp.getActiveDocument().getBody().getText();
+    return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/**
+ * Confirma el hash final després d'aplicar edits
+ * @param {string} eventId - ID de l'event a confirmar
+ */
+function confirmEditHash(eventId) {
+  if (!eventId) return;
+
+  const newHash = getDocumentStateHash();
+  const wordCount = getDocumentWordCount();
+
+  const payload = {
+    action: 'confirm_edit',
+    event_id: eventId,
+    final_hash: newHash,
+    word_count: wordCount
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true
+  };
+
+  try {
+    UrlFetchApp.fetch(API_URL, options);
+  } catch (e) {
+    Logger.log('Confirm hash failed: ' + e.message);
+  }
+}
+
+/**
+ * Obté el timeline del document actual
+ */
+function getDocumentTimeline() {
+  const doc = DocumentApp.getActiveDocument();
+  const settings = JSON.parse(getSettings());
+
+  const payload = {
+    action: 'get_timeline',
+    license_key: settings.license_key,
+    doc_id: doc.getId()
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const json = JSON.parse(response.getContentText());
+    return json.events || [];
+  } catch (e) {
+    Logger.log('Get timeline failed: ' + e.message);
+    return [];
+  }
+}
+
 // --- NUCLI DEL PROCESSAMENT (v3.10 simplificat - 2 modes) ---
 function processUserCommand(instruction, chatHistory, userMode, previewMode) {
   // v3.7: Iniciar col·lector de mètriques
@@ -813,7 +920,10 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
       language: 'ca',
       tone: 'tècnic però entenedor',
       style_notes: settings.style_guide || ''
-    }
+    },
+    // v4.0: Timeline hash fields
+    client_hash: getDocumentStateHash(),
+    word_count: getDocumentWordCount()
   };
 
   const options = {
