@@ -233,10 +233,157 @@ async function markEventReverted(env, eventId, revertedByEventId) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// DIAGNOSTIC LOGGING (v3.7)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Save a diagnostic event to the database
+ * Used to analyze patterns and improve the system
+ */
+async function saveDiagnosticEvent(env, eventData) {
+  try {
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/diagnostic_events`,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(eventData)
+      }
+    );
+
+    if (!response.ok) {
+      console.error('Failed to save diagnostic event:', await response.text());
+      return false;
+    }
+
+    return true;
+  } catch (e) {
+    console.error('Error saving diagnostic event:', e);
+    return false;
+  }
+}
+
+/**
+ * Handler for log_diagnostic action
+ */
+async function handleLogDiagnostic(body, env, corsHeaders) {
+  const { license_key, diagnostic } = body;
+
+  if (!license_key) {
+    return new Response(
+      JSON.stringify({ status: 'error', error_code: 'missing_license' }),
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
+  if (!diagnostic) {
+    return new Response(
+      JSON.stringify({ status: 'error', error_code: 'missing_diagnostic' }),
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
+  const licenseHash = await hashKey(license_key);
+
+  // Detect intent mismatch (user wanted edit but got chat, or vice versa)
+  const intentMismatch = diagnostic.request?.user_mode === 'edit' &&
+                         diagnostic.response?.mode === 'CHAT_ONLY';
+
+  // Detect "empty document problem" (doc appeared empty when user wanted to edit)
+  const docWasEmptyProblem = diagnostic.request?.content_payload_is_empty &&
+                             diagnostic.request?.user_mode !== 'chat';
+
+  const eventData = {
+    license_key_hash: licenseHash,
+    doc_id: diagnostic.doc_id || null,
+    session_id: diagnostic.session_id || null,
+
+    // Timing
+    total_ms: diagnostic.timing?.total_ms || null,
+    doc_analysis_ms: diagnostic.timing?.doc_analysis_ms || null,
+    api_call_ms: diagnostic.timing?.api_call_ms || null,
+
+    // Document stats
+    doc_total_elements: diagnostic.document?.total_children || null,
+    doc_captured_elements: (diagnostic.document?.captured?.paragraph || 0) +
+                          (diagnostic.document?.captured?.list_item || 0),
+    doc_total_chars: diagnostic.document?.captured?.total_chars || null,
+    doc_is_empty: diagnostic.request?.content_payload_is_empty || false,
+    doc_invisible_tables: diagnostic.document?.invisible?.table || 0,
+    doc_invisible_images: diagnostic.document?.invisible?.inline_image || 0,
+    doc_invisible_other: (diagnostic.document?.invisible?.footnote || 0) +
+                        (diagnostic.document?.invisible?.other || 0),
+
+    // Request info
+    instruction_length: diagnostic.request?.instruction_length || null,
+    instruction_preview: diagnostic.request?.instruction_preview || null,
+    has_selection: diagnostic.request?.has_selection || false,
+    user_mode: diagnostic.request?.user_mode || 'auto',
+    preview_mode: diagnostic.request?.preview_mode || false,
+
+    // Response info
+    ai_mode: diagnostic.response?.mode || null,
+    response_sub_mode: diagnostic.response?.sub_mode || null,
+    updates_count: diagnostic.response?.updates_applied || diagnostic.response?.changes_count || null,
+    response_length: diagnostic.response?.response_length || null,
+
+    // Analysis
+    intent_mismatch: intentMismatch,
+    doc_was_empty_problem: docWasEmptyProblem,
+
+    // Errors
+    error_message: diagnostic.errors?.length > 0 ? diagnostic.errors[0].error : null,
+
+    // Extra metadata
+    extra: {
+      by_type: diagnostic.document?.by_type || null,
+      element_details_count: diagnostic.document?.element_details?.length || 0
+    }
+  };
+
+  const success = await saveDiagnosticEvent(env, eventData);
+
+  return new Response(
+    JSON.stringify({
+      status: success ? 'ok' : 'error',
+      logged: success,
+      analysis: {
+        intent_mismatch: intentMismatch,
+        doc_was_empty_problem: docWasEmptyProblem
+      }
+    }),
+    { headers: corsHeaders }
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SYSTEM PROMPT v3 - "Document Engineering Engine" (Lovable-style)
 // ═══════════════════════════════════════════════════════════════
 
-function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode, negativeConstraints, docSkeleton) {
+function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode, negativeConstraints, docSkeleton, docStats) {
+  // v3.7: UNIVERSAL DOC READER - Build complete document stats string
+  let docStatsStr = '';
+  if (docStats) {
+    const parts = [];
+    parts.push(`Paràgrafs: ${docStats.paragraphs || 0}`);
+    parts.push(`Llistes: ${docStats.lists || 0}`);
+    if (docStats.tables > 0) parts.push(`Taules: ${docStats.tables} (només lectura)`);
+    if (docStats.has_header) parts.push(`Capçalera: SÍ`);
+    if (docStats.has_footer) parts.push(`Peu de pàgina: SÍ`);
+    if (docStats.footnotes > 0) parts.push(`Notes al peu: ${docStats.footnotes}`);
+    if (docStats.has_images) parts.push(`Imatges: SÍ (no visibles)`);
+    if (docStats.has_drawings) parts.push(`Dibuixos: SÍ (no visibles)`);
+    parts.push(`Total caràcters: ${docStats.total_chars || 0}`);
+    parts.push(`Document buit: ${docStats.is_empty ? 'SÍ ⚠️' : 'NO'}`);
+
+    docStatsStr = '\n- ' + parts.join('\n- ');
+  }
+
   let prompt = `
 ═══════════════════════════════════════════════════════════════
 IDENTITAT
@@ -259,7 +406,24 @@ El camp "thought" és OBLIGATORI en TOTES les respostes.
 CONTEXT ACTUAL
 ═══════════════════════════════════════════════════════════════
 - Selecció activa: ${hasSelection ? 'SÍ (l\'usuari ha seleccionat text específic)' : 'NO'}
-- Fitxer de coneixement: ${hasFile ? 'SÍ (usa\'l com a font)' : 'NO'}
+- Fitxer de coneixement: ${hasFile ? 'SÍ (usa\'l com a font)' : 'NO'}${docStatsStr}
+
+═══════════════════════════════════════════════════════════════
+FORMAT DEL TEXT D'ENTRADA (v3.7)
+═══════════════════════════════════════════════════════════════
+El text del document ve marcat amb IDs:
+- {{0}}, {{1}}, {{2}}... → Paràgrafs i llistes (editables via UPDATE_BY_ID)
+- {{T:0}}, {{T:1}}... → Taules (NOMÉS LECTURA - no editables directament)
+
+Les taules apareixen així:
+{{T:X}} [TAULA]
+| Col1 | Col2 |
+|---|---|
+| val1 | val2 |
+[/TAULA]
+
+IMPORTANT: Les taules es mostren com a referència. NO pots editar-les directament.
+Si l'usuari demana canvis a una taula, explica-li que ha d'editar-la manualment.
 
 ═══════════════════════════════════════════════════════════════
 MODES D'OPERACIÓ
@@ -728,6 +892,10 @@ export default {
       if (body.action === 'revert_edit') {
         return await handleRevertEdit(body, env, corsHeaders);
       }
+      // v3.7: Diagnostic logging endpoint
+      if (body.action === 'log_diagnostic') {
+        return await handleLogDiagnostic(body, env, corsHeaders);
+      }
 
       // Default: Chat handler
       return await handleChat(body, env, corsHeaders);
@@ -761,7 +929,9 @@ async function handleChat(body, env, corsHeaders) {
     last_edit,     // v2.6: Last edit memory for "una altra" cases
     user_mode,     // v2.6.2: User-selected mode (auto | edit | chat)
     negative_constraints,  // v2.8: Banned words/phrases
-    doc_skeleton   // v2.9: Document structure (headings, sections, entities)
+    doc_skeleton,  // v2.9: Document structure (headings, sections, entities)
+    doc_stats,     // v3.7: Universal Doc Reader stats
+    client_intent  // v3.7: Frontend intent classification
   } = body;
 
   if (!license_key) throw new Error("missing_license");
@@ -772,13 +942,15 @@ async function handleChat(body, env, corsHeaders) {
   const creditsResult = await useCredits(env, licenseHash, doc_metadata);
 
   // 2. Build system prompt (context-driven)
+  // v3.7: Afegim doc_stats per UNIVERSAL DOC READER
   const systemPrompt = buildSystemPrompt(
     has_selection || false,
     !!knowledge_file_uri,
     style_guide,
     strict_mode,
     negative_constraints,  // v2.8: Banned words
-    doc_skeleton  // v2.9: Document structure
+    doc_skeleton,          // v2.9: Document structure
+    doc_stats              // v3.7: Universal Doc Reader stats
   );
 
   // 3. Build contents array with chat history (MEMORY)
@@ -899,7 +1071,14 @@ INSTRUCCIÓ DE L'USUARI:
       })
     });
 
-    if (!geminiResp.ok) throw new Error("gemini_error: " + await geminiResp.text());
+    if (!geminiResp.ok) {
+      const errorText = await geminiResp.text();
+      // Handle expired/deleted knowledge file
+      if (errorText.includes('PERMISSION_DENIED') && errorText.includes('File')) {
+        throw new Error("KNOWLEDGE_FILE_EXPIRED: El fitxer de coneixement ha expirat o no existeix. Esborra'l a Configuració.");
+      }
+      throw new Error("gemini_error: " + errorText);
+    }
     const geminiData = await geminiResp.json();
     const rawResponse = geminiData.candidates[0].content.parts[0].text;
 
@@ -978,8 +1157,14 @@ INSTRUCCIÓ DE L'USUARI:
     _meta.warnings = lastValidation.warnings;
   }
 
-  // 5.1 Mode enforcement (v2.6.2)
+  // 5.1 Mode enforcement (v3.7: Enhanced with client_intent)
   const effectiveMode = user_mode || 'auto';
+
+  // v3.7: Log intent classification for debugging
+  if (client_intent) {
+    console.log('[Intent] Client classification:', JSON.stringify(client_intent));
+  }
+
   if (effectiveMode === 'chat') {
     // Force CHAT_ONLY: Never edit, convert any edit response to chat
     if (parsedResponse.mode !== 'CHAT_ONLY') {
@@ -997,8 +1182,36 @@ INSTRUCCIÓ DE L'USUARI:
       parsedResponse.chat_response = (parsedResponse.chat_response || "") +
         "\n\n💡 Tip: Si vols que editi el text seleccionat, reformula la instrucció.";
     }
+  } else if (effectiveMode === 'auto' && client_intent) {
+    // v3.7: Enhanced AUTO mode with client intent classification
+    // Use client classification to provide hints when there's mismatch
+    const aiMode = parsedResponse.mode;
+    const clientIntent = client_intent.intent; // 'edit', 'chat', 'ambiguous'
+    const confidence = client_intent.confidence || 0;
+
+    // Case 1: Client strongly detected EDIT but AI chose CHAT_ONLY
+    if (clientIntent === 'edit' && confidence > 0.7 && aiMode === 'CHAT_ONLY') {
+      console.log('[Intent Mismatch] Client: EDIT (high confidence), AI: CHAT_ONLY');
+      // AI might have misinterpreted - add suggestion to user
+      parsedResponse.chat_response = (parsedResponse.chat_response || "") +
+        "\n\n💡 Si volies que edités el document, prova reformulant: 'corregeix', 'tradueix', 'modifica'...";
+      _meta.intent_mismatch = true;
+    }
+    // Case 2: Client strongly detected CHAT but AI wants to edit
+    else if (clientIntent === 'chat' && confidence > 0.7 && aiMode !== 'CHAT_ONLY') {
+      console.log('[Intent Mismatch] Client: CHAT (high confidence), AI: EDIT');
+      // AI wants to edit but user seems to be asking a question - warn
+      // Don't block the edit, but add clarification
+      parsedResponse.chat_response = (parsedResponse.chat_response || parsedResponse.change_summary || "") +
+        "\n\n📝 He aplicat canvis. Si només volies una resposta sense editar, usa mode 'Xat'.";
+      _meta.intent_mismatch = true;
+    }
+    // Case 3: Ambiguous intent - AI decides, but flag it
+    else if (clientIntent === 'ambiguous') {
+      _meta.intent_ambiguous = true;
+    }
   }
-  // 'auto' mode: no override, AI decides
+  // 'auto' mode without client_intent: AI decides (original behavior)
 
   // 5.2 Save edit event (v3.0 Event Sourcing)
   let savedEventId = null;

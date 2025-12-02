@@ -501,6 +501,87 @@
       }
 
       /* ═══════════════════════════════════════════════════════════
+         CLARIFICATION PROMPT (v3.7) - Intent Disambiguation
+         ═══════════════════════════════════════════════════════════ */
+
+      .clarification-prompt {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+        padding: var(--space-md);
+        margin: var(--space-sm) 0;
+        background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+        border: 1px solid var(--accent);
+        border-radius: var(--radius-lg);
+        animation: msgAppear 0.3s ease;
+      }
+
+      .clarification-prompt .prompt-text {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: var(--space-xs);
+      }
+
+      .clarification-prompt .prompt-text .icon {
+        margin-right: var(--space-xs);
+      }
+
+      .clarification-prompt .prompt-instruction {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-primary);
+        padding: var(--space-sm);
+        background: var(--bg-primary);
+        border-radius: var(--radius-sm);
+        max-height: 40px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .clarification-prompt .prompt-buttons {
+        display: flex;
+        gap: var(--space-sm);
+        margin-top: var(--space-xs);
+      }
+
+      .clarification-prompt .prompt-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-xs);
+        padding: var(--space-sm) var(--space-md);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+      }
+
+      .clarification-prompt .prompt-btn:hover {
+        border-color: var(--accent);
+        background: var(--accent-muted);
+      }
+
+      .clarification-prompt .prompt-btn.edit {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }
+
+      .clarification-prompt .prompt-btn.edit:hover {
+        filter: brightness(1.1);
+      }
+
+      .clarification-prompt .prompt-btn .icon {
+        font-size: 14px;
+      }
+
+      /* ═══════════════════════════════════════════════════════════
          PREVIEW MODE (v3.2) - Visual Diff
          ═══════════════════════════════════════════════════════════ */
 
@@ -1010,6 +1091,740 @@
 
       .receipt-form.hidden {
         display: none;
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         RECIPES PANEL (v3.5 - Modern Redesign)
+         ═══════════════════════════════════════════════════════════ */
+
+      /* Category Gradient Variables */
+      :root {
+        --cat-text: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --cat-lang: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        --cat-style: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --cat-length: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --cat-other: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+      }
+
+      [data-theme="dark"] {
+        --cat-text: linear-gradient(135deg, #a78bfa 0%, #c084fc 100%);
+        --cat-lang: linear-gradient(135deg, #34d399 0%, #6ee7b7 100%);
+        --cat-style: linear-gradient(135deg, #f472b6 0%, #fb7185 100%);
+        --cat-length: linear-gradient(135deg, #60a5fa 0%, #38bdf8 100%);
+        --cat-other: linear-gradient(135deg, #fb923c 0%, #fbbf24 100%);
+      }
+
+      /* Panel Container */
+      .recipes-panel-content {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+        padding: var(--space-md);
+      }
+
+      /* Search Bar */
+      .recipes-search-wrapper {
+        position: relative;
+        margin-bottom: var(--space-md);
+      }
+
+      .recipes-search {
+        width: 100%;
+        padding: 10px 12px 10px 36px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        font-family: var(--font-display);
+        font-size: 13px;
+        color: var(--text-primary);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .recipes-search::placeholder {
+        color: var(--text-muted);
+      }
+
+      .recipes-search:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+        background: var(--bg-secondary);
+      }
+
+      .recipes-search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        font-size: 14px;
+        pointer-events: none;
+      }
+
+      .recipes-search-hint {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        color: var(--text-muted);
+        background: var(--bg-elevated);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+      }
+
+      /* Category Chips */
+      .recipes-categories {
+        display: flex;
+        gap: 6px;
+        margin-bottom: var(--space-md);
+        overflow-x: auto;
+        padding-bottom: 4px;
+        scrollbar-width: none;
+      }
+
+      .recipes-categories::-webkit-scrollbar {
+        display: none;
+      }
+
+      .category-chip {
+        flex-shrink: 0;
+        padding: 6px 12px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-full);
+        font-family: var(--font-display);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        white-space: nowrap;
+      }
+
+      .category-chip:hover {
+        border-color: var(--accent);
+        color: var(--text-primary);
+      }
+
+      .category-chip.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+        box-shadow: 0 2px 8px var(--accent-glow);
+      }
+
+      /* Recipe Cards Container */
+      .recipes-grid {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+        overflow-y: auto;
+        flex: 1;
+        padding-right: 4px;
+      }
+
+      .recipes-grid::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .recipes-grid::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .recipes-grid::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+      }
+
+      /* Recipe Card */
+      .recipe-card {
+        position: relative;
+        padding: var(--space-md);
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+      }
+
+      .recipe-card::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 4px;
+        height: 100%;
+        background: var(--card-gradient, var(--cat-other));
+        opacity: 0.9;
+        transition: width 0.2s ease;
+      }
+
+      .recipe-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      }
+
+      .recipe-card:hover::before {
+        width: 5px;
+      }
+
+      .recipe-card:active {
+        transform: translateY(0) scale(0.99);
+      }
+
+      .recipe-card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      .recipe-card-emoji {
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .recipe-card-actions {
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+
+      .recipe-card:hover .recipe-card-actions {
+        opacity: 1;
+      }
+
+      .recipe-action-btn {
+        background: var(--bg-elevated);
+        border: none;
+        width: 28px;
+        height: 28px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        transition: all 0.15s ease;
+      }
+
+      .recipe-action-btn:hover {
+        background: var(--error-muted);
+        color: var(--error);
+      }
+
+      .recipe-card-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+      }
+
+      .recipe-card-instruction {
+        font-size: 11px;
+        color: var(--text-secondary);
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .recipe-card-run {
+        position: absolute;
+        right: var(--space-md);
+        bottom: var(--space-md);
+        padding: 6px 14px;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: var(--radius-full);
+        font-family: var(--font-display);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        opacity: 0;
+        transform: translateX(10px);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .recipe-card:hover .recipe-card-run {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .recipe-card-run:hover {
+        background: var(--accent-hover);
+        box-shadow: 0 4px 12px var(--accent-glow);
+      }
+
+      /* Empty State */
+      .recipes-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        text-align: center;
+        padding: var(--space-xl);
+      }
+
+      .recipes-empty-icon {
+        font-size: 48px;
+        margin-bottom: var(--space-md);
+        animation: float 3s ease-in-out infinite;
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+      }
+
+      .recipes-empty-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: var(--space-xs);
+      }
+
+      .recipes-empty-subtitle {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: var(--space-lg);
+      }
+
+      /* Floating Add Button */
+      .recipes-fab {
+        position: absolute;
+        bottom: var(--space-lg);
+        right: var(--space-lg);
+        width: 48px;
+        height: 48px;
+        background: var(--accent);
+        border: none;
+        border-radius: 50%;
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 4px 16px var(--accent-glow);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .recipes-fab:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 24px var(--accent-glow);
+      }
+
+      .recipes-fab:active {
+        transform: scale(0.95);
+      }
+
+      /* Folders Container (v3.6) */
+      .folders-container {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+        overflow-y: auto;
+        flex: 1;
+        padding-right: 4px;
+        padding-bottom: 60px;
+      }
+
+      .folders-container::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .folders-container::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .folders-container::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+      }
+
+      /* Folder */
+      .folder {
+        border-radius: var(--radius-md);
+        overflow: hidden;
+      }
+
+      .folder-header {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        background: var(--bg-secondary);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        gap: 8px;
+      }
+
+      .folder-header:hover {
+        background: var(--bg-tertiary);
+      }
+
+      .folder-icon {
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+
+      .folder-name {
+        flex: 1;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-primary);
+      }
+
+      .folder-count {
+        font-size: 11px;
+        color: var(--text-muted);
+        background: var(--bg-elevated);
+        padding: 2px 6px;
+        border-radius: var(--radius-full);
+      }
+
+      .folder-toggle {
+        color: var(--text-muted);
+        font-size: 10px;
+        transition: transform 0.2s ease;
+      }
+
+      .folder.collapsed .folder-toggle {
+        transform: rotate(-90deg);
+      }
+
+      .folder-actions {
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.15s;
+      }
+
+      .folder-header:hover .folder-actions {
+        opacity: 1;
+      }
+
+      .folder-action-btn {
+        background: transparent;
+        border: none;
+        width: 24px;
+        height: 24px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        transition: all 0.15s ease;
+      }
+
+      .folder-add-btn:hover {
+        background: var(--accent-muted);
+        color: var(--accent);
+      }
+
+      .folder-delete-btn:hover {
+        background: var(--error-muted);
+        color: var(--error);
+      }
+
+      /* Folder Content */
+      .folder-content {
+        padding-left: 20px;
+        padding-right: 4px;
+        overflow: hidden;
+        max-height: 1000px;
+        transition: max-height 0.3s ease, opacity 0.3s ease;
+      }
+
+      .folder.collapsed .folder-content {
+        max-height: 0;
+        opacity: 0;
+      }
+
+      /* Folder Recipe Item */
+      .folder-recipe {
+        display: flex;
+        align-items: center;
+        padding: 8px 10px;
+        margin: 4px 0;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        gap: 8px;
+      }
+
+      .folder-recipe:hover {
+        background: var(--accent-muted);
+      }
+
+      .folder-recipe-emoji {
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+
+      .folder-recipe-name {
+        flex: 1;
+        font-size: 12px;
+        color: var(--text-primary);
+      }
+
+      .folder-recipe-delete {
+        background: transparent;
+        border: none;
+        width: 20px;
+        height: 20px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 14px;
+        opacity: 0;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .folder-recipe:hover .folder-recipe-delete {
+        opacity: 1;
+      }
+
+      .folder-recipe-delete:hover {
+        background: var(--error-muted);
+        color: var(--error);
+      }
+
+      /* Add Folder Button */
+      .add-folder-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+        background: transparent;
+        border: 2px dashed var(--border);
+        border-radius: var(--radius-md);
+        color: var(--text-muted);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: var(--space-sm);
+      }
+
+      .add-folder-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-muted);
+      }
+
+      /* Emoji Selector (Modal) */
+      .emoji-selector {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .folder-icon-btn,
+      .recipe-emoji-btn {
+        width: 36px;
+        height: 36px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--bg-secondary);
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .folder-icon-btn:hover,
+      .recipe-emoji-btn:hover {
+        border-color: var(--accent);
+        background: var(--accent-muted);
+      }
+
+      .folder-icon-btn.selected,
+      .recipe-emoji-btn.selected {
+        border-color: var(--accent);
+        background: var(--accent);
+        box-shadow: 0 2px 8px var(--accent-glow);
+      }
+
+      /* No Results */
+      .recipes-no-results {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        text-align: center;
+        padding: var(--space-xl);
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+
+      .recipes-no-results-icon {
+        font-size: 32px;
+        margin-bottom: var(--space-sm);
+        opacity: 0.5;
+      }
+
+      /* Modal (Enhanced) */
+      .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease;
+      }
+
+      .modal.visible {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .modal.hidden {
+        display: none;
+      }
+
+      .modal-backdrop {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+      }
+
+      .modal-content {
+        position: relative;
+        background: var(--bg-primary);
+        border-radius: var(--radius-lg);
+        width: calc(100% - 32px);
+        max-width: 360px;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3);
+        transform: scale(0.95) translateY(10px);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .modal.visible .modal-content {
+        transform: scale(1) translateY(0);
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-lg);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .modal-title {
+        font-weight: 700;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .modal-close {
+        background: var(--bg-tertiary);
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-sm);
+        font-size: 18px;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+      }
+
+      .modal-close:hover {
+        background: var(--error-muted);
+        color: var(--error);
+      }
+
+      .modal-body {
+        padding: var(--space-lg);
+      }
+
+      .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--space-sm);
+        padding: var(--space-lg);
+        border-top: 1px solid var(--border);
+      }
+
+      /* Category Selector in Modal */
+      .category-selector {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: var(--space-md);
+      }
+
+      .category-selector-btn {
+        width: 40px;
+        height: 40px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--bg-tertiary);
+        font-size: 18px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .category-selector-btn:hover {
+        border-color: var(--accent);
+        transform: scale(1.05);
+      }
+
+      .category-selector-btn.selected {
+        border-color: var(--accent);
+        background: var(--accent-muted);
+        box-shadow: 0 0 0 2px var(--accent-glow);
+      }
+
+      /* No Results */
+      .recipes-no-results {
+        text-align: center;
+        padding: var(--space-xl);
+        color: var(--text-secondary);
+      }
+
+      .recipes-no-results-icon {
+        font-size: 32px;
+        margin-bottom: var(--space-sm);
+        opacity: 0.5;
       }
 
       .form-group {
@@ -1710,6 +2525,114 @@
         color: var(--text-muted);
         font-size: 12px;
       }
+
+      /* ═══════════════════════════════════════════════════════════
+         DOC STATUS BAR v3.7 - Universal Doc Reader UI
+         ═══════════════════════════════════════════════════════════ */
+
+      .doc-status-bar {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        padding: var(--space-sm) var(--space-md);
+        font-size: 11px;
+        transition: all 0.2s ease;
+      }
+
+      .doc-status-bar.collapsed .doc-status-content {
+        display: none;
+      }
+
+      .doc-status-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .doc-status-header:hover {
+        opacity: 0.8;
+      }
+
+      .doc-status-title {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+        font-weight: 500;
+        color: var(--text-secondary);
+      }
+
+      .doc-status-title .icon {
+        font-size: 12px;
+      }
+
+      .doc-status-toggle {
+        color: var(--text-muted);
+        font-size: 10px;
+        transition: transform 0.2s ease;
+      }
+
+      .doc-status-bar.collapsed .doc-status-toggle {
+        transform: rotate(-90deg);
+      }
+
+      .doc-status-content {
+        margin-top: var(--space-sm);
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+      }
+
+      .doc-stat {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 2px 6px;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-sm);
+        color: var(--text-secondary);
+        font-size: 10px;
+      }
+
+      .doc-stat .emoji {
+        font-size: 10px;
+      }
+
+      .doc-stat.warning {
+        background: var(--error-muted);
+        color: var(--error);
+      }
+
+      .doc-stat.info {
+        background: var(--accent-muted);
+        color: var(--accent);
+      }
+
+      .doc-stat.success {
+        background: var(--success-muted);
+        color: var(--success);
+      }
+
+      .doc-status-loading {
+        color: var(--text-muted);
+        font-style: italic;
+      }
+
+      .doc-status-alert {
+        margin-top: var(--space-sm);
+        padding: var(--space-sm);
+        background: var(--error-muted);
+        border-radius: var(--radius-sm);
+        color: var(--error);
+        font-size: 10px;
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-xs);
+      }
+
+      .doc-status-alert .alert-icon {
+        flex-shrink: 0;
+      }
     </style>
   </head>
   <body>
@@ -1727,6 +2650,9 @@
         <button class="tab" data-tab="docs" onclick="switchTab('docs')" title="Coneixement">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         </button>
+        <button class="tab" data-tab="recipes" onclick="switchTab('recipes')" title="Receptes">
+          <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="12" y1="6" x2="16" y2="6"/><line x1="12" y1="10" x2="16" y2="10"/><line x1="8" y1="6" x2="8" y2="6"/><line x1="8" y1="10" x2="8" y2="10"/></svg>
+        </button>
         <button class="tab" data-tab="brain" onclick="switchTab('brain')" title="Configuracio">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
@@ -1735,6 +2661,20 @@
 
     <!-- Chat Panel -->
     <div id="chatPanel" class="panel active">
+      <!-- v3.7: Doc Status Bar - Mostra què "veu" la IA -->
+      <div id="docStatusBar" class="doc-status-bar">
+        <div class="doc-status-header" onclick="toggleDocStatus()">
+          <div class="doc-status-title">
+            <span class="icon">📄</span>
+            <span id="docStatusLabel">Analitzant document...</span>
+          </div>
+          <span class="doc-status-toggle">▼</span>
+        </div>
+        <div class="doc-status-content" id="docStatusContent">
+          <span class="doc-status-loading">Carregant...</span>
+        </div>
+      </div>
+
       <div class="chat-messages" id="chatHistory">
         <div class="msg system">Hola! Soc Docmile, el teu assistent d'escriptura.</div>
       </div>
@@ -1870,6 +2810,111 @@
           <p>• La IA usarà aquest context per respondre millor</p>
           <p>• Activa <strong>Mode Estricte</strong> per limitar respostes al contingut del fitxer</p>
           <p>• Els fitxers expiren després d'un temps - torna a pujar si cal</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recipes Panel (v3.6 - Folder System) -->
+    <div id="recipesPanel" class="panel">
+      <div class="recipes-panel-content">
+        <!-- Search Bar -->
+        <div class="recipes-search-wrapper">
+          <span class="recipes-search-icon">🔍</span>
+          <input type="text" class="recipes-search" id="recipesSearch" placeholder="Cerca receptes..." oninput="filterRecipes()">
+        </div>
+
+        <!-- Folders Container -->
+        <div id="recipesContainer" class="folders-container">
+          <!-- Dynamic folders will be loaded here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="recipesEmptyState" class="recipes-empty hidden">
+          <div class="recipes-empty-icon">📁</div>
+          <div class="recipes-empty-title">No tens cap carpeta</div>
+          <div class="recipes-empty-subtitle">Crea una carpeta per organitzar les teves receptes</div>
+          <button class="btn btn-primary" onclick="showNewFolderModal()">+ Nova Carpeta</button>
+        </div>
+
+        <!-- No Results State -->
+        <div id="recipesNoResults" class="recipes-no-results hidden">
+          <div class="recipes-no-results-icon">🔍</div>
+          <div>Cap recepta coincideix amb la cerca</div>
+        </div>
+
+        <!-- Floating Add Button -->
+        <button class="recipes-fab" onclick="showNewFolderModal()" title="Nova carpeta">+</button>
+      </div>
+    </div>
+
+    <!-- New Folder Modal (v3.6) -->
+    <div id="newFolderModal" class="modal hidden">
+      <div class="modal-backdrop" onclick="hideNewFolderModal()"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <span class="modal-title">📁 Nova Carpeta</span>
+          <button class="modal-close" onclick="hideNewFolderModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Icona</label>
+            <div class="emoji-selector">
+              <button type="button" class="folder-icon-btn selected" data-icon="📁" onclick="selectFolderIcon('📁')">📁</button>
+              <button type="button" class="folder-icon-btn" data-icon="📝" onclick="selectFolderIcon('📝')">📝</button>
+              <button type="button" class="folder-icon-btn" data-icon="🌍" onclick="selectFolderIcon('🌍')">🌍</button>
+              <button type="button" class="folder-icon-btn" data-icon="✨" onclick="selectFolderIcon('✨')">✨</button>
+              <button type="button" class="folder-icon-btn" data-icon="📏" onclick="selectFolderIcon('📏')">📏</button>
+              <button type="button" class="folder-icon-btn" data-icon="⭐" onclick="selectFolderIcon('⭐')">⭐</button>
+              <button type="button" class="folder-icon-btn" data-icon="🎯" onclick="selectFolderIcon('🎯')">🎯</button>
+              <button type="button" class="folder-icon-btn" data-icon="💼" onclick="selectFolderIcon('💼')">💼</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nom</label>
+            <input type="text" class="form-input" id="newFolderName" placeholder="Ex: Les meves receptes" maxlength="30">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="hideNewFolderModal()">Cancel·lar</button>
+          <button class="btn btn-primary" onclick="saveNewFolder()">Crear Carpeta</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Recipe Modal (v3.6 - Folder System) -->
+    <div id="newRecipeModal" class="modal hidden">
+      <div class="modal-backdrop" onclick="hideNewRecipeModal()"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <span class="modal-title">✨ Nova Recepta</span>
+          <button class="modal-close" onclick="hideNewRecipeModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Emoji</label>
+            <div class="emoji-selector">
+              <button type="button" class="recipe-emoji-btn selected" data-emoji="📌" onclick="selectRecipeEmoji('📌')">📌</button>
+              <button type="button" class="recipe-emoji-btn" data-emoji="✏️" onclick="selectRecipeEmoji('✏️')">✏️</button>
+              <button type="button" class="recipe-emoji-btn" data-emoji="✨" onclick="selectRecipeEmoji('✨')">✨</button>
+              <button type="button" class="recipe-emoji-btn" data-emoji="🎯" onclick="selectRecipeEmoji('🎯')">🎯</button>
+              <button type="button" class="recipe-emoji-btn" data-emoji="🔧" onclick="selectRecipeEmoji('🔧')">🔧</button>
+              <button type="button" class="recipe-emoji-btn" data-emoji="📋" onclick="selectRecipeEmoji('📋')">📋</button>
+              <button type="button" class="recipe-emoji-btn" data-emoji="💡" onclick="selectRecipeEmoji('💡')">💡</button>
+              <button type="button" class="recipe-emoji-btn" data-emoji="🚀" onclick="selectRecipeEmoji('🚀')">🚀</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nom</label>
+            <input type="text" class="form-input" id="newRecipeName" placeholder="Ex: Fer més formal" maxlength="30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Instrucció per la IA</label>
+            <textarea class="form-input" id="newRecipeInstruction" placeholder="Què vols que faci la IA amb el text?" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="hideNewRecipeModal()">Cancel·lar</button>
+          <button class="btn btn-primary" onclick="saveNewRecipe()">Crear Recepta</button>
         </div>
       </div>
     </div>
@@ -2061,6 +3106,371 @@
         }
       }
 
+      // ═══════════════════════════════════════════════════════════
+      // DOC STATUS BAR v3.7 - Universal Doc Reader UI
+      // ═══════════════════════════════════════════════════════════
+
+      let docStatusCollapsed = false;
+
+      function toggleDocStatus() {
+        docStatusCollapsed = !docStatusCollapsed;
+        const bar = document.getElementById('docStatusBar');
+        if (docStatusCollapsed) {
+          bar.classList.add('collapsed');
+        } else {
+          bar.classList.remove('collapsed');
+        }
+        localStorage.setItem('docmile-status-collapsed', docStatusCollapsed ? 'true' : 'false');
+      }
+
+      function initDocStatusCollapsed() {
+        const saved = localStorage.getItem('docmile-status-collapsed');
+        docStatusCollapsed = saved === 'true';
+        if (docStatusCollapsed) {
+          document.getElementById('docStatusBar').classList.add('collapsed');
+        }
+      }
+
+      function loadDocStatus() {
+        google.script.run
+          .withSuccessHandler(renderDocStatus)
+          .withFailureHandler(function(err) {
+            renderDocStatusError(err.message);
+          })
+          .getDiagnostics();
+      }
+
+      function renderDocStatus(diag) {
+        const label = document.getElementById('docStatusLabel');
+        const content = document.getElementById('docStatusContent');
+
+        if (!diag || !diag.ok) {
+          renderDocStatusError(diag ? diag.error : 'Error desconegut');
+          return;
+        }
+
+        // Update label with summary
+        const totalVisible = diag.stats.visible_to_ai || 0;
+        const totalChars = diag.stats.total_chars || 0;
+        label.textContent = totalVisible > 0
+          ? `${totalVisible} elements · ${formatChars(totalChars)}`
+          : 'Document buit';
+
+        // Build stats chips
+        let html = '';
+
+        // Main content stats
+        if (diag.stats.by_type) {
+          const types = diag.stats.by_type;
+          if (types.PARAGRAPH) {
+            html += `<span class="doc-stat"><span class="emoji">📝</span>${types.PARAGRAPH} par.</span>`;
+          }
+          if (types.LIST_ITEM) {
+            html += `<span class="doc-stat"><span class="emoji">📋</span>${types.LIST_ITEM} llistes</span>`;
+          }
+          if (types.TABLE) {
+            html += `<span class="doc-stat info"><span class="emoji">📊</span>${types.TABLE} taula(es)</span>`;
+          }
+        }
+
+        // Special sections
+        if (diag.invisible) {
+          if (diag.invisible.tables > 0) {
+            html += `<span class="doc-stat info"><span class="emoji">📊</span>${diag.invisible.tables} taula(es)</span>`;
+          }
+          if (diag.invisible.images > 0) {
+            html += `<span class="doc-stat"><span class="emoji">🖼️</span>${diag.invisible.images} imatge(s)</span>`;
+          }
+        }
+
+        // Issues/Warnings
+        if (diag.issues && diag.issues.length > 0) {
+          diag.issues.forEach(function(issue) {
+            if (issue.type === 'CRITICAL') {
+              html += `<span class="doc-stat warning"><span class="emoji">⚠️</span>${issue.message}</span>`;
+            } else if (issue.type === 'WARNING') {
+              html += `<span class="doc-stat warning"><span class="emoji">👁️</span>${issue.message}</span>`;
+            }
+          });
+        }
+
+        // Show what AI will see
+        if (diag.ai_will_see === 'DOCUMENT_EMPTY') {
+          html += `<span class="doc-stat warning"><span class="emoji">🚫</span>IA veu: BUIT</span>`;
+        } else if (totalVisible > 0) {
+          html += `<span class="doc-stat success"><span class="emoji">✓</span>IA veu: OK</span>`;
+        }
+
+        content.innerHTML = html || '<span class="doc-status-loading">Cap contingut detectat</span>';
+      }
+
+      function renderDocStatusError(error) {
+        const label = document.getElementById('docStatusLabel');
+        const content = document.getElementById('docStatusContent');
+        label.textContent = 'Error';
+        content.innerHTML = `<span class="doc-stat warning"><span class="emoji">⚠️</span>${error}</span>`;
+      }
+
+      function formatChars(chars) {
+        if (chars < 1000) return chars + ' car.';
+        return (chars / 1000).toFixed(1) + 'k car.';
+      }
+
+      // Refresh doc status when tab changes to chat
+      function refreshDocStatusIfNeeded() {
+        if (currentTab === 'chat') {
+          loadDocStatus();
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // INTENT CLASSIFICATION v3.7 - Detectar intenció localment
+      // ═══════════════════════════════════════════════════════════
+
+      const INTENT_PATTERNS = {
+        // EDIT patterns - verbs d'acció sobre text
+        edit: {
+          strong: [
+            /^(corregeix|corregir|tradueix|traduir|millora|millorar)/i,
+            /^(canvia|canviar|modifica|modificar|edita|editar)/i,
+            /^(reescriu|reescriure|reformula|reformular)/i,
+            /^(escurça|escurçar|amplia|ampliar|resumeix|resumir)/i,
+            /^(simplifica|simplificar|formalitza|formalitzar)/i,
+            /^(arregla|arreglar|fixa|fixar|repara|reparar)/i,
+            /fes[- ]?ho\s+(més|menys)/i,
+            /^una\s+altra$/i,  // Referència a edició anterior
+            /^(aquesta\s+)?no\s+m'agrada$/i,
+            /^diferent$/i,
+            /^canvia[- ]?la$/i
+          ],
+          weak: [
+            /(corregeix|tradueix|millora|canvia|modifica)/i,
+            /(reescriu|reformula|escurça|amplia|resumeix)/i,
+            /pots\s+(corregir|traduir|millorar|canviar)/i,
+            /vull\s+que\s+(corregeixis|tradueixis|milloris)/i
+          ]
+        },
+        // CHAT patterns - preguntes i consultes
+        chat: {
+          strong: [
+            /^(què|que)\s+(és|significa|vol\s+dir)/i,
+            /^(com|per\s+què|perquè)\s+/i,
+            /^(explica|explica'm|diga'm|digues)/i,
+            /^(quin|quina|quins|quines)\s+/i,
+            /^(pots\s+)?(explicar|dir|descriure)/i,
+            /^\?/,  // Comença amb interrogant
+            /\?$/   // Acaba amb interrogant
+          ],
+          weak: [
+            /(què|com|per\s+què|quant|on|qui)/i,
+            /(opines|creus|penses|sembla)/i,
+            /(resum|anàlisi|opinió)\s+de/i
+          ]
+        }
+      };
+
+      /**
+       * Classifica la intenció de l'usuari basant-se en la instrucció
+       * @param {string} instruction - La instrucció de l'usuari
+       * @param {boolean} hasSelection - Si hi ha text seleccionat
+       * @returns {Object} { intent: 'edit'|'chat'|'ambiguous', confidence: number, reason: string }
+       */
+      function classifyIntent(instruction, hasSelection) {
+        if (!instruction || instruction.trim().length === 0) {
+          return { intent: 'ambiguous', confidence: 0, reason: 'Instrucció buida' };
+        }
+
+        const text = instruction.trim().toLowerCase();
+        let editScore = 0;
+        let chatScore = 0;
+        let matchedPatterns = [];
+
+        // Check EDIT patterns
+        for (const pattern of INTENT_PATTERNS.edit.strong) {
+          if (pattern.test(text)) {
+            editScore += 3;
+            matchedPatterns.push('edit_strong');
+          }
+        }
+        for (const pattern of INTENT_PATTERNS.edit.weak) {
+          if (pattern.test(text)) {
+            editScore += 1;
+            matchedPatterns.push('edit_weak');
+          }
+        }
+
+        // Check CHAT patterns
+        for (const pattern of INTENT_PATTERNS.chat.strong) {
+          if (pattern.test(text)) {
+            chatScore += 3;
+            matchedPatterns.push('chat_strong');
+          }
+        }
+        for (const pattern of INTENT_PATTERNS.chat.weak) {
+          if (pattern.test(text)) {
+            chatScore += 1;
+            matchedPatterns.push('chat_weak');
+          }
+        }
+
+        // Context modifiers
+        if (hasSelection) {
+          editScore += 1;  // Selecció suggereix edició
+        }
+
+        // Very short instructions are likely edits if they match edit patterns
+        if (text.length < 20 && editScore > 0) {
+          editScore += 1;
+        }
+
+        // Calculate result
+        const totalScore = editScore + chatScore;
+        const editRatio = totalScore > 0 ? editScore / totalScore : 0.5;
+
+        if (editScore >= 3 && editRatio > 0.7) {
+          return {
+            intent: 'edit',
+            confidence: Math.min(editRatio, 0.95),
+            reason: 'Verbs d\'edició detectats',
+            scores: { edit: editScore, chat: chatScore }
+          };
+        } else if (chatScore >= 3 && editRatio < 0.3) {
+          return {
+            intent: 'chat',
+            confidence: Math.min(1 - editRatio, 0.95),
+            reason: 'Patrons de pregunta detectats',
+            scores: { edit: editScore, chat: chatScore }
+          };
+        } else {
+          return {
+            intent: 'ambiguous',
+            confidence: 0.5,
+            reason: 'No es pot determinar clarament',
+            scores: { edit: editScore, chat: chatScore }
+          };
+        }
+      }
+
+      /**
+       * Determina el mode efectiu a usar
+       * @param {string} userMode - Mode seleccionat per l'usuari (auto/edit/chat)
+       * @param {Object} classification - Resultat de classifyIntent()
+       * @returns {string} 'edit' | 'chat'
+       */
+      function determineEffectiveMode(userMode, classification) {
+        if (userMode === 'edit') return 'edit';
+        if (userMode === 'chat') return 'chat';
+
+        // Mode auto - usar classificació
+        if (classification.intent === 'edit') return 'edit';
+        if (classification.intent === 'chat') return 'chat';
+
+        // Ambiguo - default a chat (més segur)
+        return 'chat';
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // CLARIFICATION PROMPT v3.7 - Per intencions ambigües
+      // ═══════════════════════════════════════════════════════════
+
+      let pendingClarification = null;  // Guarda instrucció pendent
+
+      /**
+       * Mostra el prompt de clarificació quan la intenció és ambigua
+       * @param {string} instruction - La instrucció de l'usuari
+       * @param {Object} classification - El resultat de classifyIntent()
+       */
+      function showClarificationPrompt(instruction, classification) {
+        hideClarificationPrompt();  // Amaga qualsevol prompt anterior
+
+        const container = document.getElementById('chatHistory');
+        const prompt = document.createElement('div');
+        prompt.className = 'clarification-prompt';
+        prompt.id = 'clarificationPrompt';
+
+        // Escapar la instrucció per mostrar-la de forma segura
+        const escapedInstruction = instruction.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        prompt.innerHTML = `
+          <div class="prompt-text">
+            <span class="icon">🤔</span>
+            No estic segur si vols editar el document o fer una pregunta:
+          </div>
+          <div class="prompt-instruction">"${escapedInstruction}"</div>
+          <div class="prompt-buttons">
+            <button class="prompt-btn edit" onclick="resolveClarification('edit')">
+              <span class="icon">✏️</span> Editar
+            </button>
+            <button class="prompt-btn chat" onclick="resolveClarification('chat')">
+              <span class="icon">💬</span> Preguntar
+            </button>
+          </div>
+        `;
+
+        container.appendChild(prompt);
+        container.scrollTop = container.scrollHeight;
+
+        // Guardar la instrucció pendent
+        pendingClarification = {
+          instruction: instruction,
+          classification: classification
+        };
+      }
+
+      /**
+       * Amaga el prompt de clarificació
+       */
+      function hideClarificationPrompt() {
+        const prompt = document.getElementById('clarificationPrompt');
+        if (prompt) prompt.remove();
+        pendingClarification = null;
+      }
+
+      /**
+       * Resol la clarificació i envia el missatge amb el mode forçat
+       * @param {string} forcedMode - 'edit' o 'chat'
+       */
+      function resolveClarification(forcedMode) {
+        if (!pendingClarification) return;
+
+        const instruction = pendingClarification.instruction;
+        const classification = pendingClarification.classification;
+
+        hideClarificationPrompt();
+
+        // Enviar amb el mode forçat
+        sendMessageWithMode(instruction, forcedMode, classification);
+      }
+
+      /**
+       * Envia un missatge amb un mode específic (bypass de clarification)
+       * @param {string} instruction - La instrucció
+       * @param {string} mode - 'edit' o 'chat' (forçat)
+       * @param {Object} classification - La classificació original
+       */
+      function sendMessageWithMode(instruction, mode, classification) {
+        // Forçar la classificació al mode escollit
+        const forcedClassification = {
+          ...classification,
+          intent: mode,
+          confidence: 1.0,
+          reason: 'Clarificat per usuari'
+        };
+
+        addBubble('user', instruction);
+
+        const btn = document.getElementById('sendBtn');
+        btn.disabled = true;
+
+        showThinking();
+
+        // Enviar amb mode forçat
+        google.script.run
+          .withSuccessHandler(handleSendSuccess)
+          .withFailureHandler(handleSendFailure)
+          .processUserCommand(instruction, getRecentHistory(), mode, previewModeEnabled, forcedClassification);
+      }
+
       window.onload = function() {
         // Initialize theme
         initTheme();
@@ -2070,6 +3480,10 @@
 
         // Initialize mode selector
         initModeSelector();
+
+        // v3.7: Initialize Doc Status Bar
+        initDocStatusCollapsed();
+        loadDocStatus();
 
         // Position nav pill
         updateNavPill();
@@ -2085,6 +3499,9 @@
 
         // v2.8: Load banned words
         loadBannedWords();
+
+        // v3.4: Load recipes
+        loadRecipes();
 
         // Enter key handler for banned word input
         document.getElementById('newBannedWord').addEventListener('keydown', function(e) {
@@ -2194,9 +3611,9 @@
         // Update pill position
         updateNavPill();
 
-        // Show/hide input area (hide for settings panels)
+        // Show/hide input area (hide for settings/recipes panels)
         const inputArea = document.getElementById('inputArea');
-        if (tabName === 'brain' || tabName === 'docs') {
+        if (tabName === 'brain' || tabName === 'docs' || tabName === 'recipes') {
           inputArea.classList.add('hidden');
         } else {
           inputArea.classList.remove('hidden');
@@ -2275,11 +3692,98 @@
       // CHAT
       // ═══════════════════════════════════════════════════════════
 
+      // v3.7: Handler d'èxit per processUserCommand
+      function handleSendSuccess(res) {
+        hideThinking();
+        document.getElementById('sendBtn').disabled = false;
+
+        // v3.2: Handle Preview Mode response
+        if (res.status === 'preview' && res.changes && res.changes.length > 0) {
+          // DEBUG TEMPORAL: Mostrar info del document
+          if (res._debug_doc_chars !== undefined) {
+            addBubble('system', '📄 Doc: ' + res._debug_doc_chars + ' chars | Preview: "' + (res._debug_doc_preview || '').substring(0, 50) + '..."');
+          }
+          showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
+          if (res.credits !== undefined) {
+            document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+          }
+          return;
+        }
+
+        // Handle preview with 0 changes (fallback - IDs didn't match)
+        if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
+          addBubble('ai', res.ai_response + '\n\n⚠️ No s\'han pogut identificar els canvis específics.', true);
+          if (res.credits !== undefined) {
+            document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+          }
+          return;
+        }
+
+        // Normal response handling
+        addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
+
+        // v3.7: Log estadístiques d'edició per debugging
+        if (res.edit_stats) {
+          console.log('[Edit Stats]', res.edit_stats);
+          // Si hi ha problemes, mostrar-ho a la consola
+          if (res.edit_stats.skipped > 0 || res.edit_stats.errors > 0) {
+            console.warn('[Edit Warning]', {
+              skipped: res.edit_stats.skipped,
+              errors: res.edit_stats.errors,
+              duration: res.edit_stats.duration_ms + 'ms'
+            });
+          }
+        }
+
+        if (res.credits !== undefined) {
+          document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
+        }
+        // v2.6 Sprint: Show undo bar if edit was made
+        if (res.mode === 'edit' && res.undo_snapshot) {
+          pendingUndo = res.undo_snapshot;
+          showUndoBar();
+        }
+        // v2.5: Check and show structure hint (one-time)
+        checkAndShowStructureHint();
+      }
+
+      // v3.7: Handler d'error per processUserCommand
+      function handleSendFailure(err) {
+        hideThinking();
+        document.getElementById('sendBtn').disabled = false;
+        // Handle expired knowledge file error
+        if (err.message && err.message.includes('KNOWLEDGE_FILE_EXPIRED')) {
+          addBubble('error', '⚠️ El fitxer de coneixement ha expirat. <button onclick="clearKnowledgeFileAndRetry()" style="margin-left:8px;padding:4px 8px;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;">Esborrar fitxer</button>');
+        } else {
+          addBubble('error', 'Error: ' + err.message);
+        }
+      }
+
       function sendMessage() {
         const input = document.getElementById('userInput');
         const text = input.value.trim();
         if (!text) return;
 
+        // v3.7: Classificar intenció localment ABANS d'enviar
+        const userMode = getCurrentMode();
+        const intentClassification = classifyIntent(text, false); // hasSelection es determina al backend
+
+        // Debug log
+        console.log('[Intent Classification]', {
+          text: text.substring(0, 50),
+          userMode,
+          classification: intentClassification
+        });
+
+        // v3.7: Si mode AUTO i intenció ambigua amb baixa confiança, mostrar clarificació
+        if (userMode === 'auto' && intentClassification.intent === 'ambiguous') {
+          input.value = '';  // Esborrar input
+          input.style.height = 'auto';
+          showClarificationPrompt(text, intentClassification);
+          return;  // No enviar encara - esperar decisió usuari
+        }
+
+        // Netejar input i enviar normalment
         addBubble('user', text);
         input.value = '';
         input.style.height = 'auto';
@@ -2290,64 +3794,9 @@
         showThinking();
 
         google.script.run
-          .withSuccessHandler(function(res) {
-            hideThinking();
-            btn.disabled = false;
-
-            // v3.2: Handle Preview Mode response
-            if (res.status === 'preview' && res.changes && res.changes.length > 0) {
-              // DEBUG TEMPORAL: Mostrar info del document
-              if (res._debug_doc_chars !== undefined) {
-                addBubble('system', '📄 Doc: ' + res._debug_doc_chars + ' chars | Preview: "' + (res._debug_doc_preview || '').substring(0, 50) + '..."');
-              }
-              showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
-              if (res.credits !== undefined) {
-                document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
-              }
-              return;
-            }
-
-            // Handle preview with 0 changes (fallback - IDs didn't match)
-            if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-              addBubble('ai', res.ai_response + '\n\n⚠️ No s\'han pogut identificar els canvis específics.', true);
-              if (res.credits !== undefined) {
-                document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
-              }
-              return;
-            }
-
-            // Normal response handling
-            addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
-
-            // DEBUG TEMPORAL: Mostrar info del document rebut
-            if (res._debug_doc_chars !== undefined) {
-              console.log('[DEBUG] Document chars:', res._debug_doc_chars);
-              console.log('[DEBUG] Document preview:', res._debug_doc_preview);
-              addBubble('system', '📄 Doc: ' + res._debug_doc_chars + ' chars | Preview: "' + (res._debug_doc_preview || '').substring(0, 50) + '..."');
-            }
-
-            if (res.credits !== undefined) {
-              document.getElementById('creditsDisplay').innerHTML = '<span class="icon">⚡</span> ' + res.credits + ' credits';
-            }
-            // v2.6 Sprint: Show undo bar if edit was made
-            if (res.mode === 'edit' && res.undo_snapshot) {
-              pendingUndo = res.undo_snapshot;
-              showUndoBar();
-            }
-            // v2.5: Check and show structure hint (one-time)
-            checkAndShowStructureHint();
-          })
-          .withFailureHandler(function(err) {
-            hideThinking();
-            btn.disabled = false;
-            // Handle expired knowledge file error
-            if (err.message && err.message.includes('KNOWLEDGE_FILE_EXPIRED')) {
-              addBubble('error', '⚠️ El fitxer de coneixement ha expirat. <button onclick="clearKnowledgeFileAndRetry()" style="margin-left:8px;padding:4px 8px;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;">Esborrar fitxer</button>');
-            } else {
-              addBubble('error', 'Error: ' + err.message);
-            }
-          })
-          .processUserCommand(text, getRecentHistory(), getCurrentMode(), previewModeEnabled);
+          .withSuccessHandler(handleSendSuccess)
+          .withFailureHandler(handleSendFailure)
+          .processUserCommand(text, getRecentHistory(), getCurrentMode(), previewModeEnabled, intentClassification);
       }
 
       function addBubble(type, text, isEdit, lastEditWord) {
@@ -2606,6 +4055,419 @@
             addBubble('error', 'Error: ' + err.message);
           })
           .processUserCommand(instruction, getRecentHistory(), getCurrentMode(), previewModeEnabled);
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // RECIPES MANAGEMENT (v3.6 - Folder System)
+      // ═══════════════════════════════════════════════════════════
+
+      // Default folders with recipes
+      const DEFAULT_FOLDERS = [
+        {
+          id: 'redaccio',
+          name: 'Redacció',
+          icon: '📝',
+          collapsed: false,
+          recipes: [
+            { id: 'r1', name: 'Corregir', emoji: '✏️', instruction: 'Corregeix tots els errors ortogràfics i gramaticals del text' },
+            { id: 'r2', name: 'Formal', emoji: '🎩', instruction: 'Transforma el text a un to més formal i professional' },
+            { id: 'r3', name: 'Informal', emoji: '😊', instruction: 'Fes el text més informal, proper i conversacional' },
+            { id: 'r4', name: 'Millorar', emoji: '✨', instruction: 'Millora la redacció general mantenint el significat original' },
+            { id: 'r5', name: 'Simplificar', emoji: '🔤', instruction: 'Simplifica el text per fer-lo més fàcil d\'entendre' }
+          ]
+        },
+        {
+          id: 'traduccio',
+          name: 'Traducció',
+          icon: '🌍',
+          collapsed: true,
+          recipes: [
+            { id: 't1', name: 'Anglès', emoji: '🇬🇧', instruction: 'Tradueix tot el text a anglès' },
+            { id: 't2', name: 'Castellà', emoji: '🇪🇸', instruction: 'Tradueix tot el text a castellà' },
+            { id: 't3', name: 'Català', emoji: '🏠', instruction: 'Tradueix tot el text a català' },
+            { id: 't4', name: 'Francès', emoji: '🇫🇷', instruction: 'Tradueix tot el text a francès' }
+          ]
+        },
+        {
+          id: 'longitud',
+          name: 'Longitud',
+          icon: '📏',
+          collapsed: true,
+          recipes: [
+            { id: 'l1', name: 'Resumir', emoji: '📉', instruction: 'Resumeix el text mantenint només les idees principals' },
+            { id: 'l2', name: 'Ampliar', emoji: '📈', instruction: 'Amplia i desenvolupa el text amb més detalls i exemples' },
+            { id: 'l3', name: 'Concís', emoji: '🎯', instruction: 'Elimina redundàncies i fes el text més directe' }
+          ]
+        },
+        {
+          id: 'estil',
+          name: 'Estil',
+          icon: '✨',
+          collapsed: true,
+          recipes: [
+            { id: 's1', name: 'Persuasiu', emoji: '💪', instruction: 'Fes el text més persuasiu i convincent' },
+            { id: 's2', name: 'Creatiu', emoji: '🎨', instruction: 'Afegeix creativitat i originalitat al text' },
+            { id: 's3', name: 'Tècnic', emoji: '🔧', instruction: 'Transforma a un estil més tècnic i precís' },
+            { id: 's4', name: 'Bullets', emoji: '📋', instruction: 'Organitza el contingut en llistes amb bullets' }
+          ]
+        }
+      ];
+
+      let userFolders = [];
+      let currentSearch = '';
+      let selectedFolderId = null;
+
+      // Load folders from backend
+      function loadRecipes() {
+        google.script.run
+          .withSuccessHandler(function(data) {
+            if (data && data.length > 0 && data[0].recipes) {
+              // Already folder format
+              userFolders = data;
+            } else if (data && data.length > 0) {
+              // Migrate old flat recipes to folders
+              userFolders = JSON.parse(JSON.stringify(DEFAULT_FOLDERS));
+              const migratedFolder = {
+                id: 'imported_' + Date.now(),
+                name: 'Importades',
+                icon: '📥',
+                collapsed: false,
+                recipes: data.map(function(r, i) {
+                  return {
+                    id: 'imp_' + i,
+                    name: r.name || 'Sense nom',
+                    emoji: r.emoji || '📌',
+                    instruction: r.instruction || ''
+                  };
+                })
+              };
+              userFolders.push(migratedFolder);
+              saveRecipes();
+            } else {
+              // First time: load defaults
+              userFolders = JSON.parse(JSON.stringify(DEFAULT_FOLDERS));
+              saveRecipes();
+            }
+            renderFolders();
+          })
+          .withFailureHandler(function(err) {
+            console.error('Error loading recipes:', err);
+            userFolders = JSON.parse(JSON.stringify(DEFAULT_FOLDERS));
+            renderFolders();
+          })
+          .getRecipes();
+      }
+
+      // Save folders to backend
+      function saveRecipes() {
+        google.script.run
+          .withFailureHandler(function(err) {
+            console.error('Error saving recipes:', err);
+          })
+          .saveRecipes(userFolders);
+      }
+
+      // Filter recipes by search
+      function filterRecipes() {
+        currentSearch = document.getElementById('recipesSearch').value.toLowerCase();
+        renderFolders();
+      }
+
+      // Toggle folder collapsed state
+      function toggleFolder(folderId) {
+        const folder = userFolders.find(f => f.id === folderId);
+        if (folder) {
+          folder.collapsed = !folder.collapsed;
+          saveRecipes();
+          renderFolders();
+        }
+      }
+
+      // Render folders
+      function renderFolders() {
+        const container = document.getElementById('recipesContainer');
+        const emptyState = document.getElementById('recipesEmptyState');
+        const noResults = document.getElementById('recipesNoResults');
+
+        if (userFolders.length === 0) {
+          container.innerHTML = '';
+          emptyState.classList.remove('hidden');
+          if (noResults) noResults.classList.add('hidden');
+          return;
+        }
+
+        emptyState.classList.add('hidden');
+
+        // Check if any recipes match search
+        let hasResults = false;
+        if (currentSearch) {
+          userFolders.forEach(function(folder) {
+            folder.recipes.forEach(function(recipe) {
+              if (recipe.name.toLowerCase().includes(currentSearch) ||
+                  recipe.instruction.toLowerCase().includes(currentSearch)) {
+                hasResults = true;
+              }
+            });
+          });
+          if (!hasResults) {
+            container.innerHTML = '';
+            if (noResults) noResults.classList.remove('hidden');
+            return;
+          }
+        }
+
+        if (noResults) noResults.classList.add('hidden');
+
+        let html = '';
+        userFolders.forEach(function(folder, folderIndex) {
+          const isCollapsed = folder.collapsed && !currentSearch;
+          const toggleIcon = isCollapsed ? '▶' : '▼';
+
+          // Filter recipes if searching
+          let recipes = folder.recipes;
+          if (currentSearch) {
+            recipes = folder.recipes.filter(function(r) {
+              return r.name.toLowerCase().includes(currentSearch) ||
+                     r.instruction.toLowerCase().includes(currentSearch);
+            });
+            if (recipes.length === 0) return; // Skip empty folders in search
+          }
+
+          html += '<div class="folder' + (isCollapsed ? ' collapsed' : '') + '" data-folder-id="' + folder.id + '">' +
+            '<div class="folder-header" onclick="toggleFolder(\'' + folder.id + '\')">' +
+              '<span class="folder-icon">' + folder.icon + '</span>' +
+              '<span class="folder-name">' + folder.name + '</span>' +
+              '<span class="folder-count">' + folder.recipes.length + '</span>' +
+              '<span class="folder-toggle">' + toggleIcon + '</span>' +
+              '<div class="folder-actions">' +
+                '<button class="folder-action-btn folder-add-btn" onclick="event.stopPropagation(); showAddRecipeToFolder(\'' + folder.id + '\')" title="Afegir recepta">+</button>' +
+                '<button class="folder-action-btn folder-delete-btn" onclick="event.stopPropagation(); deleteFolder(' + folderIndex + ')" title="Esborrar carpeta">🗑️</button>' +
+              '</div>' +
+            '</div>' +
+            '<div class="folder-content">';
+
+          recipes.forEach(function(recipe, recipeIndex) {
+            const realRecipeIndex = folder.recipes.indexOf(recipe);
+            const escapedInstruction = recipe.instruction.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const escapedName = recipe.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+            html += '<div class="folder-recipe" onclick="runRecipe(\'' + escapedInstruction + '\', \'' + recipe.emoji + ' ' + escapedName + '\')">' +
+              '<span class="folder-recipe-emoji">' + recipe.emoji + '</span>' +
+              '<span class="folder-recipe-name">' + recipe.name + '</span>' +
+              '<button class="folder-recipe-delete" onclick="event.stopPropagation(); deleteRecipeFromFolder(' + folderIndex + ', ' + realRecipeIndex + ')" title="Esborrar">×</button>' +
+            '</div>';
+          });
+
+          html += '</div></div>';
+        });
+
+        // Add "New Folder" button
+        html += '<button class="add-folder-btn" onclick="showNewFolderModal()">+ Nova Carpeta</button>';
+
+        container.innerHTML = html;
+      }
+
+      // Run a recipe
+      function runRecipe(instruction, label) {
+        switchTab('chat');
+        addBubble('user', '📋 ' + label);
+        showThinking();
+
+        document.getElementById('sendBtn').disabled = true;
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            hideThinking();
+            document.getElementById('sendBtn').disabled = false;
+
+            // Handle Preview Mode response
+            if (res.status === 'preview' && res.changes && res.changes.length > 0) {
+              showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
+              if (res.credits !== undefined) {
+                document.getElementById('creditsDisplay').innerHTML =
+                  '<span class="icon">⚡</span> ' + res.credits + ' credits';
+              }
+              return;
+            }
+
+            // Handle preview with 0 changes (fallback)
+            if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
+              addBubble('ai', res.ai_response + '\n\n⚠️ No s\'han pogut identificar els canvis específics.', true);
+              if (res.credits !== undefined) {
+                document.getElementById('creditsDisplay').innerHTML =
+                  '<span class="icon">⚡</span> ' + res.credits + ' credits';
+              }
+              return;
+            }
+
+            // Normal response handling
+            addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
+            if (res.credits !== undefined) {
+              document.getElementById('creditsDisplay').innerHTML =
+                '<span class="icon">⚡</span> ' + res.credits + ' credits';
+            }
+            if (res.mode === 'edit' && res.undo_snapshot) {
+              pendingUndo = res.undo_snapshot;
+              showUndoBar();
+            }
+          })
+          .withFailureHandler(function(err) {
+            hideThinking();
+            document.getElementById('sendBtn').disabled = false;
+            addBubble('error', 'Error: ' + err.message);
+          })
+          .processUserCommand(instruction, getRecentHistory(), getCurrentMode(), previewModeEnabled);
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // FOLDER MANAGEMENT (v3.6)
+      // ═══════════════════════════════════════════════════════════
+
+      // Delete a folder
+      function deleteFolder(index) {
+        const folder = userFolders[index];
+        if (!folder) return;
+
+        const msg = folder.recipes.length > 0
+          ? 'Vols esborrar la carpeta "' + folder.name + '" i les seves ' + folder.recipes.length + ' recepta(s)?'
+          : 'Vols esborrar la carpeta "' + folder.name + '"?';
+
+        if (confirm(msg)) {
+          userFolders.splice(index, 1);
+          saveRecipes();
+          renderFolders();
+        }
+      }
+
+      // Delete a recipe from a folder
+      function deleteRecipeFromFolder(folderIndex, recipeIndex) {
+        if (confirm('Vols esborrar aquesta recepta?')) {
+          userFolders[folderIndex].recipes.splice(recipeIndex, 1);
+          saveRecipes();
+          renderFolders();
+        }
+      }
+
+      // Show new folder modal
+      function showNewFolderModal() {
+        document.getElementById('newFolderName').value = '';
+        selectedFolderIcon = '📁';
+        document.querySelectorAll('.folder-icon-btn').forEach(function(btn) {
+          btn.classList.toggle('selected', btn.dataset.icon === '📁');
+        });
+        const modal = document.getElementById('newFolderModal');
+        modal.classList.remove('hidden');
+        setTimeout(function() {
+          modal.classList.add('visible');
+          document.getElementById('newFolderName').focus();
+        }, 10);
+      }
+
+      // Hide new folder modal
+      function hideNewFolderModal() {
+        const modal = document.getElementById('newFolderModal');
+        modal.classList.remove('visible');
+        setTimeout(function() {
+          modal.classList.add('hidden');
+        }, 200);
+      }
+
+      let selectedFolderIcon = '📁';
+      function selectFolderIcon(icon) {
+        selectedFolderIcon = icon;
+        document.querySelectorAll('.folder-icon-btn').forEach(function(btn) {
+          btn.classList.toggle('selected', btn.dataset.icon === icon);
+        });
+      }
+
+      // Save new folder
+      function saveNewFolder() {
+        const name = document.getElementById('newFolderName').value.trim();
+
+        if (!name) {
+          alert('Escriu un nom per la carpeta');
+          return;
+        }
+
+        const newFolder = {
+          id: 'folder_' + Date.now(),
+          name: name,
+          icon: selectedFolderIcon,
+          collapsed: false,
+          recipes: []
+        };
+
+        userFolders.push(newFolder);
+        saveRecipes();
+        renderFolders();
+        hideNewFolderModal();
+      }
+
+      // Show add recipe to folder modal
+      function showAddRecipeToFolder(folderId) {
+        selectedFolderId = folderId;
+        document.getElementById('newRecipeName').value = '';
+        document.getElementById('newRecipeInstruction').value = '';
+        selectedRecipeEmoji = '📌';
+        document.querySelectorAll('.recipe-emoji-btn').forEach(function(btn) {
+          btn.classList.toggle('selected', btn.dataset.emoji === '📌');
+        });
+        const modal = document.getElementById('newRecipeModal');
+        modal.classList.remove('hidden');
+        setTimeout(function() {
+          modal.classList.add('visible');
+          document.getElementById('newRecipeName').focus();
+        }, 10);
+      }
+
+      // Hide new recipe modal
+      function hideNewRecipeModal() {
+        const modal = document.getElementById('newRecipeModal');
+        modal.classList.remove('visible');
+        setTimeout(function() {
+          modal.classList.add('hidden');
+        }, 200);
+        selectedFolderId = null;
+      }
+
+      let selectedRecipeEmoji = '📌';
+      function selectRecipeEmoji(emoji) {
+        selectedRecipeEmoji = emoji;
+        document.querySelectorAll('.recipe-emoji-btn').forEach(function(btn) {
+          btn.classList.toggle('selected', btn.dataset.emoji === emoji);
+        });
+      }
+
+      // Save new recipe to folder
+      function saveNewRecipe() {
+        const name = document.getElementById('newRecipeName').value.trim();
+        const instruction = document.getElementById('newRecipeInstruction').value.trim();
+
+        if (!name) {
+          alert('Escriu un nom per la recepta');
+          return;
+        }
+        if (!instruction) {
+          alert('Escriu la instrucció per la recepta');
+          return;
+        }
+
+        const folder = userFolders.find(f => f.id === selectedFolderId);
+        if (!folder) {
+          alert('Error: Carpeta no trobada');
+          return;
+        }
+
+        folder.recipes.push({
+          id: 'recipe_' + Date.now(),
+          name: name,
+          emoji: selectedRecipeEmoji,
+          instruction: instruction
+        });
+
+        saveRecipes();
+        renderFolders();
+        hideNewRecipeModal();
       }
 
       // ═══════════════════════════════════════════════════════════

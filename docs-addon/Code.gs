@@ -127,6 +127,10 @@ const LAST_EDIT_KEY = 'DOCMILE_LAST_EDIT';
 // Paraules que la IA mai hauria d'usar
 const BANNED_WORDS_KEY = 'DOCMILE_BANNED_WORDS';
 
+// --- RECIPES (v3.4) ---
+// Receptes de l'usuari
+const RECIPES_KEY = 'DOCMILE_RECIPES';
+
 function loadLastEdit() {
   const props = PropertiesService.getDocumentProperties();
   const json = props.getProperty(LAST_EDIT_KEY);
@@ -302,6 +306,35 @@ function saveBannedWords(words) {
   return { success: true };
 }
 
+// --- RECIPES (v3.4) ---
+
+/**
+ * Obté la llista de receptes de l'usuari
+ */
+function getRecipes() {
+  try {
+    const props = PropertiesService.getUserProperties();
+    const json = props.getProperty(RECIPES_KEY);
+    if (!json) return [];
+    return JSON.parse(json);
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Guarda la llista de receptes de l'usuari
+ */
+function saveRecipes(recipes) {
+  const props = PropertiesService.getUserProperties();
+  if (recipes && Array.isArray(recipes) && recipes.length > 0) {
+    props.setProperty(RECIPES_KEY, JSON.stringify(recipes));
+  } else {
+    props.deleteProperty(RECIPES_KEY);
+  }
+  return { success: true };
+}
+
 // --- PUJADA DE FITXERS (PROXY VIA WORKER) ---
 function uploadFileToWorker(base64Data, mimeType, fileName) {
   const settingsStr = getSettings();
@@ -339,11 +372,31 @@ function uploadFileToWorker(base64Data, mimeType, fileName) {
   }
 }
 
-// --- NUCLI DEL PROCESSAMENT (v3.2 amb preview mode) ---
-function processUserCommand(instruction, chatHistory, userMode, previewMode) {
+// --- NUCLI DEL PROCESSAMENT (v3.7 amb instrumentació) ---
+function processUserCommand(instruction, chatHistory, userMode, previewMode, clientIntentClassification) {
+  // v3.7: Iniciar col·lector de mètriques
+  const metrics = createMetricsCollector();
+
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
   const body = doc.getBody();
+
+  // v3.7: Analitzar estructura COMPLETA del document (diagnòstic)
+  const docStats = analyzeDocumentStructure(body);
+  metrics.setDocumentStats(docStats);
+
+  // v3.7: Log inicial amb estadístiques del document
+  logDiagnostic('INIT', {
+    doc_id: doc.getId(),
+    doc_name: doc.getName(),
+    total_elements: docStats.total_children,
+    captured_elements: docStats.captured.paragraph + docStats.captured.list_item,
+    captured_chars: docStats.captured.total_chars,
+    invisible_tables: docStats.invisible.table,
+    invisible_images: docStats.invisible.inline_image,
+    invisible_other: docStats.invisible.other + docStats.invisible.footnote,
+    element_types: Object.keys(docStats.by_type).join(', ')
+  });
 
   let contentPayload = "";
   let mapIdToElement = {};
@@ -371,43 +424,69 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
   const knowledgeFileUri = fileProps.getProperty('DOCMILE_FILE_URI');
   const knowledgeFileMime = fileProps.getProperty('DOCMILE_FILE_MIME');
 
-  let elementsToProcess = [];
+  // v3.7: Preparar elements per la captura
+  let selectedElements = null;
   if (selection) {
     const ranges = selection.getRangeElements() || [];
+    selectedElements = [];
     ranges.forEach(r => {
       const el = r.getElement();
-      if (el.getType() === DocumentApp.ElementType.TEXT) elementsToProcess.push(el.getParent());
-      else if (el.getType() === DocumentApp.ElementType.PARAGRAPH || el.getType() === DocumentApp.ElementType.LIST_ITEM) elementsToProcess.push(el);
+      if (el.getType() === DocumentApp.ElementType.TEXT) selectedElements.push(el.getParent());
+      else selectedElements.push(el);
     });
-    elementsToProcess = [...new Set(elementsToProcess)];
+    selectedElements = [...new Set(selectedElements)];
     isSelection = true;
-  } else {
-    const numChildren = body.getNumChildren();
-    for (let i = 0; i < numChildren; i++) {
-      const child = body.getChild(i);
-      if (child.getType() === DocumentApp.ElementType.PARAGRAPH || child.getType() === DocumentApp.ElementType.LIST_ITEM) {
-        elementsToProcess.push(child);
-      }
-    }
   }
 
-  // Use separate counter to ensure sequential IDs (skip empty paragraphs)
-  let contentIndex = 0;
-  elementsToProcess.forEach((el) => {
-    const text = el.asText().getText();
-    if (text.trim().length > 0) {
-      contentPayload += `{{${contentIndex}}} ${text}\n`;
-      mapIdToElement[contentIndex] = el;
-      contentIndex++;
-    }
+  // v3.7: UNIVERSAL DOC READER - Captura TOTAL del document
+  // Inclou: Header, Body (paràgrafs, llistes, taules, TOC), Footer, Footnotes
+  const captureResult = captureFullDocument(doc, body, isSelection, selectedElements);
+  contentPayload = captureResult.contentPayload;
+  mapIdToElement = captureResult.mapIdToElement;
+  const contentIndex = Object.keys(mapIdToElement).length;
+  const isDocumentEmpty = captureResult.isEmpty;
+  const captureStats = captureResult.stats;
+
+  // v3.7: Log de la instrucció i estat del document (UNIVERSAL DOC READER)
+  const requestInfo = {
+    instruction_length: instruction ? instruction.length : 0,
+    instruction_preview: instruction ? instruction.substring(0, 100) : '',
+    has_selection: isSelection,
+    user_mode: userMode || 'auto',
+    preview_mode: previewMode || false,
+    content_payload_chars: contentPayload.length,
+    content_payload_is_empty: isDocumentEmpty,
+    elements_with_content: contentIndex,
+    has_last_edit: !!lastEdit,
+    banned_words_count: bannedWords ? bannedWords.length : 0,
+    // v3.7: Estadístiques COMPLETES del document
+    captured_paragraphs: captureStats.captured_paragraphs,
+    captured_tables: captureStats.captured_tables,
+    captured_lists: captureStats.captured_lists,
+    has_header: captureStats.captured_header,
+    has_footer: captureStats.captured_footer,
+    footnotes_count: captureStats.footnotes_count,
+    has_images: captureStats.has_images,
+    has_drawings: captureStats.has_drawings,
+    // v3.7: Classificació d'intenció del client
+    client_intent: clientIntentClassification ? clientIntentClassification.intent : null,
+    client_intent_confidence: clientIntentClassification ? clientIntentClassification.confidence : null,
+    client_intent_reason: clientIntentClassification ? clientIntentClassification.reason : null
+  };
+  metrics.setRequestInfo(requestInfo);
+
+  logDiagnostic('REQUEST', {
+    instruction: instruction ? instruction.substring(0, 200) : null,
+    user_mode: userMode,
+    has_selection: isSelection,
+    doc_is_empty: isDocumentEmpty,
+    captured_ids: contentIndex,
+    total_chars: contentPayload.length,
+    tables: captureStats.captured_tables,
+    header: captureStats.captured_header,
+    footer: captureStats.captured_footer,
+    footnotes: captureStats.footnotes_count
   });
-
-  if (!contentPayload.trim()) contentPayload = "[Document Buit]";
-
-  // DEBUG TEMPORAL: Log per verificar que es llegeix el document
-  Logger.log('[DEBUG] contentPayload length: ' + contentPayload.length);
-  Logger.log('[DEBUG] contentPayload preview: ' + contentPayload.substring(0, 200));
-  Logger.log('[DEBUG] elementsToProcess count: ' + elementsToProcess.length);
 
   const payload = {
     license_key: settings.license_key,
@@ -424,11 +503,33 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
     user_mode: userMode || 'auto',
     negative_constraints: bannedWords, // v2.8: Paraules prohibides
     doc_skeleton: docSkeleton, // v2.9: Estructura del document
+    // v3.7: UNIVERSAL DOC READER - Estadístiques COMPLETES
+    doc_stats: {
+      total_elements: captureStats.total_elements,
+      paragraphs: captureStats.captured_paragraphs,
+      lists: captureStats.captured_lists,
+      tables: captureStats.captured_tables,
+      total_chars: captureStats.total_chars,
+      is_empty: isDocumentEmpty,
+      // Nous camps v3.7
+      has_header: captureStats.captured_header,
+      has_footer: captureStats.captured_footer,
+      footnotes: captureStats.footnotes_count,
+      has_images: captureStats.has_images,
+      has_drawings: captureStats.has_drawings
+    },
     pinned_prefs: {
       language: 'ca',
       tone: 'tècnic però entenedor',
       style_notes: settings.style_guide || ''
-    }
+    },
+    // v3.7: Classificació d'intenció del client (frontend)
+    client_intent: clientIntentClassification ? {
+      intent: clientIntentClassification.intent,
+      confidence: clientIntentClassification.confidence,
+      reason: clientIntentClassification.reason,
+      scores: clientIntentClassification.scores
+    } : null
   };
 
   const options = {
@@ -450,14 +551,33 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
 
     // --- ROUTER D'INTENCIÓ ---
     if (aiData.mode === 'CHAT_ONLY') {
+      // v3.7: Log resposta CHAT_ONLY
+      const responseInfo = {
+        mode: 'CHAT_ONLY',
+        has_chat_response: !!(aiData.chat_response || aiData.change_summary),
+        response_length: (aiData.chat_response || aiData.change_summary || '').length,
+        credits_remaining: json.credits_remaining
+      };
+      metrics.setResponseInfo(responseInfo);
+      logDiagnostic('RESPONSE', {
+        mode: 'CHAT_ONLY',
+        response_preview: (aiData.chat_response || aiData.change_summary || '').substring(0, 100),
+        doc_was_empty: isDocumentEmpty,
+        user_wanted: userMode
+      });
+      metrics.finalize();
+
       return {
         ok: true,
         ai_response: aiData.chat_response || aiData.change_summary,
         credits: json.credits_remaining,
         mode: 'chat',
-        // DEBUG: afegir info del document per verificar
-        _debug_doc_chars: contentPayload.length,
-        _debug_doc_preview: contentPayload.substring(0, 100)
+        // v3.7: Afegir diagnòstic
+        _diag: {
+          doc_chars: contentPayload.length,
+          doc_empty: isDocumentEmpty,
+          invisible_elements: docStats.invisible.table + docStats.invisible.inline_image
+        }
       };
     }
 
@@ -465,6 +585,12 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
 
     // v2.6 Snapshot for Optimistic UI Undo
     let undoSnapshot = null;
+
+    // v3.7: Variables per estadístiques d'execució (scope global dins la funció)
+    let editsApplied = 0;
+    let editsSkipped = 0;
+    let editErrors = [];
+    let editDuration = 0;
 
     if (aiData.mode === 'UPDATE_BY_ID') {
       // v3.2: Preview Mode - Return changes without applying
@@ -494,8 +620,32 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
 
         // If no changes found (IDs don't match), fall back to normal mode
         if (changes.length === 0) {
+          // v3.7: Log warning - preview amb 0 canvis
+          logDiagnostic('WARNING', {
+            issue: 'PREVIEW_NO_CHANGES',
+            updates_from_ai: Object.keys(aiData.updates).length,
+            map_ids_available: Object.keys(mapIdToElement).length
+          });
           // Try to apply directly instead of showing empty preview
         } else {
+          // v3.7: Log resposta PREVIEW
+          const responseInfo = {
+            mode: 'UPDATE_BY_ID',
+            sub_mode: 'PREVIEW',
+            changes_count: changes.length,
+            total_chars_changed: changes.reduce((sum, c) => sum + (c.proposedText || '').length, 0),
+            credits_remaining: json.credits_remaining
+          };
+          metrics.setResponseInfo(responseInfo);
+          logDiagnostic('RESPONSE', {
+            mode: 'UPDATE_BY_ID',
+            sub_mode: 'PREVIEW',
+            changes: changes.length,
+            doc_was_empty: isDocumentEmpty,
+            user_wanted: userMode
+          });
+          metrics.finalize();
+
           return {
             ok: true,
             status: 'preview',
@@ -505,20 +655,48 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
             thought: aiData.thought,
             mode: 'edit',
             doc_snapshot: docSnapshot,  // v3.3: For race condition detection
-            // DEBUG: afegir info del document per verificar
-            _debug_doc_chars: contentPayload.length,
-            _debug_doc_preview: contentPayload.substring(0, 100)
+            // v3.7: Afegir diagnòstic
+            _diag: {
+              doc_chars: contentPayload.length,
+              doc_empty: isDocumentEmpty,
+              invisible_elements: docStats.invisible.table + docStats.invisible.inline_image
+            }
           };
         }
       }
 
       // Normal mode - Apply changes directly
+      // v3.7: Robust execution with error handling and validation
       let capturedLastEdit = null;
       const existingLastEdit = loadLastEdit(); // v2.6.1: Carregar ABANS del loop
+      const editStartTime = Date.now();
 
       for (const [id, newText] of Object.entries(aiData.updates)) {
-        const targetElement = mapIdToElement[id];
-        if (targetElement) {
+        try {
+          const targetElement = mapIdToElement[id];
+
+          // v3.7: Verificar que l'element existeix i és vàlid
+          if (!targetElement) {
+            editsSkipped++;
+            logDiagnostic('EDIT_SKIP', {
+              reason: 'ELEMENT_NOT_FOUND',
+              target_id: id,
+              available_ids: Object.keys(mapIdToElement).slice(0, 10).join(', ')
+            });
+            continue;
+          }
+
+          // v3.7: Verificar que l'element té el mètode asText
+          if (typeof targetElement.asText !== 'function') {
+            editsSkipped++;
+            logDiagnostic('EDIT_SKIP', {
+              reason: 'ELEMENT_NOT_EDITABLE',
+              target_id: id,
+              element_type: targetElement.getType ? targetElement.getType().toString() : 'unknown'
+            });
+            continue;
+          }
+
           const currentDocText = targetElement.asText().getText();
 
           // v2.6 Snapshot: Capturar ABANS de modificar
@@ -527,7 +705,23 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
             originalText: currentDocText
           };
 
+          // v3.7: Aplicar edició amb validació
           updateParagraphPreservingAttributes(targetElement, newText);
+          editsApplied++;
+
+          // v3.7: Validar que l'edició s'ha aplicat correctament
+          const newDocText = targetElement.asText().getText();
+          const cleanNewText = newText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+          if (newDocText !== cleanNewText) {
+            logDiagnostic('EDIT_VALIDATION', {
+              status: 'MISMATCH',
+              target_id: id,
+              expected_length: cleanNewText.length,
+              actual_length: newDocText.length,
+              expected_preview: cleanNewText.substring(0, 50),
+              actual_preview: newDocText.substring(0, 50)
+            });
+          }
 
           // v2.6.1: Preservar originalText si editem el MATEIX paràgraf (cadena d'alternatives)
           // Si és un paràgraf diferent, comencem nova cadena amb l'actual com a original
@@ -536,8 +730,6 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
           const preservedOriginal = isSameTarget
                                     ? existingLastEdit.originalText
                                     : currentDocText;
-
-          const cleanNewText = newText.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
 
           capturedLastEdit = {
             targetId: id,
@@ -555,8 +747,26 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
               break;
             }
           }
+        } catch (editError) {
+          editsSkipped++;
+          editErrors.push({ id, error: editError.message });
+          logDiagnostic('EDIT_ERROR', {
+            target_id: id,
+            error: editError.message,
+            stack: editError.stack ? editError.stack.substring(0, 200) : null
+          });
         }
       }
+
+      // v3.7: Log timing i estadístiques d'execució
+      editDuration = Date.now() - editStartTime;
+      logDiagnostic('EDIT_EXECUTION', {
+        total_updates: Object.keys(aiData.updates).length,
+        edits_applied: editsApplied,
+        edits_skipped: editsSkipped,
+        edit_errors: editErrors.length,
+        duration_ms: editDuration
+      });
       if (capturedLastEdit) {
         saveLastEdit(capturedLastEdit);
       }
@@ -568,16 +778,76 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
       }
     }
 
+    // v3.7: Log resposta EDIT aplicada
+    const updatesApplied = aiData.updates ? Object.keys(aiData.updates).length : 0;
+    const responseInfo = {
+      mode: aiData.mode,
+      sub_mode: 'APPLIED',
+      updates_applied: updatesApplied,
+      has_undo_snapshot: !!undoSnapshot,
+      credits_remaining: json.credits_remaining
+    };
+    metrics.setResponseInfo(responseInfo);
+    logDiagnostic('RESPONSE', {
+      mode: aiData.mode,
+      sub_mode: 'APPLIED',
+      updates: updatesApplied,
+      doc_was_empty: isDocumentEmpty,
+      user_wanted: userMode,
+      last_edit_word: lastEditWord
+    });
+    metrics.finalize();
+
+    // v3.7: Construir missatge de resposta millorat
+    let enhancedResponse = aiData.change_summary;
+
+    // v3.7: Afegir warnings si hi ha edicions saltades o errors
+    if (editsSkipped > 0 || (editErrors && editErrors.length > 0)) {
+      const warnings = [];
+      if (editsSkipped > 0) {
+        warnings.push(`${editsSkipped} element${editsSkipped > 1 ? 's' : ''} no s'ha${editsSkipped > 1 ? 'n' : ''} pogut modificar`);
+      }
+      if (editErrors && editErrors.length > 0) {
+        warnings.push(`${editErrors.length} error${editErrors.length > 1 ? 's' : ''} durant l'edició`);
+      }
+      if (warnings.length > 0) {
+        enhancedResponse += '\n\n⚠️ ' + warnings.join(', ') + '.';
+      }
+    }
+
     return {
       ok: true,
-      ai_response: aiData.change_summary,
+      ai_response: enhancedResponse,
       credits: json.credits_remaining,
       mode: 'edit',
       last_edit_word: lastEditWord, // v2.8: Per al botó "Prohibir"
-      undo_snapshot: undoSnapshot   // v2.6: Per Optimistic UI Undo
+      undo_snapshot: undoSnapshot,  // v2.6: Per Optimistic UI Undo
+      // v3.7: Estadístiques d'execució
+      edit_stats: {
+        total_requested: aiData.updates ? Object.keys(aiData.updates).length : 0,
+        applied: editsApplied || 0,
+        skipped: editsSkipped || 0,
+        errors: editErrors ? editErrors.length : 0,
+        duration_ms: editDuration || 0
+      },
+      // v3.7: Diagnòstic
+      _diag: {
+        doc_chars: contentPayload.length,
+        doc_empty: isDocumentEmpty,
+        updates_applied: editsApplied || updatesApplied,
+        invisible_elements: docStats.invisible.table + docStats.invisible.inline_image
+      }
     };
 
   } catch (e) {
+    // v3.7: Log errors
+    metrics.addError(e.message);
+    logDiagnostic('ERROR', {
+      error: e.message,
+      instruction_preview: instruction ? instruction.substring(0, 50) : null,
+      doc_was_empty: typeof isDocumentEmpty !== 'undefined' ? isDocumentEmpty : 'unknown'
+    });
+    metrics.finalize();
     throw new Error("Error: " + e.message);
   }
 }
@@ -737,6 +1007,648 @@ function renderFullDocument(body, blocks) {
       default: element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.NORMAL);
     }
   });
+}
+
+// --- INSTRUMENTATION & DIAGNOSTICS (v3.7) ---
+
+/**
+ * Analitza TOTS els elements del document per diagnòstic
+ * Retorna estadístiques detallades de què hi ha vs què capturem
+ */
+function analyzeDocumentStructure(body) {
+  const stats = {
+    total_children: 0,
+    by_type: {},
+    captured: {
+      paragraph: 0,
+      list_item: 0,
+      total_chars: 0
+    },
+    invisible: {
+      table: 0,
+      inline_image: 0,
+      horizontal_rule: 0,
+      page_break: 0,
+      footnote: 0,
+      other: 0
+    },
+    element_details: []  // Per debug detallat
+  };
+
+  const numChildren = body.getNumChildren();
+  stats.total_children = numChildren;
+
+  for (let i = 0; i < numChildren; i++) {
+    const child = body.getChild(i);
+    const typeName = child.getType().toString();
+
+    // Comptador per tipus
+    stats.by_type[typeName] = (stats.by_type[typeName] || 0) + 1;
+
+    // Classificar per categoria
+    switch (child.getType()) {
+      case DocumentApp.ElementType.PARAGRAPH:
+        stats.captured.paragraph++;
+        const pText = child.asText().getText();
+        stats.captured.total_chars += pText.length;
+        if (pText.trim().length > 0) {
+          stats.element_details.push({
+            index: i,
+            type: 'PARAGRAPH',
+            chars: pText.length,
+            preview: pText.substring(0, 50)
+          });
+        }
+        break;
+
+      case DocumentApp.ElementType.LIST_ITEM:
+        stats.captured.list_item++;
+        const liText = child.asText().getText();
+        stats.captured.total_chars += liText.length;
+        if (liText.trim().length > 0) {
+          stats.element_details.push({
+            index: i,
+            type: 'LIST_ITEM',
+            chars: liText.length,
+            preview: liText.substring(0, 50)
+          });
+        }
+        break;
+
+      case DocumentApp.ElementType.TABLE:
+        stats.invisible.table++;
+        // Comptar cel·les i text dins la taula
+        try {
+          const table = child.asTable();
+          let tableChars = 0;
+          for (let r = 0; r < table.getNumRows(); r++) {
+            const row = table.getRow(r);
+            for (let c = 0; c < row.getNumCells(); c++) {
+              tableChars += row.getCell(c).getText().length;
+            }
+          }
+          stats.element_details.push({
+            index: i,
+            type: 'TABLE',
+            rows: table.getNumRows(),
+            chars: tableChars,
+            note: 'INVISIBLE TO AI'
+          });
+        } catch (e) {}
+        break;
+
+      case DocumentApp.ElementType.INLINE_IMAGE:
+        stats.invisible.inline_image++;
+        stats.element_details.push({
+          index: i,
+          type: 'INLINE_IMAGE',
+          note: 'INVISIBLE TO AI'
+        });
+        break;
+
+      case DocumentApp.ElementType.HORIZONTAL_RULE:
+        stats.invisible.horizontal_rule++;
+        break;
+
+      case DocumentApp.ElementType.PAGE_BREAK:
+        stats.invisible.page_break++;
+        break;
+
+      case DocumentApp.ElementType.FOOTNOTE:
+        stats.invisible.footnote++;
+        break;
+
+      default:
+        stats.invisible.other++;
+        stats.element_details.push({
+          index: i,
+          type: typeName,
+          note: 'UNKNOWN - INVISIBLE TO AI'
+        });
+    }
+  }
+
+  return stats;
+}
+
+/**
+ * Genera un log estructurat per diagnòstic
+ * @param {string} phase - 'INIT', 'REQUEST', 'RESPONSE', 'ERROR'
+ * @param {Object} data - Dades a logar
+ */
+function logDiagnostic(phase, data) {
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp: timestamp,
+    phase: phase,
+    ...data
+  };
+
+  // Log a la consola de Google Apps Script
+  Logger.log('[DOCMILE_DIAG] ' + JSON.stringify(logEntry));
+
+  // Retornar per si volem enviar a Supabase després
+  return logEntry;
+}
+
+/**
+ * Recull mètriques d'una execució completa
+ */
+function createMetricsCollector() {
+  const startTime = Date.now();
+  const metrics = {
+    timing: {
+      start_ms: startTime,
+      doc_analysis_ms: null,
+      api_call_ms: null,
+      total_ms: null
+    },
+    document: null,
+    request: null,
+    response: null,
+    errors: []
+  };
+
+  return {
+    setDocumentStats: function(stats) {
+      metrics.timing.doc_analysis_ms = Date.now() - startTime;
+      metrics.document = stats;
+    },
+    setRequestInfo: function(info) {
+      metrics.request = info;
+    },
+    setResponseInfo: function(info) {
+      metrics.timing.api_call_ms = Date.now() - startTime - (metrics.timing.doc_analysis_ms || 0);
+      metrics.response = info;
+    },
+    addError: function(error) {
+      metrics.errors.push({
+        time_ms: Date.now() - startTime,
+        error: error
+      });
+    },
+    finalize: function() {
+      metrics.timing.total_ms = Date.now() - startTime;
+      logDiagnostic('METRICS', metrics);
+      // v3.7: Enviar mètriques al Worker (de forma asíncrona)
+      try {
+        sendDiagnostic(metrics);
+      } catch (e) {
+        // Ignorar errors - no volem bloquejar l'usuari
+      }
+      return metrics;
+    },
+    getMetrics: function() {
+      return metrics;
+    }
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UNIVERSAL DOC READER v3.7 - Captura TOTAL del document
+// ═══════════════════════════════════════════════════════════════
+//
+// Filosofia: "Si l'usuari ho veu, la IA també ho ha de veure"
+// Serialitzem TOT el DOM del document en text estructurat.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * UNIVERSAL DOC READER - Captura ABSOLUTAMENT TOT el document
+ *
+ * Captura:
+ * - Header (capçalera del document)
+ * - Body (paràgrafs, llistes, taules, etc.)
+ * - Footer (peu de pàgina)
+ * - Footnotes (notes al peu)
+ *
+ * @param {Document} doc - El document complet
+ * @param {Body} body - El body del document
+ * @param {boolean} isSelection - Si hi ha selecció activa
+ * @param {Array} selectedElements - Elements seleccionats (si aplica)
+ */
+function captureFullDocument(doc, body, isSelection, selectedElements) {
+  const sections = [];
+  const mapIdToElement = {};
+  let globalIndex = 0;
+
+  const stats = {
+    total_elements: 0,
+    captured_paragraphs: 0,
+    captured_lists: 0,
+    captured_tables: 0,
+    captured_header: false,
+    captured_footer: false,
+    footnotes_count: 0,
+    total_chars: 0,
+    has_images: false,
+    has_drawings: false
+  };
+
+  // ═══ 1. CAPTURAR HEADER (Capçalera) ═══
+  try {
+    const header = doc.getHeader();
+    if (header) {
+      const headerText = captureContainerContent(header, 'HEADER');
+      if (headerText.text.trim()) {
+        sections.push(`[CAPÇALERA DEL DOCUMENT]\n${headerText.text}\n[/CAPÇALERA]\n`);
+        stats.captured_header = true;
+        stats.total_chars += headerText.chars;
+      }
+    }
+  } catch (e) {
+    // Document sense header - normal
+  }
+
+  // ═══ 2. CAPTURAR BODY (Contingut Principal) ═══
+  let bodyContent = "";
+
+  // Si hi ha selecció, processar només els elements seleccionats
+  const elementsToProcess = isSelection && selectedElements ?
+    selectedElements : getAllChildElements(body);
+
+  stats.total_elements = elementsToProcess.length;
+
+  for (let i = 0; i < elementsToProcess.length; i++) {
+    const element = elementsToProcess[i];
+    const result = processElement(element, globalIndex, mapIdToElement, stats);
+    if (result.content) {
+      bodyContent += result.content;
+      globalIndex = result.nextIndex;
+    }
+  }
+
+  if (bodyContent.trim()) {
+    sections.push(bodyContent);
+  }
+
+  // ═══ 3. CAPTURAR FOOTER (Peu de Pàgina) ═══
+  try {
+    const footer = doc.getFooter();
+    if (footer) {
+      const footerText = captureContainerContent(footer, 'FOOTER');
+      if (footerText.text.trim()) {
+        sections.push(`[PEU DE PÀGINA]\n${footerText.text}\n[/PEU DE PÀGINA]\n`);
+        stats.captured_footer = true;
+        stats.total_chars += footerText.chars;
+      }
+    }
+  } catch (e) {
+    // Document sense footer - normal
+  }
+
+  // ═══ 4. CAPTURAR FOOTNOTES (Notes al Peu) ═══
+  try {
+    const footnotes = doc.getFootnotes();
+    if (footnotes && footnotes.length > 0) {
+      let footnotesText = "[NOTES AL PEU]\n";
+      footnotes.forEach((fn, idx) => {
+        const fnContent = fn.getFootnoteContents();
+        if (fnContent) {
+          const fnText = fnContent.getText();
+          if (fnText.trim()) {
+            footnotesText += `[${idx + 1}] ${fnText.trim()}\n`;
+            stats.footnotes_count++;
+            stats.total_chars += fnText.length;
+          }
+        }
+      });
+      if (stats.footnotes_count > 0) {
+        footnotesText += "[/NOTES AL PEU]\n";
+        sections.push(footnotesText);
+      }
+    }
+  } catch (e) {
+    // Document sense footnotes - normal
+  }
+
+  // ═══ 5. GENERAR RESUM D'ELEMENTS INVISIBLES ═══
+  let invisibleNote = "";
+  if (stats.has_images || stats.has_drawings) {
+    const items = [];
+    if (stats.has_images) items.push("imatges");
+    if (stats.has_drawings) items.push("dibuixos");
+    invisibleNote = `\n[NOTA: El document conté ${items.join(" i ")} que no es poden mostrar com a text]\n`;
+  }
+
+  // ═══ 6. CONSTRUIR PAYLOAD FINAL ═══
+  let contentPayload = sections.join("\n").trim();
+  if (invisibleNote) {
+    contentPayload += invisibleNote;
+  }
+
+  return {
+    contentPayload: contentPayload || "[Document Buit]",
+    mapIdToElement: mapIdToElement,
+    stats: stats,
+    isEmpty: !contentPayload.trim()
+  };
+}
+
+/**
+ * Processa un element individual i retorna el seu contingut formatat
+ */
+function processElement(element, currentIndex, mapIdToElement, stats) {
+  const elementType = element.getType();
+  let content = "";
+  let nextIndex = currentIndex;
+
+  switch (elementType) {
+    case DocumentApp.ElementType.PARAGRAPH:
+      const pText = element.asText().getText();
+      if (pText.trim().length > 0) {
+        // Detectar si és un heading pel format
+        const heading = element.getHeading();
+        let prefix = "";
+        if (heading === DocumentApp.ParagraphHeading.HEADING1) prefix = "# ";
+        else if (heading === DocumentApp.ParagraphHeading.HEADING2) prefix = "## ";
+        else if (heading === DocumentApp.ParagraphHeading.HEADING3) prefix = "### ";
+        else if (heading === DocumentApp.ParagraphHeading.HEADING4) prefix = "#### ";
+
+        content = `{{${currentIndex}}} ${prefix}${pText}\n`;
+        mapIdToElement[currentIndex] = element;
+        nextIndex = currentIndex + 1;
+        stats.captured_paragraphs++;
+        stats.total_chars += pText.length;
+      }
+      break;
+
+    case DocumentApp.ElementType.LIST_ITEM:
+      const liText = element.asText().getText();
+      if (liText.trim().length > 0) {
+        const nestingLevel = element.getNestingLevel() || 0;
+        const indent = "  ".repeat(nestingLevel);
+        const glyphType = element.getGlyphType();
+        const bullet = (glyphType === DocumentApp.GlyphType.NUMBER) ?
+          `${element.getListId()}.` : "•";
+
+        content = `{{${currentIndex}}} ${indent}${bullet} ${liText}\n`;
+        mapIdToElement[currentIndex] = element;
+        nextIndex = currentIndex + 1;
+        stats.captured_lists++;
+        stats.total_chars += liText.length;
+      }
+      break;
+
+    case DocumentApp.ElementType.TABLE:
+      const tableText = convertTableToText(element.asTable());
+      if (tableText.trim().length > 0) {
+        content = `{{T:${currentIndex}}} [TAULA]\n${tableText}[/TAULA]\n`;
+        // Taules són només lectura - no afegim a mapIdToElement
+        nextIndex = currentIndex + 1;
+        stats.captured_tables++;
+        stats.total_chars += tableText.length;
+      }
+      break;
+
+    case DocumentApp.ElementType.TABLE_OF_CONTENTS:
+      try {
+        const tocText = element.asTableOfContents().getText();
+        if (tocText.trim()) {
+          content = `{{TOC:${currentIndex}}} [ÍNDEX]\n${tocText}\n[/ÍNDEX]\n`;
+          nextIndex = currentIndex + 1;
+          stats.total_chars += tocText.length;
+        }
+      } catch (e) {}
+      break;
+
+    case DocumentApp.ElementType.INLINE_IMAGE:
+      stats.has_images = true;
+      content = `{{IMG:${currentIndex}}} [Imatge]\n`;
+      nextIndex = currentIndex + 1;
+      break;
+
+    case DocumentApp.ElementType.INLINE_DRAWING:
+      stats.has_drawings = true;
+      content = `{{DRW:${currentIndex}}} [Dibuix]\n`;
+      nextIndex = currentIndex + 1;
+      break;
+
+    case DocumentApp.ElementType.HORIZONTAL_RULE:
+      content = `---\n`;
+      break;
+
+    case DocumentApp.ElementType.PAGE_BREAK:
+      content = `[Salt de pàgina]\n`;
+      break;
+
+    default:
+      // Intentar extreure text d'altres tipus
+      try {
+        if (element.asText) {
+          const otherText = element.asText().getText();
+          if (otherText && otherText.trim().length > 0) {
+            content = `{{${currentIndex}}} ${otherText}\n`;
+            mapIdToElement[currentIndex] = element;
+            nextIndex = currentIndex + 1;
+            stats.total_chars += otherText.length;
+          }
+        }
+      } catch (e) {
+        // Element sense text
+      }
+  }
+
+  return { content, nextIndex };
+}
+
+/**
+ * Captura el contingut d'un container (Header o Footer)
+ */
+function captureContainerContent(container, type) {
+  let text = "";
+  let chars = 0;
+
+  const numChildren = container.getNumChildren();
+  for (let i = 0; i < numChildren; i++) {
+    const child = container.getChild(i);
+    try {
+      const childText = child.asText ? child.asText().getText() : '';
+      if (childText && childText.trim()) {
+        text += childText.trim() + "\n";
+        chars += childText.length;
+      }
+    } catch (e) {
+      // Element sense text
+    }
+  }
+
+  return { text: text.trim(), chars };
+}
+
+/**
+ * Obté tots els elements fills del body
+ */
+function getAllChildElements(body) {
+  const elements = [];
+  const numChildren = body.getNumChildren();
+  for (let i = 0; i < numChildren; i++) {
+    elements.push(body.getChild(i));
+  }
+  return elements;
+}
+
+/**
+ * Converteix una taula de Google Docs a representació textual Markdown
+ */
+function convertTableToText(table) {
+  const rows = table.getNumRows();
+  if (rows === 0) return '';
+
+  let text = '';
+
+  for (let r = 0; r < rows; r++) {
+    const row = table.getRow(r);
+    const numCells = row.getNumCells();
+    const cells = [];
+
+    for (let c = 0; c < numCells; c++) {
+      const cellText = row.getCell(c).getText().replace(/\n/g, ' ').trim();
+      cells.push(cellText || ' ');
+    }
+
+    text += '| ' + cells.join(' | ') + ' |\n';
+
+    // Separador després de la primera fila (header)
+    if (r === 0) {
+      text += '|' + cells.map(() => '---').join('|') + '|\n';
+    }
+  }
+
+  return text;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LEGACY WRAPPER - Mantenir compatibilitat
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Wrapper per compatibilitat amb codi existent
+ * @deprecated Usar captureFullDocument() directament
+ */
+function captureDocumentComplete(body, isSelection, selectedElements) {
+  const doc = DocumentApp.getActiveDocument();
+  return captureFullDocument(doc, body, isSelection, selectedElements);
+}
+
+/**
+ * Envia mètriques de diagnòstic al Worker per analitzar patrons
+ * S'executa de forma asíncrona sense bloquejar l'usuari
+ * @param {Object} metrics - Les mètriques recollides pel collector
+ */
+function sendDiagnostic(metrics) {
+  try {
+    const settings = JSON.parse(getSettings());
+    if (!settings.license_key) return;  // No enviar si no hi ha llicència
+
+    const doc = DocumentApp.getActiveDocument();
+
+    const payload = {
+      action: 'log_diagnostic',
+      license_key: settings.license_key,
+      diagnostic: {
+        doc_id: doc ? doc.getId() : null,
+        session_id: Session.getTemporaryActiveUserKey(),  // Identificador de sessió
+        timing: metrics.timing,
+        document: metrics.document,
+        request: metrics.request,
+        response: metrics.response,
+        errors: metrics.errors
+      }
+    };
+
+    const options = {
+      'method': 'post',
+      'contentType': 'application/json',
+      'payload': JSON.stringify(payload),
+      'muteHttpExceptions': true
+    };
+
+    // Enviar de forma "fire and forget" - no esperem resposta
+    UrlFetchApp.fetch(API_URL, options);
+  } catch (e) {
+    // Silently fail - no volem que errors de diagnòstic afectin l'usuari
+    Logger.log('[DIAGNOSTIC] Error sending: ' + e.message);
+  }
+}
+
+/**
+ * Retorna diagnòstics del document actual per mostrar a l'usuari
+ * Permet que l'usuari vegi què "veu" la IA
+ */
+function getDiagnostics() {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const selection = doc.getSelection();
+
+    // Analitzar estructura completa
+    const docStats = analyzeDocumentStructure(body);
+
+    // Comptar elements amb contingut real (com ho fa processUserCommand)
+    let contentElements = 0;
+    let totalChars = 0;
+    const numChildren = body.getNumChildren();
+    for (let i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
+          child.getType() === DocumentApp.ElementType.LIST_ITEM) {
+        const text = child.asText().getText();
+        if (text.trim().length > 0) {
+          contentElements++;
+          totalChars += text.length;
+        }
+      }
+    }
+
+    // Determinar problemes potencials
+    const issues = [];
+    if (contentElements === 0) {
+      issues.push({
+        type: 'CRITICAL',
+        message: 'El document apareix BUIT per la IA',
+        detail: 'No hi ha paràgrafs ni llistes amb contingut de text'
+      });
+    }
+    if (docStats.invisible.table > 0) {
+      issues.push({
+        type: 'WARNING',
+        message: docStats.invisible.table + ' taula(es) invisible(s) per la IA',
+        detail: 'Les taules no s\'envien a la IA - considera convertir a text'
+      });
+    }
+    if (docStats.invisible.inline_image > 0) {
+      issues.push({
+        type: 'INFO',
+        message: docStats.invisible.inline_image + ' imatge(s) al document',
+        detail: 'Les imatges no es processen'
+      });
+    }
+
+    return {
+      ok: true,
+      doc_name: doc.getName(),
+      doc_id: doc.getId(),
+      has_selection: !!selection,
+      stats: {
+        total_elements: docStats.total_children,
+        visible_to_ai: contentElements,
+        total_chars: totalChars,
+        by_type: docStats.by_type
+      },
+      invisible: {
+        tables: docStats.invisible.table,
+        images: docStats.invisible.inline_image,
+        other: docStats.invisible.footnote + docStats.invisible.other
+      },
+      issues: issues,
+      ai_will_see: contentElements > 0 ? 'DOCUMENT_WITH_CONTENT' : 'DOCUMENT_EMPTY'
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e.message
+    };
+  }
 }
 
 // --- RECEIPTS (Custom Macros) ---
