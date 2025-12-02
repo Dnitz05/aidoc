@@ -1533,7 +1533,6 @@
       /* Folder */
       .folder {
         border-radius: var(--radius-md);
-        overflow: hidden;
       }
 
       .folder-header {
@@ -1621,14 +1620,11 @@
       .folder-content {
         padding-left: 20px;
         padding-right: 4px;
-        overflow: hidden;
-        max-height: 1000px;
-        transition: max-height 0.3s ease, opacity 0.3s ease;
+        overflow: visible;
       }
 
       .folder.collapsed .folder-content {
-        max-height: 0;
-        opacity: 0;
+        display: none;
       }
 
       /* Folder Recipe Item */
