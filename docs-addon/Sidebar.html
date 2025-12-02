@@ -2191,6 +2191,9 @@
             wordsInfo = '<span class="timeline-words" style="color: ' + color + '">' + sign + event.words_changed + ' paraules</span>';
           }
 
+          // Can revert? Only AI edits that aren't already reverted
+          const canRevert = event.source === 'ai' && !event.reverted_at && event.type !== 'REVERT' && event.type !== 'baseline';
+
           card.innerHTML =
             '<div class="timeline-card-header">' +
               '<span class="timeline-source ' + (event.source === 'manual' ? 'source-manual' : 'source-ai') + '">' +
@@ -2203,10 +2206,57 @@
               (event.thought ? '<div class="timeline-thought">' + escapeHtml(event.thought.substring(0, 80)) + '</div>' : '') +
               wordsInfo +
             '</div>' +
-            (event.reverted_at ? '<div class="timeline-reverted">' + ICONS.rotateCcw + ' Revertit</div>' : '');
+            (event.reverted_at ? '<div class="timeline-reverted">' + ICONS.rotateCcw + ' Revertit</div>' : '') +
+            // Expandable details section (hidden by default)
+            '<div class="timeline-details hidden">' +
+              (event.before_text ? '<div class="timeline-diff"><span class="diff-label">Abans:</span><div class="diff-text diff-before">' + escapeHtml(event.before_text || '').substring(0, 200) + '</div></div>' : '') +
+              (event.after_text ? '<div class="timeline-diff"><span class="diff-label">Després:</span><div class="diff-text diff-after">' + escapeHtml(event.after_text || '').substring(0, 200) + '</div></div>' : '') +
+              (canRevert ? '<button class="btn btn-sm timeline-revert-btn" onclick="event.stopPropagation(); revertTimelineEvent(\'' + event.id + '\')"><span class="i i--xs">' + ICONS.rotateCcw + '</span> Revertir</button>' : '') +
+            '</div>';
+
+          // Click to expand/collapse details
+          card.onclick = function() {
+            const details = card.querySelector('.timeline-details');
+            const isExpanded = card.classList.contains('expanded');
+
+            // Collapse all other cards
+            document.querySelectorAll('.timeline-card.expanded').forEach(function(c) {
+              c.classList.remove('expanded');
+              c.querySelector('.timeline-details').classList.add('hidden');
+            });
+
+            // Toggle this card
+            if (!isExpanded) {
+              card.classList.add('expanded');
+              details.classList.remove('hidden');
+            }
+          };
 
           container.appendChild(card);
         });
+      }
+
+      /**
+       * Revert a timeline event
+       */
+      function revertTimelineEvent(eventId) {
+        if (!confirm('Vols revertir aquesta edició?')) return;
+
+        showToast('Revertint...', 'info');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.status === 'ok' && result.restore_text !== undefined) {
+              showToast('Edició revertida!', 'success');
+              loadTimeline(); // Refresh timeline
+            } else {
+              showToast('Error: ' + (result.error || 'No s\'ha pogut revertir'), 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error: ' + err.message, 'error');
+          })
+          .revertEditEvent(eventId);
       }
 
       function formatTimelineTime(isoString) {

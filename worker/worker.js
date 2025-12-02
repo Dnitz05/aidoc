@@ -1894,7 +1894,11 @@ async function handleGetTimeline(body, env, corsHeaders) {
     word_count: e.word_count,
     hash_confirmed: e.hash_confirmed,
     created_at: e.created_at,
-    reverted_at: e.reverted_at
+    reverted_at: e.reverted_at,
+    // v4.0: Include text for diff display
+    before_text: e.before_text,
+    after_text: e.after_text,
+    target_id: e.target_id
   }));
 
   return new Response(JSON.stringify({

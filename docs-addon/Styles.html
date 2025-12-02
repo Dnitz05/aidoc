@@ -2298,6 +2298,70 @@
         border-top: 1px dashed var(--border);
       }
 
+      /* Expandable cards */
+      .timeline-card {
+        cursor: pointer;
+      }
+
+      .timeline-card.expanded {
+        background: var(--bg-tertiary);
+        border-color: var(--accent);
+      }
+
+      .timeline-details {
+        margin-top: var(--space-sm);
+        padding-top: var(--space-sm);
+        border-top: 1px solid var(--border);
+        animation: fadeSlideIn 0.15s ease-out;
+      }
+
+      .timeline-details.hidden {
+        display: none;
+      }
+
+      .timeline-diff {
+        margin-bottom: var(--space-sm);
+      }
+
+      .diff-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .diff-text {
+        font-size: 11px;
+        padding: var(--space-xs) var(--space-sm);
+        border-radius: var(--radius-sm);
+        font-family: var(--font-mono);
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 80px;
+        overflow-y: auto;
+      }
+
+      .diff-before {
+        background: rgba(239, 68, 68, 0.1);
+        border-left: 2px solid var(--error);
+        color: var(--text-secondary);
+      }
+
+      .diff-after {
+        background: rgba(34, 197, 94, 0.1);
+        border-left: 2px solid var(--success);
+        color: var(--text-secondary);
+      }
+
+      .timeline-revert-btn {
+        margin-top: var(--space-sm);
+        width: 100%;
+        justify-content: center;
+        gap: 6px;
+      }
+
       /* ═══════════════════════════════════════════════════════════
          SETTINGS PANEL (CERVELL)
          ═══════════════════════════════════════════════════════════ */

@@ -764,6 +764,48 @@ function getDocumentTimeline() {
   }
 }
 
+/**
+ * Reverteix una edició específica del timeline
+ */
+function revertEditEvent(eventId) {
+  const doc = DocumentApp.getActiveDocument();
+  const settings = JSON.parse(getSettings());
+
+  const payload = {
+    action: 'revert_edit',
+    license_key: settings.license_key,
+    doc_id: doc.getId(),
+    event_id: eventId
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const json = JSON.parse(response.getContentText());
+
+    // If we have restore_text and target_id, apply the revert to the document
+    if (json.status === 'ok' && json.restore_text !== undefined && json.target_id !== null) {
+      const body = doc.getBody();
+      const paragraphs = body.getParagraphs();
+
+      if (json.target_id >= 0 && json.target_id < paragraphs.length) {
+        paragraphs[json.target_id].setText(json.restore_text);
+      }
+    }
+
+    return json;
+  } catch (e) {
+    Logger.log('Revert edit failed: ' + e.message);
+    return { status: 'error', error: e.message };
+  }
+}
+
 // --- NUCLI DEL PROCESSAMENT (v3.10 simplificat - 2 modes) ---
 function processUserCommand(instruction, chatHistory, userMode, previewMode) {
   // v3.7: Iniciar col·lector de mètriques
