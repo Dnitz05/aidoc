@@ -249,9 +249,8 @@
         <!-- Empty State -->
         <div id="recipesEmptyState" class="recipes-empty hidden">
           <div class="recipes-empty-icon"><span class="i i--xl i--accent"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span></div>
-          <div class="recipes-empty-title">No tens cap carpeta</div>
-          <div class="recipes-empty-subtitle">Crea una carpeta per organitzar les teves receptes</div>
-          <button class="btn btn-primary" onclick="showNewFolderModal()">+ Nova Carpeta</button>
+          <div class="recipes-empty-title">No tens cap recepta</div>
+          <div class="recipes-empty-subtitle">Crea carpetes i receptes per automatitzar tasques</div>
         </div>
 
         <!-- No Results State -->
@@ -259,9 +258,18 @@
           <div class="recipes-no-results-icon"><span class="i i--xl i--accent"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span></div>
           <div>Cap recepta coincideix amb la cerca</div>
         </div>
+      </div>
 
-        <!-- Floating Add Button -->
-        <button class="recipes-fab" onclick="showNewFolderModal()" title="Nova carpeta">+</button>
+      <!-- Sticky Bottom Buttons -->
+      <div class="recipes-bottom-bar">
+        <button class="recipes-add-btn" onclick="showNewFolderModal()">
+          <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></span>
+          Nova carpeta
+        </button>
+        <button class="recipes-add-btn" onclick="showNewRecipeModal()">
+          <span class="i i--sm"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+          Nova recepta
+        </button>
       </div>
     </div>
 
@@ -2697,6 +2705,18 @@
         saveRecipes();
         renderFolders();
         hideNewFolderModal();
+      }
+
+      // Show new recipe modal (without pre-selected folder)
+      function showNewRecipeModal() {
+        // If no folders exist, prompt to create one first
+        if (recipeFolders.length === 0) {
+          showToast('Primer crea una carpeta', 'warning');
+          showNewFolderModal();
+          return;
+        }
+        // Use first folder as default, or let user choose
+        showAddRecipeToFolder(recipeFolders[0].id);
       }
 
       // Show add recipe to folder modal

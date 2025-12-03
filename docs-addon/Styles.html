@@ -1711,33 +1711,46 @@
         margin-bottom: var(--space-lg);
       }
 
-      /* Floating Add Button */
-      .recipes-fab {
-        position: absolute;
-        bottom: var(--space-lg);
-        right: var(--space-lg);
-        width: 48px;
-        height: 48px;
-        background: var(--accent);
-        border: none;
-        border-radius: 50%;
-        color: white;
-        font-size: 24px;
-        cursor: pointer;
-        box-shadow: 0 4px 16px var(--accent-glow);
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      /* Sticky Bottom Bar */
+      .recipes-bottom-bar {
+        display: flex;
+        gap: var(--space-sm);
+        padding: var(--space-sm);
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .recipes-add-btn {
+        flex: 1;
         display: flex;
         align-items: center;
         justify-content: center;
+        gap: 6px;
+        padding: var(--space-sm);
+        background: transparent;
+        border: 1px dashed var(--border);
+        border-radius: var(--radius-md);
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
       }
 
-      .recipes-fab:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 24px var(--accent-glow);
+      .recipes-add-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-muted);
       }
 
-      .recipes-fab:active {
-        transform: scale(0.95);
+      .recipes-add-btn .i {
+        color: inherit;
+      }
+
+      .recipes-add-btn .i svg {
+        stroke: currentColor;
+        fill: none;
       }
 
       /* Folders Container (v3.6) */
@@ -1748,7 +1761,6 @@
         overflow-y: auto;
         flex: 1;
         padding-right: 4px;
-        padding-bottom: 60px;
       }
 
       .folders-container::-webkit-scrollbar {
