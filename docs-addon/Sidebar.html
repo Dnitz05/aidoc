@@ -3755,32 +3755,32 @@
           // Determine depth based on type
           let depth = 0;
           let typeClass = 'p';
-          let typeLabel = 'P';
+          let typeLabel = 'Text';
 
           if (item.type === 'HEADING_1' || item.type === 'H1') {
             depth = 0;
             typeClass = 'h1';
-            typeLabel = 'H1';
+            typeLabel = 'Títol';
           } else if (item.type === 'HEADING_2' || item.type === 'H2') {
             depth = 1;
             typeClass = 'h2';
-            typeLabel = 'H2';
+            typeLabel = 'Sec';
           } else if (item.type === 'HEADING_3' || item.type === 'H3') {
             depth = 2;
             typeClass = 'h3';
-            typeLabel = 'H3';
+            typeLabel = 'Sub';
           } else if (item.type === 'BOLD_HEADER' || item.type === 'BOLD') {
             depth = currentDepth;
             typeClass = 'bold';
-            typeLabel = 'B';
+            typeLabel = 'Neg';
           } else if (item.type === 'SECTION') {
             depth = currentDepth + 1;
             typeClass = 'section';
-            typeLabel = '§';
+            typeLabel = 'Bloc';
           } else {
             depth = Math.min(currentDepth + 1, 3);
             typeClass = 'p';
-            typeLabel = 'P';
+            typeLabel = 'Text';
           }
 
           currentDepth = depth;

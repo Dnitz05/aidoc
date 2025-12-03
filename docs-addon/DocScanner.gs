@@ -284,6 +284,17 @@ function applyAutoStructure() {
     var paragraphs = body.getParagraphs();
     var pLength = paragraphs.length;
 
+    // ═══ DETECTAR SI JA EXISTEIX H1 ═══
+    var hasExistingH1 = false;
+    for (var j = 0; j < pLength; j++) {
+      if (paragraphs[j].getHeading() === DocumentApp.ParagraphHeading.HEADING1) {
+        hasExistingH1 = true;
+        break;
+      }
+    }
+
+    var firstVisualHeadingAssigned = hasExistingH1; // Si ja hi ha H1, no n'assignem cap més
+
     for (var i = 0; i < pLength; i++) {
       try {
         var para = paragraphs[i];
@@ -313,14 +324,27 @@ function applyAutoStructure() {
         var isVisualHeading = detectVisualHeadingForAutoStructure(para, trimmedText);
 
         if (isVisualHeading) {
-          // ═══ APLICAR H2 ═══
-          para.setHeading(DocumentApp.ParagraphHeading.HEADING2);
-          results.converted++;
-          results.details.push({
-            index: i,
-            text: trimmedText.substring(0, 50) + (trimmedText.length > 50 ? '...' : ''),
-            reason: isVisualHeading
-          });
+          // ═══ APLICAR H1 al primer, H2 a la resta ═══
+          if (!firstVisualHeadingAssigned) {
+            para.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+            firstVisualHeadingAssigned = true;
+            results.converted++;
+            results.details.push({
+              index: i,
+              text: trimmedText.substring(0, 50) + (trimmedText.length > 50 ? '...' : ''),
+              reason: isVisualHeading,
+              appliedStyle: 'H1'
+            });
+          } else {
+            para.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+            results.converted++;
+            results.details.push({
+              index: i,
+              text: trimmedText.substring(0, 50) + (trimmedText.length > 50 ? '...' : ''),
+              reason: isVisualHeading,
+              appliedStyle: 'H2'
+            });
+          }
         }
 
       } catch (paraError) {
