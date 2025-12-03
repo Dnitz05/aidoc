@@ -3072,15 +3072,32 @@
       .outline-type.p { background: rgba(255,255,255,0.05); color: var(--text-muted); }
       .outline-type.section { background: rgba(16, 185, 129, 0.15); color: var(--accent); }
 
-      .outline-text {
+      .outline-text-wrap {
         flex: 1;
+        min-width: 0;
+        cursor: pointer;
+      }
+
+      .outline-text {
+        display: block;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         color: var(--text-secondary);
       }
 
-      .outline-item:hover .outline-text {
+      .outline-text-end {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--text-muted);
+        font-size: 10px;
+        margin-top: 1px;
+      }
+
+      .outline-item:hover .outline-text,
+      .outline-item:hover .outline-text-end {
         color: var(--text-primary);
       }
 

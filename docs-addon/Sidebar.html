@@ -3874,13 +3874,20 @@
 
           // Backend retorna 'text' per headings i 'preview' per seccions
           const textContent = item.text || item.preview || '';
-          const preview = textContent.substring(0, 40) + (textContent.length > 40 ? '...' : '') || 'Sense text';
+          const isLong = textContent.length > 50;
+          const previewStart = textContent.substring(0, 35) + (isLong ? '...' : '');
+          const previewEnd = isLong ? '...' + textContent.substring(textContent.length - 20) : '';
           // Backend retorna 'index', no 'idx'
           const itemIndex = item.index !== undefined ? item.index : idx;
 
           html += '<div class="outline-item" data-depth="' + depth + '" data-idx="' + itemIndex + '">';
           html += '<span class="outline-type ' + typeClass + '" onclick="event.stopPropagation(); showStylePicker(' + itemIndex + ', this)" title="Canviar estil">' + typeLabel + '</span>';
-          html += '<span class="outline-text" onclick="scrollToElement(' + itemIndex + ')">' + escapeHtml(preview) + '</span>';
+          html += '<div class="outline-text-wrap" onclick="scrollToElement(' + itemIndex + ')">';
+          html += '<span class="outline-text">' + escapeHtml(previewStart) + '</span>';
+          if (previewEnd) {
+            html += '<span class="outline-text-end">' + escapeHtml(previewEnd) + '</span>';
+          }
+          html += '</div>';
           html += '<span class="outline-id">¶' + itemIndex + '</span>';
           html += '</div>';
         });
