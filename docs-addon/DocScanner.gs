@@ -294,6 +294,7 @@ function applyAutoStructure() {
     }
 
     var firstVisualHeadingAssigned = hasExistingH1; // Si ja hi ha H1, no n'assignem cap més
+    var firstNonEmptyParaProcessed = false; // Per detectar el primer paràgraf
 
     for (var i = 0; i < pLength; i++) {
       try {
@@ -310,6 +311,8 @@ function applyAutoStructure() {
 
         // 2. Ignorar massa llargs (no són títols)
         if (trimmedText.length > SCAN_CONFIG.AUTO_STRUCTURE_MAX_LENGTH) {
+          // Marcar que ja hem passat el primer paràgraf
+          if (!firstNonEmptyParaProcessed) firstNonEmptyParaProcessed = true;
           continue;
         }
 
@@ -317,8 +320,29 @@ function applyAutoStructure() {
         var currentHeading = para.getHeading();
         if (currentHeading !== DocumentApp.ParagraphHeading.NORMAL) {
           results.skipped++;
+          if (!firstNonEmptyParaProcessed) firstNonEmptyParaProcessed = true;
           continue;
         }
+
+        // ═══ HEURÍSTICA ESPECIAL: PRIMER PARÀGRAF = TÍTOL PRINCIPAL ═══
+        if (!firstNonEmptyParaProcessed && !firstVisualHeadingAssigned) {
+          var isProbablyTitle = detectProbableTitle(trimmedText);
+          if (isProbablyTitle) {
+            para.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+            firstVisualHeadingAssigned = true;
+            firstNonEmptyParaProcessed = true;
+            results.converted++;
+            results.details.push({
+              index: i,
+              text: trimmedText.substring(0, 50) + (trimmedText.length > 50 ? '...' : ''),
+              reason: isProbablyTitle,
+              appliedStyle: 'H1'
+            });
+            continue;
+          }
+        }
+
+        firstNonEmptyParaProcessed = true;
 
         // ═══ DETECTAR VISUAL HEADING ═══
         var isVisualHeading = detectVisualHeadingForAutoStructure(para, trimmedText);
@@ -360,6 +384,43 @@ function applyAutoStructure() {
 
   results.execution_time_ms = Date.now() - startTime;
   return results;
+}
+
+/**
+ * Detecta si el primer paràgraf és probablement el títol del document
+ * Heurístiques basades en posició i format típic de títols
+ */
+function detectProbableTitle(text) {
+  // 1. Ha de ser curt (títols rarament superen 80 caràcters)
+  if (text.length > 80) {
+    return null;
+  }
+
+  // 2. No ha d'acabar en punt (els títols no acaben en punt)
+  var lastChar = text.charAt(text.length - 1);
+  if (lastChar === '.' || lastChar === ',' || lastChar === ';') {
+    return null;
+  }
+
+  // 3. Ha de començar amb majúscula
+  var firstChar = text.charAt(0);
+  if (firstChar !== firstChar.toUpperCase() || /\d/.test(firstChar)) {
+    return null;
+  }
+
+  // 4. No ha de semblar una frase completa (no tenir masses paraules)
+  var wordCount = text.split(/\s+/).length;
+  if (wordCount > 12) {
+    return null;
+  }
+
+  // 5. No ha de contenir salts de línia ni caràcters estranys
+  if (/[\n\r\t]/.test(text)) {
+    return null;
+  }
+
+  // Si passa tots els filtres, és probable que sigui el títol
+  return 'FIRST_PARA_HEURISTIC';
 }
 
 /**
