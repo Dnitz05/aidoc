@@ -891,6 +891,33 @@
         padding: 0 var(--space-xs);
       }
 
+      /* Header toggles container */
+      .header-toggles {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      /* Avoid Words Button */
+      .avoid-words-btn {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-muted);
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px 0;
+        transition: color 0.2s ease;
+      }
+
+      .avoid-words-btn:hover {
+        color: var(--text-secondary);
+      }
+
+      .avoid-words-btn.active {
+        color: var(--accent);
+      }
+
       /* Switch Toggle (iOS style) */
       .switch-container {
         display: flex;
@@ -3724,9 +3751,26 @@
         display: flex;
         align-items: center;
         gap: 6px;
-        padding: 0 var(--space-sm);
+        padding: var(--space-xs) var(--space-sm);
         margin-bottom: var(--space-xs);
-        min-height: 28px;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-sm);
+        animation: slideDown 0.2s ease-out;
+      }
+
+      .constraints-area.hidden {
+        display: none;
+      }
+
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateY(-8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
 
       .constraints-chips {
@@ -3738,38 +3782,11 @@
         overflow-y: auto;
       }
 
-      .constraint-add-btn {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        border: 1px dashed var(--border);
-        background: transparent;
-        color: var(--text-muted);
-        font-size: 16px;
-        font-weight: 300;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.15s ease;
-        flex-shrink: 0;
-      }
-
-      .constraint-add-btn:hover {
-        border-color: var(--error);
-        color: var(--error);
-        background: var(--error-muted);
-      }
-
       .constraint-input-wrapper {
         display: flex;
         align-items: center;
         gap: 4px;
-        animation: chipAppear 0.15s ease-out;
-      }
-
-      .constraint-input-wrapper.hidden {
-        display: none;
+        flex-shrink: 0;
       }
 
       .constraint-input {

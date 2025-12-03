@@ -497,22 +497,26 @@
             </button>
           </div>
         </div>
-        <label class="switch-container" title="Preview Mode: previsualitza canvis abans d'aplicar">
-          <span class="switch-label">Preview</span>
-          <div class="switch" id="previewToggle" onclick="togglePreviewMode()">
-            <div class="switch-track">
-              <div class="switch-thumb"></div>
+        <div class="header-toggles">
+          <button class="avoid-words-btn" id="avoidWordsBtn" onclick="toggleAvoidWords()" title="Paraules a evitar">
+            Avoid words
+          </button>
+          <label class="switch-container" title="Preview Mode: previsualitza canvis abans d'aplicar">
+            <span class="switch-label">Preview</span>
+            <div class="switch" id="previewToggle" onclick="togglePreviewMode()">
+              <div class="switch-track">
+                <div class="switch-thumb"></div>
+              </div>
             </div>
-          </div>
-        </label>
+          </label>
+        </div>
       </div>
 
       <!-- v4.0: Banned Words Chips (visible constraints) -->
-      <div class="constraints-area">
+      <div class="constraints-area hidden" id="constraintsArea">
         <div class="constraints-chips" id="constraintsChips"></div>
-        <button class="constraint-add-btn" id="constraintAddBtn" onclick="showConstraintInput()" title="Afegir paraula prohibida">+</button>
-        <div class="constraint-input-wrapper hidden" id="constraintInputWrapper">
-          <input type="text" class="constraint-input" id="constraintInput" placeholder="Paraula..." onkeydown="handleConstraintInputKey(event)">
+        <div class="constraint-input-wrapper" id="constraintInputWrapper">
+          <input type="text" class="constraint-input" id="constraintInput" placeholder="Afegir paraula..." onkeydown="handleConstraintInputKey(event)">
           <button class="constraint-input-confirm" onclick="addConstraintFromInput()"><span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span></button>
         </div>
       </div>
@@ -3086,12 +3090,21 @@
 
       function renderConstraintChips() {
         const container = document.getElementById('constraintsChips');
+        const area = document.getElementById('constraintsArea');
+        const btn = document.getElementById('avoidWordsBtn');
         if (!container) return;
 
         if (bannedWords.length === 0) {
           container.innerHTML = '';
+          // Hide area if no words
+          if (area) area.classList.add('hidden');
+          if (btn) btn.classList.remove('active');
           return;
         }
+
+        // Show area if there are words
+        if (area) area.classList.remove('hidden');
+        if (btn) btn.classList.add('active');
 
         container.innerHTML = bannedWords.map(function(word, index) {
           return '<span class="constraint-chip">' +
@@ -3118,15 +3131,31 @@
           .saveBannedWords(bannedWords);
       }
 
-      // v4.0.1: Afegir paraula directament des del xat
-      function showConstraintInput() {
-        const wrapper = document.getElementById('constraintInputWrapper');
-        const btn = document.getElementById('constraintAddBtn');
+      // v4.0.1: Toggle avoid words area
+      function toggleAvoidWords() {
+        const area = document.getElementById('constraintsArea');
+        const btn = document.getElementById('avoidWordsBtn');
         const input = document.getElementById('constraintInput');
 
-        if (wrapper && btn) {
-          wrapper.classList.remove('hidden');
-          btn.style.display = 'none';
+        if (area && btn) {
+          const isHidden = area.classList.toggle('hidden');
+          btn.classList.toggle('active', !isHidden);
+
+          if (!isHidden && input) {
+            input.value = '';
+            input.focus();
+          }
+        }
+      }
+
+      function showConstraintInput() {
+        const area = document.getElementById('constraintsArea');
+        const btn = document.getElementById('avoidWordsBtn');
+        const input = document.getElementById('constraintInput');
+
+        if (area) {
+          area.classList.remove('hidden');
+          if (btn) btn.classList.add('active');
           if (input) {
             input.value = '';
             input.focus();
@@ -3135,12 +3164,13 @@
       }
 
       function hideConstraintInput() {
-        const wrapper = document.getElementById('constraintInputWrapper');
-        const btn = document.getElementById('constraintAddBtn');
-
-        if (wrapper && btn) {
-          wrapper.classList.add('hidden');
-          btn.style.display = 'flex';
+        // Keep area visible if there are chips
+        const chips = document.querySelectorAll('.constraint-chip');
+        if (chips.length === 0) {
+          const area = document.getElementById('constraintsArea');
+          const btn = document.getElementById('avoidWordsBtn');
+          if (area) area.classList.add('hidden');
+          if (btn) btn.classList.remove('active');
         }
       }
 
