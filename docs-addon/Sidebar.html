@@ -497,10 +497,14 @@
             </button>
           </div>
         </div>
-        <button class="preview-toggle active" id="previewToggle" onclick="togglePreviewMode()" title="Preview Mode: previsualitza canvis abans d'aplicar">
-          <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
-          <span class="preview-label">Preview</span>
-        </button>
+        <label class="switch-container" title="Preview Mode: previsualitza canvis abans d'aplicar">
+          <span class="switch-label">Preview</span>
+          <div class="switch" id="previewToggle" onclick="togglePreviewMode()">
+            <div class="switch-track">
+              <div class="switch-thumb"></div>
+            </div>
+          </div>
+        </label>
       </div>
 
       <!-- v4.0: Banned Words Chips (visible constraints) -->

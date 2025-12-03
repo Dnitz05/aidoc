@@ -891,39 +891,76 @@
         padding: 0 var(--space-xs);
       }
 
-      /* Preview Toggle Button */
-      .preview-toggle {
+      /* Switch Toggle (iOS style) */
+      .switch-container {
         display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 6px 10px;
-        background: var(--bg-secondary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-md);
-        color: var(--text-muted);
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .switch-label {
         font-size: 12px;
         font-weight: 500;
+        color: var(--text-muted);
+        transition: color 0.2s ease;
+      }
+
+      .switch-container:hover .switch-label {
+        color: var(--text-secondary);
+      }
+
+      .switch {
+        position: relative;
+        width: 36px;
+        height: 20px;
         cursor: pointer;
-        transition: all 0.2s ease;
       }
 
-      .preview-toggle:hover {
+      .switch-track {
+        position: absolute;
+        inset: 0;
         background: var(--bg-tertiary);
-        border-color: var(--text-muted);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        transition: all 0.25s ease;
       }
 
-      .preview-toggle.active {
-        background: var(--accent-muted);
+      .switch-thumb {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        background: var(--text-muted);
+        border-radius: 50%;
+        transition: all 0.25s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      }
+
+      /* Active state */
+      .switch.active .switch-track {
+        background: var(--accent);
         border-color: var(--accent);
+      }
+
+      .switch.active .switch-thumb {
+        left: 18px;
+        background: white;
+      }
+
+      .switch-container:has(.switch.active) .switch-label {
         color: var(--accent);
       }
 
-      .preview-toggle.active:hover {
-        background: var(--accent-muted);
+      /* Hover state */
+      .switch:hover .switch-track {
+        border-color: var(--text-muted);
       }
 
-      .preview-label {
-        line-height: 1;
+      .switch.active:hover .switch-track {
+        background: var(--accent-hover, var(--accent));
       }
 
       .input-wrapper {
