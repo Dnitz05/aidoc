@@ -3824,8 +3824,10 @@
             typeClass = 'bold';
             typeLabel = 'Neg';
           } else {
-            // Ignorar SECTION i P - només mostrem títols
-            return;
+            // Paràgrafs normals (SECTION, P, etc.)
+            depth = Math.min(currentDepth + 1, 3);
+            typeClass = 'p';
+            typeLabel = 'Text';
           }
 
           currentDepth = depth;
