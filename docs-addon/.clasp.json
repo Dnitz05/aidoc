@@ -1,5 +1,17 @@
 {
-  "scriptId": "1H_9Wd2V6E5w35jWjpxfgrj_PWQQ9Uxc3IQf8RDfbubz8L8cIzue1rDea",
-  "rootDir": ".",
-  "projectId": "gen-lang-client-0070954307"
+  "scriptId": "1N3VZXdv-uJ3-MgvbsoiD9hIc6Hrf1VcszuFzIJUl0N-J8kCnv-91177i",
+  "rootDir": "",
+  "parentId": "1ADqAJwmflSiXKj18OBZgCi-oV0VR_h9Vb4YiXadM0hE",
+  "scriptExtensions": [
+    ".js",
+    ".gs"
+  ],
+  "htmlExtensions": [
+    ".html"
+  ],
+  "jsonExtensions": [
+    ".json"
+  ],
+  "filePushOrder": [],
+  "skipSubdirectories": false
 }
