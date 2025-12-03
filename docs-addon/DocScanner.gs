@@ -316,15 +316,36 @@ function applyAutoStructure() {
           continue;
         }
 
-        // 3. Ignorar si ja té estil Heading
+        // 3. Comprovar si ja té estil Heading
         var currentHeading = para.getHeading();
+
+        // ═══ HEURÍSTICA ESPECIAL: PRIMER HEADING NO-H1 → CONVERTIR A H1 ═══
+        if (!firstNonEmptyParaProcessed && !firstVisualHeadingAssigned) {
+          if (currentHeading === DocumentApp.ParagraphHeading.HEADING2 ||
+              currentHeading === DocumentApp.ParagraphHeading.HEADING3 ||
+              currentHeading === DocumentApp.ParagraphHeading.HEADING4) {
+            // El primer heading és H2/H3/H4 però no hi ha H1 → Convertir a H1
+            para.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+            firstVisualHeadingAssigned = true;
+            firstNonEmptyParaProcessed = true;
+            results.converted++;
+            results.details.push({
+              index: i,
+              text: trimmedText.substring(0, 50) + (trimmedText.length > 50 ? '...' : ''),
+              reason: 'FIRST_HEADING_PROMOTED',
+              appliedStyle: 'H1'
+            });
+            continue;
+          }
+        }
+
         if (currentHeading !== DocumentApp.ParagraphHeading.NORMAL) {
           results.skipped++;
           if (!firstNonEmptyParaProcessed) firstNonEmptyParaProcessed = true;
           continue;
         }
 
-        // ═══ HEURÍSTICA ESPECIAL: PRIMER PARÀGRAF = TÍTOL PRINCIPAL ═══
+        // ═══ HEURÍSTICA ESPECIAL: PRIMER PARÀGRAF NORMAL = TÍTOL PRINCIPAL ═══
         if (!firstNonEmptyParaProcessed && !firstVisualHeadingAssigned) {
           var isProbablyTitle = detectProbableTitle(trimmedText);
           if (isProbablyTitle) {
