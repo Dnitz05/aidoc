@@ -3766,14 +3766,14 @@
         skeleton.structure.forEach(function(item, idx) {
           // Determine depth based on type
           let depth = 0;
-          let typeClass = 'p';
-          let typeLabel = 'Text';
+          let typeClass = '';
+          let typeLabel = '';
 
-          if (item.type === 'HEADING_1' || item.type === 'H1') {
+          if (item.type === 'HEADING_1' || item.type === 'H1' || item.type === 'TITLE') {
             depth = 0;
             typeClass = 'h1';
             typeLabel = 'Títol';
-          } else if (item.type === 'HEADING_2' || item.type === 'H2') {
+          } else if (item.type === 'HEADING_2' || item.type === 'H2' || item.type === 'SUBTITLE') {
             depth = 1;
             typeClass = 'h2';
             typeLabel = 'Sec';
@@ -3781,18 +3781,17 @@
             depth = 2;
             typeClass = 'h3';
             typeLabel = 'Sub';
+          } else if (item.type === 'HEADING_4' || item.type === 'H4') {
+            depth = 3;
+            typeClass = 'h4';
+            typeLabel = 'Sub';
           } else if (item.type === 'BOLD_HEADER' || item.type === 'BOLD') {
-            depth = currentDepth;
+            depth = currentDepth + 1;
             typeClass = 'bold';
             typeLabel = 'Neg';
-          } else if (item.type === 'SECTION') {
-            depth = currentDepth + 1;
-            typeClass = 'section';
-            typeLabel = 'Bloc';
           } else {
-            depth = Math.min(currentDepth + 1, 3);
-            typeClass = 'p';
-            typeLabel = 'Text';
+            // Ignorar SECTION i P - només mostrem títols
+            return;
           }
 
           currentDepth = depth;
