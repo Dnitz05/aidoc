@@ -117,8 +117,7 @@ function getDocSkeleton() {
         // Crear nou bloc
         currentSection = {
           type: 'SECTION',
-          preview: trimmedText.substring(0, SCAN_CONFIG.PREVIEW_LENGTH) +
-                   (trimmedText.length > SCAN_CONFIG.PREVIEW_LENGTH ? '...' : ''),
+          preview: trimmedText,  // Text complet, el frontend el truncarà
           entities: entities,
           word_count: countWords(trimmedText)
         };
