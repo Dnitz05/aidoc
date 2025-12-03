@@ -746,8 +746,7 @@
         `;
         emptyEl.classList.add('hidden');
 
-        const settings = JSON.parse(getSettings() || '{}');
-        if (!settings.license_key) {
+        if (!currentSettings.license_key) {
           listEl.innerHTML = '';
           emptyEl.classList.remove('hidden');
           return;
@@ -772,7 +771,7 @@
           })
           .callWorker({
             action: 'list_conversations',
-            license_key: settings.license_key,
+            license_key: currentSettings.license_key,
             limit: 50
           });
       }
@@ -861,8 +860,6 @@
         const chatHistory = document.getElementById('chatHistory');
         chatHistory.innerHTML = '<div class="msg system">Carregant conversa...</div>';
 
-        const settings = JSON.parse(getSettings() || '{}');
-
         google.script.run
           .withSuccessHandler(function(res) {
             if (res.status === 'ok' && res.conversation) {
@@ -882,7 +879,7 @@
           })
           .callWorker({
             action: 'get_conversation',
-            license_key: settings.license_key,
+            license_key: currentSettings.license_key,
             conversation_id: conversationId
           });
       }
@@ -931,8 +928,6 @@
       function deleteConversation(conversationId) {
         if (!confirm('Eliminar aquesta conversa?')) return;
 
-        const settings = JSON.parse(getSettings() || '{}');
-
         google.script.run
           .withSuccessHandler(function(res) {
             if (res.status === 'ok') {
@@ -951,7 +946,7 @@
           })
           .callWorker({
             action: 'delete_conversation',
-            license_key: settings.license_key,
+            license_key: currentSettings.license_key,
             conversation_id: conversationId
           });
       }
@@ -1565,8 +1560,7 @@
         saveDebounceTimer = null;
 
         // Get license key for API calls
-        const settings = JSON.parse(getSettings() || '{}');
-        if (!settings.license_key) {
+        if (!currentSettings.license_key) {
           console.warn('[v5.2] No license key, skipping save');
           showSaveIndicator('');
           return;
@@ -1590,7 +1584,7 @@
                 .withFailureHandler(reject)
                 .callWorker({
                   action: 'create_conversation',
-                  license_key: settings.license_key,
+                  license_key: currentSettings.license_key,
                   title: title,
                   messages: messagesToSave
                 });
@@ -1632,7 +1626,7 @@
                 .withFailureHandler(reject)
                 .callWorker({
                   action: 'append_messages',
-                  license_key: settings.license_key,
+                  license_key: currentSettings.license_key,
                   conversation_id: currentConversationId,
                   messages: messagesToSave
                 });
@@ -1670,9 +1664,7 @@
 
       function triggerAutoTitle() {
         if (!currentConversationId) return;
-
-        const settings = JSON.parse(getSettings() || '{}');
-        if (!settings.license_key) return;
+        if (!currentSettings.license_key) return;
 
         google.script.run
           .withSuccessHandler(function(res) {
@@ -1691,7 +1683,7 @@
           })
           .callWorker({
             action: 'generate_title',
-            license_key: settings.license_key,
+            license_key: currentSettings.license_key,
             conversation_id: currentConversationId
           });
       }
@@ -1744,8 +1736,7 @@
 
         newTitle = newTitle.trim();
 
-        const settings = JSON.parse(getSettings() || '{}');
-        if (settings.license_key) {
+        if (currentSettings.license_key) {
           google.script.run
             .withSuccessHandler(function(res) {
               if (res.status === 'ok') {
@@ -1764,7 +1755,7 @@
             })
             .callWorker({
               action: 'update_conversation',
-              license_key: settings.license_key,
+              license_key: currentSettings.license_key,
               conversation_id: currentConversationId,
               title: newTitle
             });
@@ -1820,8 +1811,7 @@
 
         newTitle = newTitle.trim();
 
-        const settings = JSON.parse(getSettings() || '{}');
-        if (settings.license_key) {
+        if (currentSettings.license_key) {
           google.script.run
             .withSuccessHandler(function(res) {
               if (res.status === 'ok') {
@@ -1840,7 +1830,7 @@
             })
             .callWorker({
               action: 'update_conversation',
-              license_key: settings.license_key,
+              license_key: currentSettings.license_key,
               conversation_id: convId,
               title: newTitle
             });
@@ -1861,8 +1851,7 @@
         const conv = conversationsList.find(c => c.id === convId);
         if (!conv) return;
 
-        const settings = JSON.parse(getSettings() || '{}');
-        if (!settings.license_key) return;
+        if (!currentSettings.license_key) return;
 
         const newPinned = !conv.pinned;
 
@@ -1885,7 +1874,7 @@
           })
           .callWorker({
             action: 'update_conversation',
-            license_key: settings.license_key,
+            license_key: currentSettings.license_key,
             conversation_id: convId,
             pinned: newPinned
           });
