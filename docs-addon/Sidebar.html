@@ -1729,27 +1729,31 @@
 
         newTitle = newTitle.trim();
 
-        google.script.run
-          .withSuccessHandler(function(res) {
-            if (res.status === 'ok') {
-              titleEl.textContent = newTitle;
-              // Update in list
-              const conv = conversationsList.find(c => c.id === currentConversationId);
-              if (conv) {
-                conv.title = newTitle;
-                renderConversationsList(conversationsList);
+        const settings = JSON.parse(getSettings() || '{}');
+        if (settings.license_key) {
+          google.script.run
+            .withSuccessHandler(function(res) {
+              if (res.status === 'ok') {
+                titleEl.textContent = newTitle;
+                // Update in list
+                const conv = conversationsList.find(c => c.id === currentConversationId);
+                if (conv) {
+                  conv.title = newTitle;
+                  renderConversationsList(conversationsList);
+                }
               }
-            }
-          })
-          .withFailureHandler(function(err) {
-            console.error('[Title Save Error]', err);
-            showToast('Error guardant títol', 'error');
-          })
-          .callWorker({
-            action: 'update_conversation',
-            conversation_id: currentConversationId,
-            title: newTitle
-          });
+            })
+            .withFailureHandler(function(err) {
+              console.error('[Title Save Error]', err);
+              showToast('Error guardant títol', 'error');
+            })
+            .callWorker({
+              action: 'update_conversation',
+              license_key: settings.license_key,
+              conversation_id: currentConversationId,
+              title: newTitle
+            });
+        }
 
         titleEl.textContent = newTitle;
         titleEl.style.display = '';
@@ -1801,27 +1805,31 @@
 
         newTitle = newTitle.trim();
 
-        google.script.run
-          .withSuccessHandler(function(res) {
-            if (res.status === 'ok') {
-              const conv = conversationsList.find(c => c.id === convId);
-              if (conv) {
-                conv.title = newTitle;
+        const settings = JSON.parse(getSettings() || '{}');
+        if (settings.license_key) {
+          google.script.run
+            .withSuccessHandler(function(res) {
+              if (res.status === 'ok') {
+                const conv = conversationsList.find(c => c.id === convId);
+                if (conv) {
+                  conv.title = newTitle;
+                }
+                // Update header if this is current conversation
+                if (convId === currentConversationId) {
+                  updateConversationTitle(newTitle);
+                }
               }
-              // Update header if this is current conversation
-              if (convId === currentConversationId) {
-                updateConversationTitle(newTitle);
-              }
-            }
-          })
-          .withFailureHandler(function(err) {
-            console.error('[Title Save Error]', err);
-          })
-          .callWorker({
-            action: 'update_conversation',
-            conversation_id: convId,
-            title: newTitle
-          });
+            })
+            .withFailureHandler(function(err) {
+              console.error('[Title Save Error]', err);
+            })
+            .callWorker({
+              action: 'update_conversation',
+              license_key: settings.license_key,
+              conversation_id: convId,
+              title: newTitle
+            });
+        }
 
         element.textContent = newTitle;
         element.style.display = '';
@@ -1837,6 +1845,9 @@
 
         const conv = conversationsList.find(c => c.id === convId);
         if (!conv) return;
+
+        const settings = JSON.parse(getSettings() || '{}');
+        if (!settings.license_key) return;
 
         const newPinned = !conv.pinned;
 
@@ -1859,6 +1870,7 @@
           })
           .callWorker({
             action: 'update_conversation',
+            license_key: settings.license_key,
             conversation_id: convId,
             pinned: newPinned
           });
