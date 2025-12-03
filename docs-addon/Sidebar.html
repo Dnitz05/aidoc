@@ -3876,7 +3876,8 @@
           const textContent = item.text || item.preview || '';
           const isLong = textContent.length > 50;
           const previewStart = textContent.substring(0, 35) + (isLong ? '...' : '');
-          const previewEnd = isLong ? '...' + textContent.substring(textContent.length - 20) : '';
+          // Segona línia: mostrar les últimes paraules fins al punt final
+          const previewEnd = isLong ? textContent.substring(textContent.length - 25).trim() : '';
           // Backend retorna 'index', no 'idx'
           const itemIndex = item.index !== undefined ? item.index : idx;
 
