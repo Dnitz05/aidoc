@@ -3823,12 +3823,8 @@
             depth = 3;
             typeClass = 'h3';
             typeLabel = 'Títol 3';
-          } else if (item.type === 'BOLD_HEADER' || item.type === 'BOLD') {
-            depth = currentDepth + 1;
-            typeClass = 'bold';
-            typeLabel = 'Negreta';
           } else {
-            // Paràgrafs normals (SECTION, P, etc.)
+            // Paràgrafs normals (SECTION, BOLD, P, etc.)
             depth = Math.min(currentDepth + 1, 3);
             typeClass = 'p';
             typeLabel = 'Normal';
