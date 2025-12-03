@@ -3863,9 +3863,9 @@
           // Backend retorna 'index', no 'idx'
           const itemIndex = item.index !== undefined ? item.index : idx;
 
-          html += '<div class="outline-item" data-depth="' + depth + '" data-idx="' + itemIndex + '" onclick="scrollToElement(' + itemIndex + ')">';
-          html += '<span class="outline-type ' + typeClass + '">' + typeLabel + '</span>';
-          html += '<span class="outline-text">' + escapeHtml(preview) + '</span>';
+          html += '<div class="outline-item" data-depth="' + depth + '" data-idx="' + itemIndex + '">';
+          html += '<span class="outline-type ' + typeClass + '" onclick="event.stopPropagation(); showStylePicker(' + itemIndex + ', this)" title="Canviar estil">' + typeLabel + '</span>';
+          html += '<span class="outline-text" onclick="scrollToElement(' + itemIndex + ')">' + escapeHtml(preview) + '</span>';
           html += '<span class="outline-id">¶' + itemIndex + '</span>';
           html += '</div>';
         });
@@ -3960,6 +3960,71 @@
             item.style.display = 'none';
           }
         });
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // STYLE PICKER - Canviar estil de paràgraf
+      // ═══════════════════════════════════════════════════════════
+
+      var activeStylePicker = null;
+
+      function showStylePicker(paraIndex, targetEl) {
+        // Tancar picker anterior si existeix
+        hideStylePicker();
+
+        const styles = [
+          { label: 'Títol 1', value: 'HEADING1', class: 'h1' },
+          { label: 'Títol 2', value: 'HEADING2', class: 'h2' },
+          { label: 'Títol 3', value: 'HEADING3', class: 'h3' },
+          { label: 'Normal', value: 'NORMAL', class: 'p' }
+        ];
+
+        const picker = document.createElement('div');
+        picker.className = 'style-picker';
+        picker.innerHTML = styles.map(function(s) {
+          return '<div class="style-picker-option ' + s.class + '" onclick="changeParaStyle(' + paraIndex + ', \'' + s.value + '\')">' + s.label + '</div>';
+        }).join('');
+
+        // Posicionar sota l'element
+        const rect = targetEl.getBoundingClientRect();
+        picker.style.position = 'fixed';
+        picker.style.left = rect.left + 'px';
+        picker.style.top = (rect.bottom + 4) + 'px';
+        picker.style.zIndex = '9999';
+
+        document.body.appendChild(picker);
+        activeStylePicker = picker;
+
+        // Tancar al clicar fora
+        setTimeout(function() {
+          document.addEventListener('click', hideStylePicker, { once: true });
+        }, 10);
+      }
+
+      function hideStylePicker() {
+        if (activeStylePicker) {
+          activeStylePicker.remove();
+          activeStylePicker = null;
+        }
+      }
+
+      function changeParaStyle(paraIndex, newStyle) {
+        hideStylePicker();
+        showToast('Canviant estil...', 'info');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              showToast('Estil canviat correctament', 'success');
+              refreshStructure(); // Refrescar outline
+            } else {
+              showToast('Error: ' + (result ? result.error : 'Desconegut'), 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error: ' + err.message, 'error');
+          })
+          .setParagraphHeading(paraIndex, newStyle);
       }
 
       function scrollToElement(idx) {

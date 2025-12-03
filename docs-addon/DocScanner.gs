@@ -475,3 +475,62 @@ function detectVisualHeadingForAutoStructure(para, text) {
   return null;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SET PARAGRAPH HEADING - Canviar estil manualment
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Canvia l'estil d'un paràgraf pel seu índex
+ * @param {number} paraIndex - Índex del paràgraf
+ * @param {string} headingType - Tipus: HEADING1, HEADING2, HEADING3, NORMAL
+ * @returns {Object} Resultat amb success/error
+ */
+function setParagraphHeading(paraIndex, headingType) {
+  try {
+    var doc = DocumentApp.getActiveDocument();
+    if (!doc) {
+      return { success: false, error: "No hi ha document actiu" };
+    }
+
+    var body = doc.getBody();
+    var paragraphs = body.getParagraphs();
+
+    if (paraIndex < 0 || paraIndex >= paragraphs.length) {
+      return { success: false, error: "Índex de paràgraf invàlid" };
+    }
+
+    var para = paragraphs[paraIndex];
+
+    // Mapejar string a enum
+    var headingEnum;
+    switch (headingType) {
+      case 'HEADING1':
+        headingEnum = DocumentApp.ParagraphHeading.HEADING1;
+        break;
+      case 'HEADING2':
+        headingEnum = DocumentApp.ParagraphHeading.HEADING2;
+        break;
+      case 'HEADING3':
+        headingEnum = DocumentApp.ParagraphHeading.HEADING3;
+        break;
+      case 'NORMAL':
+        headingEnum = DocumentApp.ParagraphHeading.NORMAL;
+        break;
+      default:
+        return { success: false, error: "Tipus d'estil no reconegut: " + headingType };
+    }
+
+    para.setHeading(headingEnum);
+
+    return {
+      success: true,
+      paraIndex: paraIndex,
+      newStyle: headingType,
+      text: para.getText().substring(0, 50)
+    };
+
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
