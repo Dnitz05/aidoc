@@ -1555,7 +1555,10 @@
 
       async function flushPendingMessages() {
         console.log('[v5.2] flushPendingMessages, pending:', pendingSaveMessages.length);
-        if (pendingSaveMessages.length === 0) return;
+        if (pendingSaveMessages.length === 0) {
+          showSaveIndicator('');
+          return;
+        }
 
         const messagesToSave = [...pendingSaveMessages];
         pendingSaveMessages = [];
@@ -1565,6 +1568,7 @@
         const settings = JSON.parse(getSettings() || '{}');
         if (!settings.license_key) {
           console.warn('[v5.2] No license key, skipping save');
+          showSaveIndicator('');
           return;
         }
 
@@ -1578,6 +1582,8 @@
                   : firstUserMsg.content)
               : 'Nova conversa';
 
+            console.log('[v5.2] Creating conversation:', title);
+
             const result = await new Promise((resolve, reject) => {
               google.script.run
                 .withSuccessHandler(resolve)
@@ -1590,7 +1596,9 @@
                 });
             });
 
-            if (result.conversation_id) {
+            console.log('[v5.2] Create result:', result);
+
+            if (result && result.conversation_id) {
               currentConversationId = result.conversation_id;
               conversationMessageCount = messagesToSave.length;
               updateConversationTitle(title);
@@ -1609,10 +1617,16 @@
                 conversationsList.unshift(newConv);
                 renderConversationsList(conversationsList);
               }
+              showSaveIndicator('saved');
+            } else {
+              console.warn('[v5.2] No conversation_id in result:', result);
+              showSaveIndicator('error');
             }
           } else {
             // Append to existing conversation
-            await new Promise((resolve, reject) => {
+            console.log('[v5.2] Appending to:', currentConversationId);
+
+            const result = await new Promise((resolve, reject) => {
               google.script.run
                 .withSuccessHandler(resolve)
                 .withFailureHandler(reject)
@@ -1624,15 +1638,16 @@
                 });
             });
 
+            console.log('[v5.2] Append result:', result);
+
             conversationMessageCount += messagesToSave.length;
 
             // Trigger auto-title after first exchange (4 messages = 2 turns)
             if (conversationMessageCount === 4) {
               triggerAutoTitle();
             }
+            showSaveIndicator('saved');
           }
-
-          showSaveIndicator('saved');
 
         } catch (e) {
           console.error('[Conversation Save Error]', e);
