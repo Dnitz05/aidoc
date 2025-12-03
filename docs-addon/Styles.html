@@ -2998,7 +2998,7 @@
 
       /* Outline Tree */
       .outline-tree {
-        padding: var(--space-xs) var(--space-sm) var(--space-sm) var(--space-xs);
+        padding: var(--space-xs) var(--space-sm) var(--space-sm) 0;
         flex: 1;
         min-height: 100px;
         overflow-y: auto;
@@ -3034,7 +3034,7 @@
         display: flex;
         align-items: center;
         gap: var(--space-xs);
-        padding: 6px 8px 6px 4px;
+        padding: 6px 8px 6px 0;
         border-radius: var(--radius-sm);
         cursor: pointer;
         transition: all 0.15s ease;
@@ -3092,9 +3092,9 @@
       }
 
       /* Indentation for hierarchy */
-      .outline-item[data-depth="1"] { padding-left: 12px; }
-      .outline-item[data-depth="2"] { padding-left: 24px; }
-      .outline-item[data-depth="3"] { padding-left: 36px; }
+      .outline-item[data-depth="1"] { padding-left: 8px; }
+      .outline-item[data-depth="2"] { padding-left: 16px; }
+      .outline-item[data-depth="3"] { padding-left: 24px; }
 
       /* Entities Section - no expand */
       #entitiesSection {

@@ -1561,6 +1561,13 @@
         pendingSaveMessages = [];
         saveDebounceTimer = null;
 
+        // Get license key for API calls
+        const settings = JSON.parse(getSettings() || '{}');
+        if (!settings.license_key) {
+          console.warn('[v5.2] No license key, skipping save');
+          return;
+        }
+
         try {
           if (!currentConversationId) {
             // Create new conversation with first message as title
@@ -1577,6 +1584,7 @@
                 .withFailureHandler(reject)
                 .callWorker({
                   action: 'create_conversation',
+                  license_key: settings.license_key,
                   title: title,
                   messages: messagesToSave
                 });
@@ -1610,6 +1618,7 @@
                 .withFailureHandler(reject)
                 .callWorker({
                   action: 'append_messages',
+                  license_key: settings.license_key,
                   conversation_id: currentConversationId,
                   messages: messagesToSave
                 });
@@ -1647,6 +1656,9 @@
       function triggerAutoTitle() {
         if (!currentConversationId) return;
 
+        const settings = JSON.parse(getSettings() || '{}');
+        if (!settings.license_key) return;
+
         google.script.run
           .withSuccessHandler(function(res) {
             if (res.status === 'ok' && res.generated && res.title) {
@@ -1664,6 +1676,7 @@
           })
           .callWorker({
             action: 'generate_title',
+            license_key: settings.license_key,
             conversation_id: currentConversationId
           });
       }
