@@ -2756,6 +2756,50 @@
         color: var(--error);
       }
 
+      /* Knowledge Panel Content (v6.1 - Sticky bottom bar) */
+      .knowledge-panel-content {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: var(--space-md);
+        gap: var(--space-md);
+      }
+
+      .knowledge-panel-content::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .knowledge-panel-content::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .knowledge-panel-content::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+      }
+
+      /* Sticky Bottom Bar */
+      .knowledge-bottom-bar {
+        display: flex;
+        gap: var(--space-sm);
+        padding: var(--space-sm);
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .knowledge-bottom-bar .knowledge-upload-btn {
+        flex: 1;
+        margin: 0;
+        padding: var(--space-sm);
+      }
+
+      .knowledge-bottom-bar .upload-progress {
+        flex: 1;
+      }
+
       .knowledge-library-card {
         flex: 1;
         display: flex;
