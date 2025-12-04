@@ -1232,6 +1232,9 @@ export default {
       if (body.action === 'delete_folder') {
         return await handleDeleteFolder(body, env, corsHeaders);
       }
+      if (body.action === 'create_folder') {
+        return await handleCreateFolder(body, env, corsHeaders);
+      }
 
       // Default: Chat handler
       return await handleChat(body, env, corsHeaders);
@@ -2625,7 +2628,7 @@ async function handleDeleteConversation(body, env, corsHeaders) {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Get all knowledge files for the user (v6.0 - with folders)
+ * Get all knowledge files for the user (v7.0 - with persistent folders)
  */
 async function handleGetKnowledgeLibrary(body, env, corsHeaders) {
   const { license_key } = body;
@@ -2633,7 +2636,8 @@ async function handleGetKnowledgeLibrary(body, env, corsHeaders) {
 
   const licenseHash = await hashKey(license_key);
 
-  const response = await fetch(
+  // Get files
+  const filesResponse = await fetch(
     `${env.SUPABASE_URL}/rest/v1/knowledge_library?license_key_hash=eq.${licenseHash}&order=folder.asc.nullsfirst,last_used_at.desc&select=id,file_name,mime_type,file_size,gemini_file_uri,gemini_expires_at,used_in_docs,created_at,folder`,
     {
       method: 'GET',
@@ -2645,18 +2649,38 @@ async function handleGetKnowledgeLibrary(body, env, corsHeaders) {
     }
   );
 
-  if (!response.ok) {
-    throw new Error("supabase_error: " + await response.text());
+  if (!filesResponse.ok) {
+    throw new Error("supabase_error: " + await filesResponse.text());
   }
 
-  const files = await response.json();
+  const files = await filesResponse.json();
 
-  // Extract unique folders from files
-  const folders = [...new Set(files.map(f => f.folder).filter(f => f))].sort();
+  // Get folders from persistent table (v7.0)
+  const foldersResponse = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_folders?license_key_hash=eq.${licenseHash}&order=folder_name.asc&select=folder_name`,
+    {
+      method: 'GET',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  let folders = [];
+  if (foldersResponse.ok) {
+    const foldersData = await foldersResponse.json();
+    folders = foldersData.map(f => f.folder_name);
+  }
+
+  // Also include implicit folders from files (for backwards compatibility)
+  const implicitFolders = files.map(f => f.folder).filter(f => f);
+  const allFolders = [...new Set([...folders, ...implicitFolders])].sort();
 
   return new Response(JSON.stringify({
     status: "ok",
-    folders: folders,
+    folders: allFolders,
     files: files.map(f => ({
       id: f.id,
       name: f.file_name,
@@ -2736,7 +2760,7 @@ async function handleRenameFolder(body, env, corsHeaders) {
 }
 
 /**
- * Delete a folder (moves all files to root) (v6.0)
+ * Delete a folder (moves all files to root) (v7.0 - also deletes from knowledge_folders)
  */
 async function handleDeleteFolder(body, env, corsHeaders) {
   const { license_key, folder_name } = body;
@@ -2745,8 +2769,8 @@ async function handleDeleteFolder(body, env, corsHeaders) {
 
   const licenseHash = await hashKey(license_key);
 
-  // Move all files from this folder to root (folder = null)
-  const response = await fetch(
+  // 1. Move all files from this folder to root (folder = null)
+  const filesResponse = await fetch(
     `${env.SUPABASE_URL}/rest/v1/knowledge_library?folder=eq.${encodeURIComponent(folder_name)}&license_key_hash=eq.${licenseHash}`,
     {
       method: 'PATCH',
@@ -2759,12 +2783,71 @@ async function handleDeleteFolder(body, env, corsHeaders) {
     }
   );
 
-  if (!response.ok) {
-    throw new Error("supabase_error: " + await response.text());
+  if (!filesResponse.ok) {
+    throw new Error("supabase_error: " + await filesResponse.text());
   }
+
+  // 2. Delete folder from knowledge_folders table (v7.0)
+  await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_folders?folder_name=eq.${encodeURIComponent(folder_name)}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
 
   return new Response(JSON.stringify({
     status: "ok"
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Create a new folder (v7.0)
+ */
+async function handleCreateFolder(body, env, corsHeaders) {
+  const { license_key, folder_name } = body;
+  if (!license_key) throw new Error("missing_license");
+  if (!folder_name) throw new Error("missing_folder_name");
+
+  const trimmed = folder_name.trim();
+  if (trimmed.length === 0) throw new Error("invalid_folder_name");
+  if (trimmed.length > 30) throw new Error("folder_name_too_long");
+
+  const licenseHash = await hashKey(license_key);
+
+  // Insert into knowledge_folders
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_folders`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        license_key_hash: licenseHash,
+        folder_name: trimmed
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    if (error.includes('unique') || error.includes('duplicate')) {
+      throw new Error("duplicate_folder");
+    }
+    throw new Error("supabase_error: " + error);
+  }
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    folder_name: trimmed
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 

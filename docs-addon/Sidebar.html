@@ -3469,15 +3469,28 @@
           return;
         }
 
-        // Add folder to local list
-        if (!knowledgeFolders.includes(name)) {
-          knowledgeFolders.push(name);
-          knowledgeFolders.sort();
+        if (name.length > 30) {
+          showToast('Nom massa llarg (màx 30 caràcters)', 'warning');
+          return;
         }
 
-        renderKnowledgeLibrary();
-        hideNewKnowledgeFolderModal();
-        showToast('Carpeta creada: ' + name, 'success');
+        // v7.0: Save to database (persistent)
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.status === 'ok') {
+              refreshKnowledgeLibrary();
+              hideNewKnowledgeFolderModal();
+              showToast('Carpeta creada: ' + name, 'success');
+            }
+          })
+          .withFailureHandler(function(err) {
+            let message = 'Error creant carpeta';
+            if (err.message && err.message.includes('duplicate')) {
+              message = 'Aquesta carpeta ja existeix';
+            }
+            showToast(message, 'error');
+          })
+          .createFolder(name);
       }
 
       // Show new recipe modal (without pre-selected folder)

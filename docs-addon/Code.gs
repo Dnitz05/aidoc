@@ -247,6 +247,21 @@ function deleteFolder(folderName) {
 }
 
 /**
+ * Create a new folder (v7.0 - persistent)
+ */
+function createFolder(folderName) {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) throw new Error("Falta la llicència API.");
+
+  return callWorker({
+    action: 'create_folder',
+    license_key: settings.license_key,
+    folder_name: folderName
+  });
+}
+
+/**
  * Upload a file to the knowledge library
  */
 function uploadToKnowledgeLibrary(base64Data, mimeType, fileName) {
