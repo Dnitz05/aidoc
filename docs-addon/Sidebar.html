@@ -181,6 +181,12 @@
               <div class="title">Fitxers Actius</div>
               <div class="subtitle" id="activeFileStatus">Cap fitxer seleccionat</div>
             </div>
+            <!-- Strict Mode Toggle (compact) -->
+            <label class="strict-mode-toggle" title="Mode Estricte: Només usa info dels fitxers">
+              <span class="strict-mode-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+              <input type="checkbox" id="strictMode">
+              <span class="strict-mode-slider"></span>
+            </label>
           </div>
           <div id="activeFileDisplay" class="knowledge-active-file hidden">
             <!-- v6.0: Multiple file chips will be rendered here dynamically -->
@@ -205,21 +211,6 @@
               <span>Cap fitxer a la biblioteca</span>
             </div>
           </div>
-        </div>
-
-        <!-- Strict Mode Toggle -->
-        <div class="toggle-row">
-          <div class="toggle-label">
-            <span class="i i--default"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-            <div>
-              <div class="text">Mode Estricte</div>
-              <div class="hint">Només usa info del fitxer/context</div>
-            </div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="strictMode">
-            <span class="toggle-slider"></span>
-          </label>
         </div>
       </div>
 

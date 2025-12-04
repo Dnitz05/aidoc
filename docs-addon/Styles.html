@@ -2826,6 +2826,75 @@
         display: none;
       }
 
+      /* Strict Mode Toggle (compact inline) */
+      .strict-mode-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-left: auto;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: var(--radius-sm);
+        transition: background 0.15s ease;
+      }
+
+      .strict-mode-toggle:hover {
+        background: var(--bg-tertiary);
+      }
+
+      .strict-mode-icon {
+        width: 14px;
+        height: 14px;
+        color: var(--text-muted);
+        transition: color 0.15s ease;
+      }
+
+      .strict-mode-icon svg {
+        width: 100%;
+        height: 100%;
+        stroke: currentColor;
+        stroke-width: 2;
+        fill: none;
+      }
+
+      .strict-mode-toggle input {
+        display: none;
+      }
+
+      .strict-mode-slider {
+        width: 28px;
+        height: 16px;
+        background: var(--border);
+        border-radius: 8px;
+        position: relative;
+        transition: background 0.2s ease;
+      }
+
+      .strict-mode-slider::after {
+        content: '';
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: white;
+        border-radius: 50%;
+        top: 2px;
+        left: 2px;
+        transition: transform 0.2s ease;
+      }
+
+      .strict-mode-toggle input:checked + .strict-mode-slider {
+        background: var(--accent);
+      }
+
+      .strict-mode-toggle input:checked + .strict-mode-slider::after {
+        transform: translateX(12px);
+      }
+
+      .strict-mode-toggle input:checked ~ .strict-mode-icon,
+      .strict-mode-toggle:has(input:checked) .strict-mode-icon {
+        color: var(--accent);
+      }
+
       .knowledge-library-card {
         flex: 1;
         display: flex;
