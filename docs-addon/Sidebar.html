@@ -225,19 +225,44 @@
 
       <!-- Sticky Bottom Bar -->
       <div class="knowledge-bottom-bar">
-        <label class="knowledge-upload-btn" id="uploadBtn">
+        <button class="knowledge-add-btn" onclick="showNewKnowledgeFolderModal()">
+          <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></span>
+          Nova carpeta
+        </button>
+        <label class="knowledge-add-btn" id="uploadBtn">
           <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md" onchange="handleFileSelect()">
-          <span class="upload-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
-          <span class="upload-text">Pujar fitxer</span>
+          <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+          Pujar fitxer
         </label>
-        <div id="uploadProgress" class="upload-progress hidden">
-          <div class="upload-progress-inner">
-            <span class="upload-spinner"></span>
-            <span class="upload-status">Processant fitxer...</span>
+      </div>
+      <div id="uploadProgress" class="upload-progress hidden">
+        <div class="upload-progress-inner">
+          <span class="upload-spinner"></span>
+          <span class="upload-status">Processant fitxer...</span>
+        </div>
+        <div class="upload-progress-bar">
+          <div class="upload-progress-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Knowledge Folder Modal -->
+    <div id="newKnowledgeFolderModal" class="modal hidden">
+      <div class="modal-backdrop" onclick="hideNewKnowledgeFolderModal()"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <span class="modal-title"><span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span> Nova Carpeta</span>
+          <button class="modal-close" onclick="hideNewKnowledgeFolderModal()"><span class="i"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Nom de la carpeta</label>
+            <input type="text" class="form-input" id="newKnowledgeFolderName" placeholder="Ex: Documentació projecte" maxlength="30">
           </div>
-          <div class="upload-progress-bar">
-            <div class="upload-progress-fill"></div>
-          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="hideNewKnowledgeFolderModal()">Cancel·lar</button>
+          <button class="btn btn-primary" onclick="saveNewKnowledgeFolder()">Crear Carpeta</button>
         </div>
       </div>
     </div>
@@ -306,6 +331,34 @@
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="hideNewFolderModal()">Cancel·lar</button>
           <button class="btn btn-primary" onclick="saveNewFolder()">Crear Carpeta</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Folder Modal -->
+    <div id="editFolderModal" class="modal hidden">
+      <div class="modal-backdrop" onclick="hideEditFolderModal()"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <span class="modal-title"><span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></span> Editar Carpeta</span>
+          <button class="modal-close" onclick="hideEditFolderModal()"><span class="i"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editFolderIndex">
+          <div class="form-group">
+            <label class="form-label">Icona</label>
+            <div class="icon-selector" id="editFolderIconSelector">
+              <!-- Icons rendered by JS -->
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nom</label>
+            <input type="text" class="form-input" id="editFolderName" placeholder="Ex: Les meves receptes" maxlength="30">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="hideEditFolderModal()">Cancel·lar</button>
+          <button class="btn btn-primary" onclick="saveEditFolder()">Desar Canvis</button>
         </div>
       </div>
     </div>
@@ -2850,6 +2903,7 @@
               '<span class="folder-toggle">' + (isCollapsed ? icon('chevronRight', 'i--sm') : icon('chevronDown', 'i--sm')) + '</span>' +
               '<div class="folder-actions">' +
                 '<button class="folder-action-btn folder-add-btn" onclick="event.stopPropagation(); showAddRecipeToFolder(\'' + folder.id + '\')" title="Afegir recepta">' + icon('plus', 'i--sm') + '</button>' +
+                '<button class="folder-action-btn folder-edit-btn" onclick="event.stopPropagation(); showEditFolderModal(' + folderIndex + ')" title="Editar carpeta">' + icon('pencil', 'i--sm') + '</button>' +
                 '<button class="folder-action-btn folder-delete-btn" onclick="event.stopPropagation(); deleteFolder(' + folderIndex + ')" title="Esborrar carpeta">' + icon('trash', 'i--error i--sm') + '</button>' +
               '</div>' +
             '</div>' +
@@ -3112,6 +3166,47 @@
         saveRecipes();
         renderFolders();
         hideNewFolderModal();
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // KNOWLEDGE FOLDER MODAL FUNCTIONS
+      // ═══════════════════════════════════════════════════════════════
+
+      function showNewKnowledgeFolderModal() {
+        document.getElementById('newKnowledgeFolderName').value = '';
+        const modal = document.getElementById('newKnowledgeFolderModal');
+        modal.classList.remove('hidden');
+        setTimeout(function() {
+          modal.classList.add('visible');
+          document.getElementById('newKnowledgeFolderName').focus();
+        }, 10);
+      }
+
+      function hideNewKnowledgeFolderModal() {
+        const modal = document.getElementById('newKnowledgeFolderModal');
+        modal.classList.remove('visible');
+        setTimeout(function() {
+          modal.classList.add('hidden');
+        }, 200);
+      }
+
+      function saveNewKnowledgeFolder() {
+        const name = document.getElementById('newKnowledgeFolderName').value.trim();
+
+        if (!name) {
+          showToast('Escriu un nom per la carpeta', 'warning');
+          return;
+        }
+
+        // Add folder to local list
+        if (!knowledgeFolders.includes(name)) {
+          knowledgeFolders.push(name);
+          knowledgeFolders.sort();
+        }
+
+        renderKnowledgeLibrary();
+        hideNewKnowledgeFolderModal();
+        showToast('Carpeta creada: ' + name, 'success');
       }
 
       // Show new recipe modal (without pre-selected folder)

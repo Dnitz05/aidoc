@@ -2790,14 +2790,40 @@
         flex-shrink: 0;
       }
 
-      .knowledge-bottom-bar .knowledge-upload-btn {
+      .knowledge-add-btn {
         flex: 1;
-        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
         padding: var(--space-sm);
+        background: transparent;
+        border: 1px dashed var(--border);
+        border-radius: var(--radius-md);
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
       }
 
-      .knowledge-bottom-bar .upload-progress {
-        flex: 1;
+      .knowledge-add-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-muted);
+      }
+
+      .knowledge-add-btn .i {
+        color: inherit;
+      }
+
+      .knowledge-add-btn .i svg {
+        stroke: currentColor;
+        fill: none;
+      }
+
+      .knowledge-add-btn input[type="file"] {
+        display: none;
       }
 
       .knowledge-library-card {
@@ -2829,8 +2855,8 @@
       .knowledge-library-list {
         flex: 1;
         overflow-y: auto;
+        overflow-x: hidden;
         min-height: 80px;
-        max-height: 200px;
         margin: var(--space-sm) 0;
       }
 
