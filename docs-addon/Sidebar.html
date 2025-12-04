@@ -2903,7 +2903,7 @@
               '<span class="folder-toggle">' + (isCollapsed ? icon('chevronRight', 'i--sm') : icon('chevronDown', 'i--sm')) + '</span>' +
               '<div class="folder-actions">' +
                 '<button class="folder-action-btn folder-add-btn" onclick="event.stopPropagation(); showAddRecipeToFolder(\'' + folder.id + '\')" title="Afegir recepta">' + icon('plus', 'i--sm') + '</button>' +
-                '<button class="folder-action-btn folder-edit-btn" onclick="event.stopPropagation(); showEditFolderModal(' + folderIndex + ')" title="Editar carpeta">' + icon('pencil', 'i--sm') + '</button>' +
+                '<button class="folder-action-btn folder-edit-btn" onclick="event.stopPropagation(); showEditFolderModal(' + folderIndex + ')" title="Editar carpeta">' + icon('edit', 'i--sm') + '</button>' +
                 '<button class="folder-action-btn folder-delete-btn" onclick="event.stopPropagation(); deleteFolder(' + folderIndex + ')" title="Esborrar carpeta">' + icon('trash', 'i--error i--sm') + '</button>' +
               '</div>' +
             '</div>' +
@@ -3166,6 +3166,63 @@
         saveRecipes();
         renderFolders();
         hideNewFolderModal();
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // EDIT FOLDER MODAL FUNCTIONS
+      // ═══════════════════════════════════════════════════════════════
+
+      let selectedEditFolderIcon = 'folder';
+
+      function showEditFolderModal(folderIndex) {
+        const folder = userFolders[folderIndex];
+        if (!folder) return;
+
+        document.getElementById('editFolderIndex').value = folderIndex;
+        document.getElementById('editFolderName').value = folder.name;
+        selectedEditFolderIcon = mapEmojiToIcon(folder.icon);
+        renderIconSelector('editFolderIconSelector', FOLDER_ICONS, selectedEditFolderIcon, 'selectEditFolderIcon');
+
+        const modal = document.getElementById('editFolderModal');
+        modal.classList.remove('hidden');
+        setTimeout(function() {
+          modal.classList.add('visible');
+          document.getElementById('editFolderName').focus();
+        }, 10);
+      }
+
+      function hideEditFolderModal() {
+        const modal = document.getElementById('editFolderModal');
+        modal.classList.remove('visible');
+        setTimeout(function() {
+          modal.classList.add('hidden');
+        }, 200);
+      }
+
+      function selectEditFolderIcon(iconName) {
+        selectedEditFolderIcon = iconName;
+        document.querySelectorAll('#editFolderIconSelector .icon-picker-btn').forEach(function(btn) {
+          btn.classList.toggle('selected', btn.dataset.icon === iconName);
+        });
+      }
+
+      function saveEditFolder() {
+        const folderIndex = parseInt(document.getElementById('editFolderIndex').value);
+        const name = document.getElementById('editFolderName').value.trim();
+
+        if (!name) {
+          showToast('Escriu un nom per la carpeta', 'warning');
+          return;
+        }
+
+        if (userFolders[folderIndex]) {
+          userFolders[folderIndex].name = name;
+          userFolders[folderIndex].icon = selectedEditFolderIcon;
+          saveRecipes();
+          renderFolders();
+          hideEditFolderModal();
+          showToast('Carpeta actualitzada', 'success');
+        }
       }
 
       // ═══════════════════════════════════════════════════════════════
