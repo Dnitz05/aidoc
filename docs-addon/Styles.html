@@ -414,6 +414,151 @@
         word-break: break-word;
       }
 
+      /* ═══════════════════════════════════════════════════════════
+         MARKDOWN STYLES (v6.5)
+         ═══════════════════════════════════════════════════════════ */
+
+      .md-content {
+        line-height: 1.55;
+        word-break: break-word;
+      }
+
+      .md-content p.md-para {
+        margin: 0 0 8px 0;
+      }
+
+      .md-content p.md-para:last-child {
+        margin-bottom: 0;
+      }
+
+      /* Code blocks */
+      .md-content pre.md-pre {
+        background: var(--bg-secondary);
+        border-radius: var(--radius-sm);
+        padding: 10px 12px;
+        overflow-x: auto;
+        margin: 8px 0;
+        font-size: 11px;
+        border: 1px solid var(--border);
+      }
+
+      .md-content pre.md-pre code {
+        background: none;
+        padding: 0;
+        font-family: var(--font-mono);
+        color: var(--text-secondary);
+        font-size: inherit;
+      }
+
+      /* Inline code */
+      .md-content code.md-inline-code {
+        background: var(--bg-secondary);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 0.88em;
+        color: var(--accent);
+        border: 1px solid var(--border);
+      }
+
+      /* Bold & Italic */
+      .md-content strong {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .md-content em {
+        font-style: italic;
+      }
+
+      .md-content del {
+        text-decoration: line-through;
+        opacity: 0.65;
+      }
+
+      /* Headers inside bubbles */
+      .md-content .md-header {
+        font-weight: 600;
+        margin: 10px 0 6px 0;
+        color: var(--text-primary);
+        line-height: 1.3;
+      }
+
+      .md-content h4.md-header { font-size: 1.05em; }
+      .md-content h5.md-header { font-size: 0.98em; }
+      .md-content h6.md-header { font-size: 0.92em; }
+
+      /* Lists */
+      .md-content ul.md-list,
+      .md-content ol.md-list-num {
+        margin: 8px 0;
+        padding-left: 18px;
+      }
+
+      .md-content .md-li,
+      .md-content .md-li-num {
+        margin: 3px 0;
+        line-height: 1.45;
+      }
+
+      /* Links */
+      .md-content a.md-link {
+        color: var(--accent);
+        text-decoration: none;
+        border-bottom: 1px solid transparent;
+        transition: border-color 0.15s ease;
+      }
+
+      .md-content a.md-link:hover {
+        border-bottom-color: var(--accent);
+      }
+
+      /* Blockquotes */
+      .md-content blockquote.md-quote {
+        border-left: 3px solid var(--accent);
+        margin: 8px 0;
+        padding: 4px 12px;
+        background: var(--bg-secondary);
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        font-style: italic;
+        color: var(--text-secondary);
+      }
+
+      /* Horizontal rule */
+      .md-content hr.md-hr {
+        border: none;
+        height: 1px;
+        background: var(--border);
+        margin: 12px 0;
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         LOADING MORE MESSAGES (v6.5)
+         ═══════════════════════════════════════════════════════════ */
+
+      .msg.loading-more {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 8px;
+        background: transparent;
+        border: none;
+      }
+
+      .msg.loading-more .thinking-shimmer {
+        width: 60%;
+        height: 10px;
+        border-radius: 5px;
+        background: linear-gradient(
+          90deg,
+          var(--bg-secondary) 25%,
+          var(--bg-tertiary) 50%,
+          var(--bg-secondary) 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.5s ease-in-out infinite;
+      }
+
       /* Revert Button */
       .revert-btn {
         display: inline-flex;
@@ -1785,9 +1930,9 @@
         display: flex;
         flex-direction: column;
         gap: var(--space-sm);
+        overflow-x: hidden;
         overflow-y: auto;
         flex: 1;
-        padding-right: 4px;
       }
 
       .folders-container::-webkit-scrollbar {
@@ -2008,29 +2153,6 @@
       }
 
       .folder.drag-over .folder-header {
-        background: var(--accent-muted);
-      }
-
-      /* Add Folder Button */
-      .add-folder-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 12px;
-        background: transparent;
-        border: 2px dashed var(--border);
-        border-radius: var(--radius-md);
-        color: var(--text-muted);
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        margin-top: var(--space-sm);
-      }
-
-      .add-folder-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent);
         background: var(--accent-muted);
       }
 

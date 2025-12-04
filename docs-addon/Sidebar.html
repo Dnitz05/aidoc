@@ -172,70 +172,73 @@
 
     <!-- Docs Panel (Knowledge) v5.1 - Library System -->
     <div id="docsPanel" class="panel">
-      <!-- Active Files Section (v6.0 - Multiple Files) -->
-      <div class="settings-card" id="activeFileSection">
-        <div class="settings-card-header">
-          <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-          <div>
-            <div class="title">Fitxers Actius</div>
-            <div class="subtitle" id="activeFileStatus">Cap fitxer seleccionat</div>
+      <div class="knowledge-panel-content">
+        <!-- Active Files Section (v6.0 - Multiple Files) -->
+        <div class="settings-card" id="activeFileSection">
+          <div class="settings-card-header">
+            <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+            <div>
+              <div class="title">Fitxers Actius</div>
+              <div class="subtitle" id="activeFileStatus">Cap fitxer seleccionat</div>
+            </div>
+          </div>
+          <div id="activeFileDisplay" class="knowledge-active-file hidden">
+            <!-- v6.0: Multiple file chips will be rendered here dynamically -->
           </div>
         </div>
-        <div id="activeFileDisplay" class="knowledge-active-file hidden">
-          <!-- v6.0: Multiple file chips will be rendered here dynamically -->
-        </div>
-      </div>
 
-      <!-- Library Section -->
-      <div class="settings-card knowledge-library-card">
-        <div class="settings-card-header">
-          <span class="i i--default"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
-          <div>
-            <div class="title">Biblioteca</div>
-            <div class="subtitle">Fitxers pujats anteriorment</div>
+        <!-- Library Section -->
+        <div class="settings-card knowledge-library-card">
+          <div class="settings-card-header">
+            <span class="i i--default"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+            <div>
+              <div class="title">Biblioteca</div>
+              <div class="subtitle">Fitxers pujats anteriorment</div>
+            </div>
+            <button class="knowledge-refresh-btn" onclick="refreshKnowledgeLibrary()" title="Actualitzar">
+              <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
+            </button>
           </div>
-          <button class="knowledge-refresh-btn" onclick="refreshKnowledgeLibrary()" title="Actualitzar">
-            <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
-          </button>
-        </div>
-        <div id="knowledgeLibraryList" class="knowledge-library-list">
-          <div class="knowledge-empty">
-            <span class="i i--muted"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
-            <span>Cap fitxer a la biblioteca</span>
+          <div id="knowledgeLibraryList" class="knowledge-library-list">
+            <div class="knowledge-empty">
+              <span class="i i--muted"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+              <span>Cap fitxer a la biblioteca</span>
+            </div>
           </div>
         </div>
-        <!-- Upload New File -->
-        <div class="knowledge-upload-section">
-          <label class="knowledge-upload-btn" id="uploadBtn">
-            <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md" onchange="handleFileSelect()">
-            <span class="upload-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
-            <span class="upload-text">Pujar fitxer a la biblioteca</span>
+
+        <!-- Strict Mode Toggle -->
+        <div class="toggle-row">
+          <div class="toggle-label">
+            <span class="i i--default"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+            <div>
+              <div class="text">Mode Estricte</div>
+              <div class="hint">Només usa info del fitxer/context</div>
+            </div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="strictMode">
+            <span class="toggle-slider"></span>
           </label>
-          <div id="uploadProgress" class="upload-progress hidden">
-            <div class="upload-progress-inner">
-              <span class="upload-spinner"></span>
-              <span class="upload-status">Processant fitxer...</span>
-            </div>
-            <div class="upload-progress-bar">
-              <div class="upload-progress-fill"></div>
-            </div>
-          </div>
         </div>
       </div>
 
-      <!-- Strict Mode Toggle -->
-      <div class="toggle-row">
-        <div class="toggle-label">
-          <span class="i i--default"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-          <div>
-            <div class="text">Mode Estricte</div>
-            <div class="hint">Només usa info del fitxer/context</div>
+      <!-- Sticky Bottom Bar -->
+      <div class="knowledge-bottom-bar">
+        <label class="knowledge-upload-btn" id="uploadBtn">
+          <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md" onchange="handleFileSelect()">
+          <span class="upload-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+          <span class="upload-text">Pujar fitxer</span>
+        </label>
+        <div id="uploadProgress" class="upload-progress hidden">
+          <div class="upload-progress-inner">
+            <span class="upload-spinner"></span>
+            <span class="upload-status">Processant fitxer...</span>
+          </div>
+          <div class="upload-progress-bar">
+            <div class="upload-progress-fill"></div>
           </div>
         </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="strictMode">
-          <span class="toggle-slider"></span>
-        </label>
       </div>
     </div>
 
@@ -730,7 +733,14 @@
       let conversationMessageCount = 0; // Track for auto-title trigger
       const SAVE_DEBOUNCE_MS = 1500; // Save 1.5s after last message
 
-      console.log('[Docmile v5.2] Loaded - Enhanced Conversations System');
+      // v6.5: Pagination for large conversations
+      const MESSAGES_PAGE_SIZE = 50;
+      let currentMessagesOffset = 0;
+      let isLoadingMessages = false;
+      let hasMoreMessages = false;
+      let totalMessagesCount = 0;
+
+      console.log('[Docmile v6.5] Loaded - Paginated Conversations');
 
       const MODES = {
         edit: { icon: 'edit', label: 'Edit' },
@@ -887,19 +897,26 @@
         currentConversationId = conversationId;
         closeConversationsDrawer();
 
+        // v6.5: Reset pagination state
+        currentMessagesOffset = 0;
+        hasMoreMessages = false;
+        totalMessagesCount = 0;
+
         // Clear chat and show loading
         const chatHistory = document.getElementById('chatHistory');
         chatHistory.innerHTML = '<div class="msg system">Carregant conversa...</div>';
 
+        // v6.5: First get conversation metadata, then load paginated messages
         google.script.run
           .withSuccessHandler(function(res) {
             if (res.status === 'ok' && res.conversation) {
-              loadConversationMessages(res.conversation);
               updateConversationTitle(res.conversation.title);
-              // v5.2: Track message count for auto-title
               conversationMessageCount = res.conversation.message_count || 0;
-              // Update active state in drawer
+              totalMessagesCount = conversationMessageCount;
               updateActiveConversation(conversationId);
+
+              // Load initial batch of messages (most recent)
+              loadPaginatedMessages(conversationId, false);
             } else {
               chatHistory.innerHTML = '<div class="msg system">Error carregant la conversa</div>';
             }
@@ -915,17 +932,126 @@
           });
       }
 
-      function loadConversationMessages(conversation) {
+      // v6.5: Load paginated messages
+      function loadPaginatedMessages(conversationId, prepend) {
+        if (isLoadingMessages) return;
+        isLoadingMessages = true;
+
         const chatHistory = document.getElementById('chatHistory');
-        chatHistory.innerHTML = '';
+        const scrollHeightBefore = chatHistory.scrollHeight;
+
+        if (!prepend) {
+          chatHistory.innerHTML = '<div class="msg system">Carregant missatges...</div>';
+        } else {
+          // Show loading indicator at top
+          const loadingEl = document.createElement('div');
+          loadingEl.className = 'msg loading-more';
+          loadingEl.innerHTML = '<div class="thinking-shimmer"></div>';
+          loadingEl.id = 'loadingMoreIndicator';
+          chatHistory.insertBefore(loadingEl, chatHistory.firstChild);
+        }
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            document.getElementById('loadingMoreIndicator')?.remove();
+            isLoadingMessages = false;
+
+            if (res.status === 'ok') {
+              loadConversationMessages({
+                messages: res.messages || [],
+                has_more: res.has_more,
+                total: res.total
+              }, prepend);
+
+              if (prepend) {
+                // Maintain scroll position
+                const scrollHeightAfter = chatHistory.scrollHeight;
+                chatHistory.scrollTop = scrollHeightAfter - scrollHeightBefore;
+              }
+            } else {
+              if (!prepend) {
+                chatHistory.innerHTML = '<div class="msg system">Error carregant missatges</div>';
+              }
+            }
+          })
+          .withFailureHandler(function(err) {
+            document.getElementById('loadingMoreIndicator')?.remove();
+            isLoadingMessages = false;
+            console.error('Error loading messages:', err);
+            if (!prepend) {
+              chatHistory.innerHTML = '<div class="msg system">Error: ' + err.message + '</div>';
+            }
+          })
+          .callWorker({
+            action: 'get_conversation_messages',
+            license_key: currentSettings.license_key,
+            conversation_id: conversationId,
+            offset: currentMessagesOffset,
+            limit: MESSAGES_PAGE_SIZE
+          });
+      }
+
+      // v6.5: Load older messages when scrolling up
+      function loadMoreMessages() {
+        if (isLoadingMessages || !hasMoreMessages || !currentConversationId) return;
+        loadPaginatedMessages(currentConversationId, true);
+      }
+
+      function loadConversationMessages(conversation, prepend) {
+        const chatHistory = document.getElementById('chatHistory');
+
+        if (!prepend) {
+          chatHistory.innerHTML = '';
+          currentMessagesOffset = 0;
+        }
 
         if (conversation.messages && conversation.messages.length > 0) {
+          // v6.5: Create bubbles and add them properly
           for (const msg of conversation.messages) {
-            addBubble(msg.role === 'ai' ? 'ai' : 'user', msg.content, false);
+            const bubble = document.createElement('div');
+            bubble.className = 'msg ' + (msg.role === 'ai' ? 'ai' : 'user');
+
+            if (msg.role === 'ai') {
+              // Use markdown for AI messages
+              bubble.innerHTML = '<div class="md-content">' + renderMarkdown(msg.content) + '</div>';
+            } else {
+              bubble.innerText = msg.content;
+            }
+
+            if (prepend) {
+              chatHistory.insertBefore(bubble, chatHistory.firstChild);
+            } else {
+              chatHistory.appendChild(bubble);
+            }
           }
-        } else {
+
+          // Update pagination state
+          currentMessagesOffset += conversation.messages.length;
+          hasMoreMessages = conversation.has_more || false;
+          if (conversation.total) {
+            totalMessagesCount = conversation.total;
+          }
+
+          // Scroll to bottom for initial load
+          if (!prepend) {
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+          }
+        } else if (!prepend) {
           chatHistory.innerHTML = '<div class="msg system">Conversa buida. Escriu un missatge!</div>';
         }
+      }
+
+      // v6.5: Initialize scroll listener for lazy loading
+      function initChatScrollListener() {
+        const chatHistory = document.getElementById('chatHistory');
+        if (!chatHistory) return;
+
+        chatHistory.addEventListener('scroll', function() {
+          // Load more when near the top
+          if (chatHistory.scrollTop < 100 && hasMoreMessages && !isLoadingMessages && currentConversationId) {
+            loadMoreMessages();
+          }
+        });
       }
 
       function updateConversationTitle(title) {
@@ -1189,6 +1315,9 @@
 
         // Initialize mode selector
         initModeSelector();
+
+        // v6.5: Initialize scroll listener for lazy loading messages
+        initChatScrollListener();
 
         // Position nav pill
         updateNavPill();
@@ -2743,9 +2872,6 @@
 
           html += '</div></div>';
         });
-
-        // Add "New Folder" button
-        html += '<button class="add-folder-btn" onclick="showNewFolderModal()">+ Nova Carpeta</button>';
 
         container.innerHTML = html;
       }
