@@ -927,7 +927,7 @@ function getDocumentWordCount() {
  * @param {string} eventId - ID de l'event a confirmar
  */
 function confirmEditHash(eventId) {
-  if (!eventId) return;
+  if (!eventId) return { confirmed: false };
 
   const settings = JSON.parse(getSettings());
   const newHash = getDocumentStateHash();
@@ -949,9 +949,12 @@ function confirmEditHash(eventId) {
   };
 
   try {
-    UrlFetchApp.fetch(API_URL, options);
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const json = JSON.parse(response.getContentText());
+    return { confirmed: json.status === 'ok' };
   } catch (e) {
     Logger.log('Confirm hash failed: ' + e.message);
+    return { confirmed: false };
   }
 }
 
@@ -990,6 +993,7 @@ function getDocumentTimeline() {
 
 /**
  * Reverteix una edició específica del timeline
+ * Usa el mateix mapatge d'elements que processUserCommand
  */
 function revertEditEvent(eventId) {
   const doc = DocumentApp.getActiveDocument();
@@ -1013,20 +1017,55 @@ function revertEditEvent(eventId) {
     const response = UrlFetchApp.fetch(API_URL, options);
     const json = JSON.parse(response.getContentText());
 
-    // If we have restore_text and target_id, apply the revert to the document
-    if (json.status === 'ok' && json.restore_text && json.target_id !== null) {
-      const body = doc.getBody();
-      const paragraphs = body.getParagraphs();
+    if (json.status !== 'ok') {
+      return { status: 'error', error: json.error_code || json.error || 'Error desconegut' };
+    }
 
-      if (json.target_id >= 0 && json.target_id < paragraphs.length) {
-        paragraphs[json.target_id].setText(json.restore_text);
-      }
-    } else if (json.status === 'ok' && !json.restore_text) {
-      // No before_text available - can't revert
+    if (!json.restore_text) {
       return { status: 'error', error: 'No hi ha text anterior guardat per aquesta edició' };
     }
 
-    return json;
+    if (json.target_id === null || json.target_id === undefined) {
+      return { status: 'error', error: 'No hi ha target_id per aquesta edició' };
+    }
+
+    // Usar el MATEIX mapatge que processUserCommand (només PARAGRAPH i LIST_ITEM amb text)
+    const body = doc.getBody();
+    const numChildren = body.getNumChildren();
+    let elementsToProcess = [];
+
+    for (let i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
+          child.getType() === DocumentApp.ElementType.LIST_ITEM) {
+        elementsToProcess.push(child);
+      }
+    }
+
+    // Trobar element per ID (comptant només elements amb text, com fa el marcatge)
+    const targetId = parseInt(json.target_id, 10);
+    let targetElement = null;
+    let currentIndex = 0;
+
+    for (let i = 0; i < elementsToProcess.length; i++) {
+      const el = elementsToProcess[i];
+      const text = el.asText().getText();
+      if (text.trim().length > 0) {
+        if (currentIndex === targetId) {
+          targetElement = el;
+          break;
+        }
+        currentIndex++;
+      }
+    }
+
+    if (targetElement) {
+      targetElement.asText().setText(json.restore_text);
+      return { status: 'ok', restore_text: json.restore_text, target_id: json.target_id };
+    } else {
+      return { status: 'error', error: "No s'ha trobat el paràgraf amb ID " + targetId };
+    }
+
   } catch (e) {
     Logger.log('Revert edit failed: ' + e.message);
     return { status: 'error', error: e.message };

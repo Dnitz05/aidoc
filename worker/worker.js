@@ -1137,6 +1137,10 @@ export default {
       if (body.action === 'get_conversation') {
         return await handleGetConversation(body, env, corsHeaders);
       }
+      // v6.5: Paginated message retrieval
+      if (body.action === 'get_conversation_messages') {
+        return await handleGetConversationMessages(body, env, corsHeaders);
+      }
       if (body.action === 'create_conversation') {
         return await handleCreateConversation(body, env, corsHeaders);
       }
@@ -2134,6 +2138,57 @@ async function handleGetConversation(body, env, corsHeaders) {
       created_at: conv.created_at,
       updated_at: conv.updated_at
     }
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * GET paginated messages from a conversation (v6.5)
+ * body: { license_key, conversation_id, offset?, limit? }
+ */
+async function handleGetConversationMessages(body, env, corsHeaders) {
+  const { license_key, license_key_hash, conversation_id, offset = 0, limit = 50 } = body;
+
+  const licenseHash = license_key_hash || (license_key ? await hashKey(license_key) : null);
+  if (!licenseHash) throw new Error("missing_license");
+  if (!conversation_id) throw new Error("missing_conversation_id");
+
+  // Use SQL function for efficient pagination
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/rpc/get_conversation_messages`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        p_conversation_id: conversation_id,
+        p_license_hash: licenseHash,
+        p_offset: parseInt(offset) || 0,
+        p_limit: Math.min(parseInt(limit) || 50, 100)  // Max 100 per request
+      })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  const result = await response.json();
+
+  if (result.status === 'error') {
+    throw new Error(result.error || 'fetch_messages_failed');
+  }
+
+  const totalCount = result.total_count || 0;
+  const messages = result.messages || [];
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    messages: messages,
+    total: totalCount,
+    has_more: (parseInt(offset) || 0) + messages.length < totalCount
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 

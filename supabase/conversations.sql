@@ -276,3 +276,109 @@ BEGIN
   LIMIT p_limit;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ═══════════════════════════════════════════════════════════════
+-- PAGINATED MESSAGE RETRIEVAL (v6.5)
+-- ═══════════════════════════════════════════════════════════════
+
+-- Get paginated messages from a conversation (for lazy loading)
+-- Returns newest messages first, client reverses for display
+CREATE OR REPLACE FUNCTION get_conversation_messages(
+  p_conversation_id UUID,
+  p_license_hash TEXT,
+  p_offset INTEGER DEFAULT 0,
+  p_limit INTEGER DEFAULT 50
+)
+RETURNS JSONB AS $$
+DECLARE
+  conv_record RECORD;
+  total_count INTEGER;
+  msg_slice JSONB;
+BEGIN
+  -- 1. Verify ownership and get conversation
+  SELECT messages, message_count INTO conv_record
+  FROM conversations
+  WHERE id = p_conversation_id AND license_key_hash = p_license_hash;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('status', 'error', 'error', 'conversation_not_found');
+  END IF;
+
+  total_count := COALESCE(conv_record.message_count, 0);
+
+  -- 2. If no messages, return empty
+  IF total_count = 0 OR conv_record.messages IS NULL THEN
+    RETURN jsonb_build_object(
+      'status', 'ok',
+      'messages', '[]'::jsonb,
+      'total_count', 0
+    );
+  END IF;
+
+  -- 3. Extract slice of messages (from end, for "load older" pattern)
+  -- We load from newest to oldest, then reverse in the client
+  SELECT COALESCE(jsonb_agg(elem ORDER BY idx DESC), '[]'::jsonb)
+  INTO msg_slice
+  FROM (
+    SELECT elem, idx
+    FROM jsonb_array_elements(conv_record.messages) WITH ORDINALITY arr(elem, idx)
+    ORDER BY idx DESC  -- Newest first
+    OFFSET p_offset
+    LIMIT p_limit
+  ) sub;
+
+  -- 4. Reverse to chronological order for client display
+  SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+  INTO msg_slice
+  FROM (
+    SELECT elem
+    FROM jsonb_array_elements(msg_slice) WITH ORDINALITY arr(elem, idx)
+    ORDER BY idx DESC
+  ) sub;
+
+  RETURN jsonb_build_object(
+    'status', 'ok',
+    'messages', msg_slice,
+    'total_count', total_count
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- Atomic append with ownership verification (v6.5 enhanced)
+CREATE OR REPLACE FUNCTION append_conversation_messages(
+  p_conversation_id UUID,
+  p_license_hash TEXT,
+  p_messages JSONB
+)
+RETURNS JSONB AS $$
+DECLARE
+  msg_count INTEGER;
+  new_count INTEGER;
+BEGIN
+  -- Verify ownership
+  IF NOT EXISTS (
+    SELECT 1 FROM conversations
+    WHERE id = p_conversation_id AND license_key_hash = p_license_hash
+  ) THEN
+    RETURN jsonb_build_object('status', 'error', 'error', 'conversation_not_found');
+  END IF;
+
+  -- Count messages to append
+  SELECT jsonb_array_length(p_messages) INTO msg_count;
+
+  -- Atomic append
+  UPDATE conversations
+  SET
+    messages = messages || p_messages,
+    message_count = message_count + msg_count,
+    updated_at = NOW()
+  WHERE id = p_conversation_id
+  RETURNING message_count INTO new_count;
+
+  RETURN jsonb_build_object(
+    'status', 'ok',
+    'message_count', new_count,
+    'appended', msg_count
+  );
+END;
+$$ LANGUAGE plpgsql;
