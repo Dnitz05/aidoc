@@ -3037,6 +3037,88 @@
         line-height: 1.4;
       }
 
+      /* Move File Modal Styles */
+      .move-file-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-primary);
+        padding: var(--space-sm);
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-sm);
+        margin-bottom: var(--space-md);
+        word-break: break-all;
+      }
+
+      .move-folder-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+        max-height: 200px;
+        overflow-y: auto;
+        margin-bottom: var(--space-md);
+      }
+
+      .move-folder-option {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        color: var(--text-primary);
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-align: left;
+      }
+
+      .move-folder-option:hover {
+        background: var(--accent-muted);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .move-folder-option .i {
+        color: var(--text-muted);
+      }
+
+      .move-folder-option:hover .i {
+        color: var(--accent);
+      }
+
+      .move-folder-option .i svg {
+        stroke: currentColor;
+        fill: none;
+      }
+
+      .move-folder-empty {
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 12px;
+        padding: var(--space-md);
+      }
+
+      .move-new-folder {
+        display: flex;
+        gap: var(--space-sm);
+        align-items: center;
+      }
+
+      .move-new-folder .form-input {
+        flex: 1;
+      }
+
+      .move-new-folder .btn-sm {
+        padding: 8px 10px;
+        min-width: auto;
+      }
+
+      .move-new-folder .btn-sm .i svg {
+        stroke: currentColor;
+        fill: none;
+      }
+
       .strict-mode-toggle {
         display: flex;
         align-items: center;

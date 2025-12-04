@@ -265,6 +265,29 @@
       </div>
     </div>
 
+    <!-- Move File Modal -->
+    <div id="moveFileModal" class="modal hidden">
+      <div class="modal-backdrop" onclick="hideMoveFileModal()"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <span class="modal-title"><span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 11v6"/><path d="M9 14l3-3 3 3"/></svg></span> Moure fitxer</span>
+          <button class="modal-close" onclick="hideMoveFileModal()"><span class="i"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>
+        </div>
+        <div class="modal-body">
+          <div class="move-file-name" id="moveFileName"></div>
+          <div class="move-folder-list" id="moveFolderList">
+            <!-- Folders rendered dynamically -->
+          </div>
+          <div class="move-new-folder">
+            <input type="text" class="form-input" id="moveNewFolderName" placeholder="O crea una nova carpeta...">
+            <button class="btn btn-secondary btn-sm" onclick="moveToNewFolder()">
+              <span class="i i--sm"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Recipes Panel (v3.6 - Folder System) -->
     <div id="recipesPanel" class="panel">
       <div class="recipes-panel-content">
@@ -3761,34 +3784,89 @@
         }
       }
 
+      // Move file modal state
+      let moveFileId = null;
+      let moveFileName = null;
+
       function promptMoveFile(fileId, fileName) {
-        const options = ['(Arrel)', ...knowledgeFolders.filter(f => f !== currentFolder)];
-        const choice = prompt(
-          'Moure "' + fileName + '" a:\n\n' +
-          options.map((f, i) => (i + 1) + '. ' + f).join('\n') +
-          '\n\nEscriu el número o el nom de la carpeta (o un nom nou per crear-la):'
-        );
+        moveFileId = fileId;
+        moveFileName = fileName;
 
-        if (choice !== null && choice.trim()) {
-          let targetFolder = null;
-          const num = parseInt(choice.trim());
+        // Find current folder of the file
+        const file = knowledgeLibrary.find(f => f.id === fileId);
+        const fileFolder = file ? file.folder : null;
 
-          if (!isNaN(num) && num >= 1 && num <= options.length) {
-            targetFolder = num === 1 ? null : options[num - 1];
-          } else {
-            // User typed a folder name
-            targetFolder = choice.trim() === '(Arrel)' ? null : choice.trim();
-          }
+        // Set file name in modal
+        document.getElementById('moveFileName').textContent = fileName;
+        document.getElementById('moveNewFolderName').value = '';
 
-          google.script.run
-            .withSuccessHandler(function() {
-              refreshKnowledgeLibrary();
-            })
-            .withFailureHandler(function(err) {
-              alert('Error: ' + err.message);
-            })
-            .moveFileToFolder(fileId, targetFolder);
+        // Render folder options
+        let html = '';
+
+        // Root option (only if file is in a folder)
+        if (fileFolder !== null) {
+          html += `
+            <button class="move-folder-option" onclick="executeMoveFile(null)">
+              <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+              <span>General (sense carpeta)</span>
+            </button>
+          `;
         }
+
+        // Existing folders (exclude current folder)
+        knowledgeFolders.forEach(folder => {
+          if (folder !== fileFolder) {
+            html += `
+              <button class="move-folder-option" onclick="executeMoveFile('${escapeHtml(folder)}')">
+                <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+                <span>${escapeHtml(folder)}</span>
+              </button>
+            `;
+          }
+        });
+
+        if (!html) {
+          html = '<div class="move-folder-empty">No hi ha altres carpetes disponibles</div>';
+        }
+
+        document.getElementById('moveFolderList').innerHTML = html;
+
+        // Show modal
+        const modal = document.getElementById('moveFileModal');
+        modal.classList.remove('hidden');
+        setTimeout(() => modal.classList.add('visible'), 10);
+      }
+
+      function hideMoveFileModal() {
+        const modal = document.getElementById('moveFileModal');
+        modal.classList.remove('visible');
+        setTimeout(() => modal.classList.add('hidden'), 200);
+        moveFileId = null;
+        moveFileName = null;
+      }
+
+      function executeMoveFile(targetFolder) {
+        if (!moveFileId) return;
+
+        google.script.run
+          .withSuccessHandler(function() {
+            hideMoveFileModal();
+            refreshKnowledgeLibrary();
+            showToast('Fitxer mogut correctament', 'success');
+          })
+          .withFailureHandler(function(err) {
+            alert('Error: ' + err.message);
+          })
+          .moveFileToFolder(moveFileId, targetFolder);
+      }
+
+      function moveToNewFolder() {
+        const newFolderName = document.getElementById('moveNewFolderName').value.trim();
+        if (!newFolderName) {
+          showToast('Escriu un nom per la carpeta', 'warning');
+          return;
+        }
+        executeMoveFile(newFolderName);
       }
 
       // v6.0: Toggle file activation (add/remove from active list)
