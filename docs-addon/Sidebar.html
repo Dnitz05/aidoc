@@ -182,11 +182,20 @@
               <div class="subtitle" id="activeFileStatus">Cap fitxer seleccionat</div>
             </div>
             <!-- Strict Mode Toggle (compact) -->
-            <label class="strict-mode-toggle" title="Mode Estricte: Només usa info dels fitxers">
-              <span class="strict-mode-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-              <input type="checkbox" id="strictMode">
-              <span class="strict-mode-slider"></span>
-            </label>
+            <div class="strict-mode-wrapper">
+              <button class="strict-mode-info" onclick="toggleStrictModeInfo(event)">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              </button>
+              <div class="strict-mode-popup" id="strictModePopup">
+                <div class="strict-mode-popup-title">Mode Estricte</div>
+                <div class="strict-mode-popup-text">Quan està activat, la IA només utilitza la informació dels fitxers actius i el context del document. No afegeix coneixement extern.</div>
+              </div>
+              <label class="strict-mode-toggle">
+                <span class="strict-mode-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+                <input type="checkbox" id="strictMode">
+                <span class="strict-mode-slider"></span>
+              </label>
+            </div>
           </div>
           <div id="activeFileDisplay" class="knowledge-active-file hidden">
             <!-- v6.0: Multiple file chips will be rendered here dynamically -->
@@ -1696,6 +1705,18 @@
           return;
         }
 
+        // v7.0: Handle Reference Highlight response
+        if (res.status === 'reference_highlight' && res.highlights) {
+          addBubbleWithReferences(res.ai_response, res.highlights);
+          showToast(res.applied + ' paràgrafs marcats', 'success');
+          if (res.credits !== undefined) {
+            updateCredits(res.credits);
+          }
+          // v5.2: Queue message for save
+          queueMessageForSave(lastSentMessage, res.ai_response, 'reference');
+          return;
+        }
+
         // Normal response handling
         addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
 
@@ -2301,6 +2322,134 @@
 
         container.appendChild(bubble);
         container.scrollTop = container.scrollHeight;
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // v7.0: REFERENCE HIGHLIGHTING FUNCTIONS
+      // ═══════════════════════════════════════════════════════════
+
+      /**
+       * Renderitza una resposta amb referències clicables
+       * @param {string} aiResponse - Text de resposta
+       * @param {Array} highlights - Array de highlights
+       */
+      function addBubbleWithReferences(aiResponse, highlights) {
+        const container = document.getElementById('chatHistory');
+        const bubble = document.createElement('div');
+        bubble.className = 'msg ai';
+
+        // Renderitzar resposta principal amb markdown
+        let html = '<div class="md-content">' + renderMarkdown(aiResponse) + '</div>';
+
+        // Afegir secció de referències
+        if (highlights && highlights.length > 0) {
+          html += '<div class="reference-list">';
+
+          for (const hl of highlights) {
+            const colorClass = 'ref-' + (hl.color || 'yellow');
+            const colorIcon = getColorIcon(hl.color);
+            html += '<div class="reference-item ' + colorClass + '" ' +
+              'onclick="scrollToDocReference(' + hl.para_id + ', \'' + hl.color + '\')" ' +
+              'title="Clic per veure al document">' +
+              '<span class="ref-badge">' + colorIcon + '</span>' +
+              '<span class="ref-content">' +
+              '<span class="ref-snippet">"' + escapeHtmlSafe(hl.snippet || '...') + '"</span>' +
+              '<span class="ref-reason">' + escapeHtmlSafe(hl.reason) + '</span>' +
+              '</span>' +
+              '<span class="ref-arrow">' + icon('chevronRight', 'i--sm') + '</span>' +
+              '</div>';
+          }
+
+          html += '</div>';
+
+          // Botó per netejar tots els highlights
+          html += '<button class="clear-highlights-btn" onclick="clearAllHighlights()">' +
+            icon('x', 'i--sm') + ' Netejar marcatges</button>';
+        }
+
+        bubble.innerHTML = html;
+        container.appendChild(bubble);
+        container.scrollTop = container.scrollHeight;
+      }
+
+      /**
+       * Retorna emoji segons el color
+       */
+      function getColorIcon(color) {
+        const icons = {
+          yellow: '🟡',
+          orange: '🟠',
+          blue: '🔵',
+          purple: '🟣'
+        };
+        return icons[color] || '🟡';
+      }
+
+      /**
+       * Escapa HTML per evitar XSS
+       */
+      function escapeHtmlSafe(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+      }
+
+      /**
+       * Scroll al document i destacar referència
+       */
+      function scrollToDocReference(paraId, color) {
+        showToast('Navegant al paràgraf...', 'info');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              showToast('Paràgraf destacat', 'success');
+              updateActiveReference(paraId);
+            } else {
+              showToast('No s\'ha pogut navegar', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error: ' + err.message, 'error');
+          })
+          .scrollToReference(paraId, color);
+      }
+
+      /**
+       * Actualitza UI per mostrar ref activa
+       */
+      function updateActiveReference(paraId) {
+        // Treure 'active' de tots
+        document.querySelectorAll('.reference-item').forEach(function(el) {
+          el.classList.remove('active');
+        });
+
+        // Afegir 'active' al clicat
+        document.querySelectorAll('.reference-item').forEach(function(el) {
+          if (el.getAttribute('onclick').indexOf(paraId + ',') !== -1) {
+            el.classList.add('active');
+          }
+        });
+      }
+
+      /**
+       * Netejar tots els highlights del document
+       */
+      function clearAllHighlights() {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              showToast('Marcatges netejats (' + result.cleared + ')', 'success');
+              // Treure visual de refs
+              document.querySelectorAll('.reference-item').forEach(function(el) {
+                el.classList.add('cleared');
+              });
+            }
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error netejant: ' + err.message, 'error');
+          })
+          .clearReferenceHighlights();
       }
 
       function showThinking() {
@@ -3215,6 +3364,29 @@
           hideEditFolderModal();
           showToast('Carpeta actualitzada', 'success');
         }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // STRICT MODE INFO POPUP
+      // ═══════════════════════════════════════════════════════════════
+
+      function toggleStrictModeInfo(event) {
+        event.stopPropagation();
+        const popup = document.getElementById('strictModePopup');
+        popup.classList.toggle('visible');
+
+        // Close when clicking outside
+        if (popup.classList.contains('visible')) {
+          setTimeout(() => {
+            document.addEventListener('click', closeStrictModeInfo);
+          }, 10);
+        }
+      }
+
+      function closeStrictModeInfo() {
+        const popup = document.getElementById('strictModePopup');
+        popup.classList.remove('visible');
+        document.removeEventListener('click', closeStrictModeInfo);
       }
 
       // ═══════════════════════════════════════════════════════════════
