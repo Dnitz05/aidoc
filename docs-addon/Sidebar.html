@@ -183,18 +183,16 @@
             </div>
             <!-- Strict Mode Toggle (compact) -->
             <div class="strict-mode-wrapper">
-              <button class="strict-mode-info" onclick="toggleStrictModeInfo(event)">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              </button>
-              <div class="strict-mode-popup" id="strictModePopup">
-                <div class="strict-mode-popup-title">Mode Estricte</div>
-                <div class="strict-mode-popup-text">Quan està activat, la IA només utilitza la informació dels fitxers actius i el context del document. No afegeix coneixement extern.</div>
-              </div>
               <label class="strict-mode-toggle">
                 <span class="strict-mode-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
                 <input type="checkbox" id="strictMode">
                 <span class="strict-mode-slider"></span>
               </label>
+              <button class="strict-mode-info" onclick="toggleStrictModeInfo(event)">?</button>
+              <div class="strict-mode-popup" id="strictModePopup">
+                <div class="strict-mode-popup-title">Mode Estricte</div>
+                <div class="strict-mode-popup-text">Quan està activat, la IA només utilitza la informació dels fitxers actius i el context del document. No afegeix coneixement extern.</div>
+              </div>
             </div>
           </div>
           <div id="activeFileDisplay" class="knowledge-active-file hidden">

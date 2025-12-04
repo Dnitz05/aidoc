@@ -2980,28 +2980,25 @@
       }
 
       .strict-mode-info {
-        width: 16px;
-        height: 16px;
+        width: 14px;
+        height: 14px;
         padding: 0;
-        background: transparent;
-        border: none;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: 50%;
         color: var(--text-muted);
+        font-size: 9px;
+        font-weight: 600;
+        line-height: 12px;
+        text-align: center;
         cursor: pointer;
-        opacity: 0.5;
-        transition: opacity 0.15s ease, color 0.15s ease;
+        transition: all 0.15s ease;
       }
 
       .strict-mode-info:hover {
-        opacity: 1;
-        color: var(--accent);
-      }
-
-      .strict-mode-info svg {
-        width: 100%;
-        height: 100%;
-        stroke: currentColor;
-        stroke-width: 2;
-        fill: none;
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
       }
 
       .strict-mode-popup {
