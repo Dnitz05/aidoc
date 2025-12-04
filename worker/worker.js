@@ -1490,14 +1490,30 @@ INSTRUCCIÓ DE L'USUARI:
     const updateEntries = Object.entries(parsedResponse.updates);
     if (updateEntries.length > 0) {
       const [targetId, afterText] = updateEntries[0];
-      // Note: We need before_text from the original document, which we'll get from last_edit or text
-      const beforeText = last_edit?.targetId === targetId ? last_edit.originalText : null;
+      const targetIdNum = parseInt(targetId, 10);
+
+      // v4.1: Extreure before_text del document marcat o de last_edit
+      let beforeText = null;
+
+      // Primer intent: extreure del document marcat amb regex {{ID}}contingut
+      if (text) {
+        const regex = new RegExp(`\\{\\{${targetId}\\}\\}([\\s\\S]*?)(?=\\{\\{\\d+\\}\\}|$)`);
+        const match = text.match(regex);
+        if (match) {
+          beforeText = match[1].trim();
+        }
+      }
+
+      // Fallback: usar last_edit si existeix i coincideix (comparant com a números)
+      if (!beforeText && last_edit && parseInt(last_edit.targetId, 10) === targetIdNum) {
+        beforeText = last_edit.originalText;
+      }
 
       const eventData = {
         license_key_hash: licenseHash,
         doc_id: doc_metadata?.doc_id || 'unknown',
         event_type: 'UPDATE_BY_ID',
-        target_id: parseInt(targetId, 10),
+        target_id: targetIdNum,
         before_text: beforeText,
         after_text: afterText,
         user_instruction: user_instruction,

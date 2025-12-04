@@ -2297,13 +2297,14 @@
         } else if (type === 'ai') {
           // v6.5: AI responses with markdown rendering
           bubble.innerHTML = '<div class="md-content">' + renderMarkdown(text) + '</div>';
-        } else if (type === 'error') {
-          // v3.3: Errors poden tenir HTML per botons (controlat internament)
+        } else if (type === 'error' || type === 'system') {
+          // v3.3: Errors i system poden tenir HTML per icones (controlat internament)
           bubble.innerHTML = text;
         } else if (type === 'user' && selectionBadge) {
           // v5.3: Missatge d'usuari amb badge de selecció
           bubble.innerHTML = selectionHtml + '<div class="user-text">' + sanitizeText(text) + '</div>';
         } else {
+          // user sense badge
           bubble.innerText = text;
         }
 
