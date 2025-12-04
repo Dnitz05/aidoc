@@ -1289,6 +1289,42 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
       };
     }
 
+    // v7.0: REFERENCE_HIGHLIGHT mode - Marca parts del document sense editar
+    if (aiData.mode === 'REFERENCE_HIGHLIGHT' && aiData.highlights) {
+      // Aplicar highlights al document
+      const highlightResult = applyReferenceHighlights(aiData.highlights);
+
+      // Log resposta REFERENCE_HIGHLIGHT
+      const responseInfo = {
+        mode: 'REFERENCE_HIGHLIGHT',
+        highlights_requested: aiData.highlights.length,
+        highlights_applied: highlightResult.applied,
+        credits_remaining: json.credits_remaining
+      };
+      metrics.setResponseInfo(responseInfo);
+      logDiagnostic('RESPONSE', {
+        mode: 'REFERENCE_HIGHLIGHT',
+        highlights: aiData.highlights.length,
+        applied: highlightResult.applied,
+        doc_was_empty: isDocumentEmpty
+      });
+      metrics.finalize();
+
+      return {
+        ok: true,
+        status: 'reference_highlight',
+        ai_response: aiData.ai_response,
+        highlights: aiData.highlights,
+        applied: highlightResult.applied,
+        credits: json.credits_remaining,
+        mode: 'reference',
+        _diag: {
+          doc_chars: contentPayload.length,
+          doc_empty: isDocumentEmpty
+        }
+      };
+    }
+
     let lastEditWord = null; // v2.8: Paraula per al botó "Prohibir"
 
     // v2.6 Snapshot for Optimistic UI Undo
@@ -1681,6 +1717,14 @@ const PREVIEW_COLORS = {
   DELETE_TEXT: '#B71C1C',    // Vermell fosc (text a eliminar)
   ADD_BG: '#C8E6C9',         // Verd clar (fons text nou)
   ADD_TEXT: '#1B5E20'        // Verd fosc (text nou)
+};
+
+// v7.0: Colors per Reference Highlighting
+const REFERENCE_COLORS = {
+  yellow: '#FFF59D',   // Atenció / Repeticions
+  orange: '#FFCC80',   // Problemes d'estil
+  blue: '#90CAF9',     // Recomanacions
+  purple: '#CE93D8'    // Preguntes / Clarificacions
 };
 
 /**
@@ -2890,6 +2934,194 @@ function clearStructureHighlight() {
     }
   } catch (e) {
     // Ignorar errors de neteja
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REFERENCE HIGHLIGHTING v7.0
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Aplica highlights de referència al document
+ * @param {Array} highlights - Array de {para_id, color, reason}
+ * @returns {Object} - {success, applied, errors}
+ */
+function applyReferenceHighlights(highlights) {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const results = { applied: 0, errors: [] };
+    const highlightedIndices = [];
+
+    // Construir mapa d'elements editables
+    const elementsToProcess = getEditableElements(body);
+    let mapIdToElement = {};
+    let currentIndex = 0;
+    for (const el of elementsToProcess) {
+      const text = el.asText().getText();
+      if (text.trim().length > 0) {
+        mapIdToElement[currentIndex] = el;
+        currentIndex++;
+      }
+    }
+
+    for (const hl of highlights) {
+      try {
+        const element = mapIdToElement[hl.para_id];
+
+        if (!element) {
+          results.errors.push('Paràgraf ' + hl.para_id + ' no trobat');
+          continue;
+        }
+
+        const textObj = element.editAsText();
+        const textLength = textObj.getText().length;
+
+        if (textLength === 0) continue;
+
+        // Aplicar color de fons
+        const color = REFERENCE_COLORS[hl.color] || REFERENCE_COLORS.yellow;
+        textObj.setBackgroundColor(0, textLength - 1, color);
+
+        highlightedIndices.push(hl.para_id);
+        results.applied++;
+
+      } catch (e) {
+        results.errors.push('Error a paràgraf ' + hl.para_id + ': ' + e.message);
+      }
+    }
+
+    // Guardar índexs per netejar després
+    if (highlightedIndices.length > 0) {
+      const props = PropertiesService.getDocumentProperties();
+      props.setProperty('referenceHighlights', JSON.stringify(highlightedIndices));
+    }
+
+    results.success = results.applied > 0;
+    return results;
+
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Neteja tots els highlights de referència
+ * @returns {Object} - {success, cleared}
+ */
+function clearReferenceHighlights() {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const props = PropertiesService.getDocumentProperties();
+
+    const savedIndices = props.getProperty('referenceHighlights');
+    if (!savedIndices) return { success: true, cleared: 0 };
+
+    const indices = JSON.parse(savedIndices);
+
+    // Reconstruir mapa d'elements
+    const elementsToProcess = getEditableElements(body);
+    let mapIdToElement = {};
+    let currentIndex = 0;
+    for (const el of elementsToProcess) {
+      const text = el.asText().getText();
+      if (text.trim().length > 0) {
+        mapIdToElement[currentIndex] = el;
+        currentIndex++;
+      }
+    }
+
+    let cleared = 0;
+
+    for (const idx of indices) {
+      try {
+        const element = mapIdToElement[idx];
+        if (element && element.editAsText) {
+          const textObj = element.editAsText();
+          const len = textObj.getText().length;
+          if (len > 0) {
+            textObj.setBackgroundColor(0, len - 1, null);
+            cleared++;
+          }
+        }
+      } catch (e) {
+        // Ignorar errors individuals
+      }
+    }
+
+    props.deleteProperty('referenceHighlights');
+    return { success: true, cleared: cleared };
+
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Scroll a un paràgraf i highlight temporal amb color específic
+ * v7.0: Millorat per centrar millor i usar blau clar per defecte
+ * @param {number} paragraphIndex - Índex del paràgraf
+ * @param {string} color - Color del highlight
+ * @returns {Object} - {success}
+ */
+function scrollToReference(paragraphIndex, color) {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const numChildren = body.getNumChildren();
+
+    if (numChildren === 0) {
+      return { success: false, error: 'Document sense contingut' };
+    }
+
+    // Reconstruir mapa d'elements (igual que processUserCommand)
+    let mapIdToElement = {};
+    let currentIndex = 0;
+
+    for (let i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      const childType = child.getType();
+
+      if (childType === DocumentApp.ElementType.PARAGRAPH ||
+          childType === DocumentApp.ElementType.LIST_ITEM) {
+        try {
+          const text = child.asText().getText();
+          if (text && text.trim().length > 0) {
+            mapIdToElement[currentIndex] = child;
+            currentIndex++;
+          }
+        } catch (e) {
+          // Ignorar elements que no es poden llegir
+        }
+      }
+    }
+
+    const element = mapIdToElement[paragraphIndex];
+    if (!element) {
+      return { success: false, error: 'Paràgraf ' + paragraphIndex + ' no trobat (total: ' + currentIndex + ')' };
+    }
+
+    // Aplicar highlight amb color específic (blau clar per defecte)
+    const textObj = element.editAsText();
+    const textContent = textObj.getText();
+    const len = textContent.length;
+
+    if (len > 0) {
+      // v7.0: Blau clar per defecte (#B3E5FC) en lloc de groc
+      const bgColor = REFERENCE_COLORS[color] || '#B3E5FC';
+      textObj.setBackgroundColor(0, len - 1, bgColor);
+    }
+
+    // v7.0: Seleccionar element per forçar scroll + centrat
+    const rangeBuilder = doc.newRange();
+    rangeBuilder.addElement(element);
+    doc.setSelection(rangeBuilder.build());
+
+    return { success: true };
+
+  } catch (e) {
+    return { success: false, error: e.message };
   }
 }
 

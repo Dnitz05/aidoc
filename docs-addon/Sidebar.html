@@ -718,7 +718,10 @@
         link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
         loader: '<svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>',
         gripVertical: '<svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>',
-        rotateCcw: '<svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>'
+        rotateCcw: '<svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
+        user: '<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+        flag: '<svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>',
+        penTool: '<svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>'
       };
 
       // Helper function to render icons
@@ -2423,14 +2426,16 @@
 
         google.script.run
           .withSuccessHandler(function(result) {
+            console.log('[scrollToReference] Result:', result);
             if (result && result.success) {
               showToast('Paràgraf destacat', 'success');
               updateActiveReference(paraId);
             } else {
-              showToast('No s\'ha pogut navegar', 'error');
+              showToast(result && result.error ? result.error : 'No s\'ha pogut navegar', 'error');
             }
           })
           .withFailureHandler(function(err) {
+            console.error('[scrollToReference] Error:', err);
             showToast('Error: ' + err.message, 'error');
           })
           .scrollToReference(paraId, color);
@@ -2753,54 +2758,71 @@
 
         events.forEach(function(event, index) {
           const card = document.createElement('div');
-          card.className = 'timeline-card ' + (event.source === 'manual' ? 'timeline-manual' : 'timeline-ai');
+          const isManual = event.source === 'manual' || event.operation === 'manual_gap';
+          const isBaseline = event.source === 'baseline' || event.type === 'baseline';
+          card.className = 'timeline-card ' + (isManual ? 'timeline-manual' : isBaseline ? 'timeline-baseline' : 'timeline-ai');
           card.style.animationDelay = (index * 30) + 'ms';
 
           // Determine icon and label based on source/type
           let iconName = 'edit';
           let sourceLabel = 'IA';
-          if (event.source === 'manual' || event.operation === 'manual_gap') {
-            iconName = 'user';
-            sourceLabel = 'Manual';
-          } else if (event.source === 'baseline') {
+          let description = '';
+
+          if (isManual) {
+            iconName = 'penTool';
+            sourceLabel = 'Edició externa';
+            description = 'Canvis fets fora de l\'assistent';
+          } else if (isBaseline) {
             iconName = 'flag';
-            sourceLabel = 'Baseline';
+            sourceLabel = 'Punt inicial';
+            description = 'Primera captura del document';
           } else if (event.type === 'REVERT') {
             iconName = 'rotateCcw';
-            sourceLabel = 'Revert';
+            sourceLabel = 'Reversió';
+            description = 'Edició revertida';
           }
 
           // Format time
           const timeStr = formatTimelineTime(event.created_at);
 
-          // Words changed indicator
+          // Words changed indicator - més destacat per manuals
           let wordsInfo = '';
           if (event.words_changed !== null && event.words_changed !== undefined) {
             const sign = event.words_changed >= 0 ? '+' : '';
             const color = event.words_changed >= 0 ? 'var(--success)' : 'var(--error)';
-            wordsInfo = '<span class="timeline-words" style="color: ' + color + '">' + sign + event.words_changed + ' paraules</span>';
+            const label = isManual ? ' paraules modificades' : ' paraules';
+            wordsInfo = '<span class="timeline-words" style="color: ' + color + '">' + sign + event.words_changed + label + '</span>';
+          } else if (isBaseline && event.word_count) {
+            wordsInfo = '<span class="timeline-words" style="color: var(--text-muted)">' + event.word_count + ' paraules al document</span>';
           }
 
           // Can revert? Only AI edits that aren't already reverted
-          const canRevert = event.source === 'ai' && !event.reverted_at && event.type !== 'REVERT' && event.type !== 'baseline';
+          const canRevert = event.source === 'ai' && !event.reverted_at && event.type !== 'REVERT' && !isBaseline;
+
+          // Build body content based on type
+          let bodyContent = '';
+          if (isManual || isBaseline) {
+            bodyContent = '<div class="timeline-description">' + description + '</div>' + wordsInfo;
+          } else {
+            bodyContent =
+              (event.instruction ? '<div class="timeline-instruction">' + escapeHtml(event.instruction.substring(0, 100)) + (event.instruction.length > 100 ? '...' : '') + '</div>' : '') +
+              (event.thought ? '<div class="timeline-thought">' + escapeHtml(event.thought.substring(0, 80)) + '</div>' : '') +
+              wordsInfo;
+          }
 
           card.innerHTML =
             '<div class="timeline-card-header">' +
-              '<span class="timeline-source ' + (event.source === 'manual' ? 'source-manual' : 'source-ai') + '">' +
+              '<span class="timeline-source ' + (isManual ? 'source-manual' : isBaseline ? 'source-baseline' : 'source-ai') + '">' +
                 '<span class="i i--xs">' + (ICONS[iconName] || ICONS.circle) + '</span> ' + sourceLabel +
               '</span>' +
               '<span class="timeline-time">' + timeStr + '</span>' +
             '</div>' +
-            '<div class="timeline-card-body">' +
-              (event.instruction ? '<div class="timeline-instruction">' + escapeHtml(event.instruction.substring(0, 100)) + (event.instruction.length > 100 ? '...' : '') + '</div>' : '') +
-              (event.thought ? '<div class="timeline-thought">' + escapeHtml(event.thought.substring(0, 80)) + '</div>' : '') +
-              wordsInfo +
-            '</div>' +
+            '<div class="timeline-card-body">' + bodyContent + '</div>' +
             (event.reverted_at ? '<div class="timeline-reverted">' + ICONS.rotateCcw + ' Revertit</div>' : '') +
             // Expandable details section (hidden by default)
             '<div class="timeline-details hidden">' +
               (event.before_text ? '<div class="timeline-diff"><span class="diff-label">Abans:</span><div class="diff-text diff-before">' + escapeHtml(event.before_text || '').substring(0, 200) + '</div></div>' : '') +
-              (event.after_text ? '<div class="timeline-diff"><span class="diff-label">Després:</span><div class="diff-text diff-after">' + escapeHtml(event.after_text || '').substring(0, 200) + '</div></div>' : '') +
+              (event.after_text && event.after_text !== '[edició manual]' && event.after_text !== '[baseline]' ? '<div class="timeline-diff"><span class="diff-label">Després:</span><div class="diff-text diff-after">' + escapeHtml(event.after_text || '').substring(0, 200) + '</div></div>' : '') +
               (canRevert ? '<button class="btn btn-sm timeline-revert-btn" onclick="event.stopPropagation(); revertTimelineEvent(\'' + event.id + '\')"><span class="i i--xs">' + ICONS.rotateCcw + '</span> Revertir</button>' : '') +
             '</div>';
 

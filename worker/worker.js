@@ -663,6 +663,22 @@ Acció: Edita NOMÉS els paràgrafs afectats via {{ID}}. Cirurgia, no reemplaça
 Quan: L'usuari demana CREAR contingut NOU (escriu un email, genera una llista, crea des de zero).
 Acció: Genera estructura nova amb blocks tipats.
 
+[MODE ANALISTA] → "REFERENCE_HIGHLIGHT"
+Quan: L'usuari demana ANALITZAR el document sense editar-lo (detecta repeticions, quines parts clarificar, on estan els arguments, revisa coherència).
+Acció: Marca parts del document amb colors i explica per què. NO edites res.
+Format:
+{
+  "thought": "[Anàlisi: quines parts destaco i per què]",
+  "mode": "REFERENCE_HIGHLIGHT",
+  "ai_response": "Explicació en llenguatge natural",
+  "highlights": [
+    {"para_id": 5, "color": "yellow", "reason": "'important' x4", "snippet": "Això és important..."},
+    {"para_id": 12, "color": "orange", "reason": "frase confusa", "snippet": "Resulta evident que..."}
+  ]
+}
+Colors disponibles: "yellow" (atenció), "orange" (problema), "blue" (recomanació), "purple" (clarificació)
+Límit: Màxim 5 highlights per resposta. Usa para_id exactes del document ({{0}}, {{1}}, etc.).
+
 ═══════════════════════════════════════════════════════════════
 GESTIÓ DE CONTINUÏTAT (CRÍTIC)
 ═══════════════════════════════════════════════════════════════
@@ -1021,7 +1037,13 @@ function parseAndValidate(rawText) {
     'INSERT_AFTER': 'REWRITE',
     'INSERT_BEFORE': 'REWRITE',
     'CREATE': 'REWRITE',
-    'GENERATE': 'REWRITE'
+    'GENERATE': 'REWRITE',
+    // v7.0: Reference Highlight mode
+    'REFERENCE_HIGHLIGHT': 'REFERENCE_HIGHLIGHT',
+    'REFERENCE': 'REFERENCE_HIGHLIGHT',
+    'HIGHLIGHT': 'REFERENCE_HIGHLIGHT',
+    'ANALYZE': 'REFERENCE_HIGHLIGHT',
+    'MARK': 'REFERENCE_HIGHLIGHT'
   };
 
   parsed.mode = modeMap[rawMode] || 'CHAT_ONLY';  // DEFAULT: CHAT_ONLY (safe)
@@ -1041,6 +1063,32 @@ function parseAndValidate(rawText) {
       // No valid blocks → convert to CHAT
       parsed.mode = 'CHAT_ONLY';
       parsed.chat_response = parsed.change_summary || parsed.userMessage || "No s'ha pogut generar contingut nou.";
+    }
+  }
+
+  // ─── VALIDATE REFERENCE_HIGHLIGHT (v7.0) ───
+  if (parsed.mode === 'REFERENCE_HIGHLIGHT') {
+    if (!parsed.highlights || !Array.isArray(parsed.highlights)) {
+      parsed.highlights = [];
+    }
+    // Filter invalid highlights and limit to 5
+    const validColors = ['yellow', 'orange', 'blue', 'purple'];
+    parsed.highlights = parsed.highlights
+      .filter(h => typeof h.para_id === 'number' && h.para_id >= 0)
+      .slice(0, 5)
+      .map(h => ({
+        para_id: h.para_id,
+        color: validColors.includes(h.color) ? h.color : 'yellow',
+        reason: String(h.reason || '').substring(0, 50),
+        snippet: String(h.snippet || '').substring(0, 30)
+      }));
+    // If no valid highlights, convert to CHAT_ONLY
+    if (parsed.highlights.length === 0) {
+      parsed.mode = 'CHAT_ONLY';
+      parsed.chat_response = parsed.ai_response || parsed.change_summary || "No he trobat seccions específiques a destacar.";
+    } else {
+      // Ensure ai_response exists
+      parsed.ai_response = parsed.ai_response || parsed.chat_response || "He identificat les següents seccions:";
     }
   }
 
@@ -1068,7 +1116,8 @@ function parseAndValidate(rawText) {
     const modeThoughts = {
       'CHAT_ONLY': 'Intenció: consulta. Estratègia: respondre sense editar.',
       'UPDATE_BY_ID': 'Intenció: edició. Estratègia: modificar paràgrafs específics.',
-      'REWRITE': 'Intenció: creació. Estratègia: generar contingut nou.'
+      'REWRITE': 'Intenció: creació. Estratègia: generar contingut nou.',
+      'REFERENCE_HIGHLIGHT': 'Intenció: anàlisi. Estratègia: marcar seccions rellevants sense editar.'
     };
     parsed.thought = modeThoughts[parsed.mode] || 'Processant petició.';
   }
@@ -1224,6 +1273,39 @@ async function handleChat(body, env, corsHeaders) {
 
   if (!license_key) throw new Error("missing_license");
   if (!text) throw new Error("missing_text");
+
+  // ═══════════════════════════════════════════════════════════════
+  // v7.0: FAST PATH - Resposta immediata per salutacions simples
+  // ═══════════════════════════════════════════════════════════════
+  const greetingPatterns = /^(hola|bon dia|bona tarda|bona nit|hey|hi|hello|ei|bones|què tal|com estàs|com va)[\s!?.]*$/i;
+  const userMsg = (user_instruction || '').trim();
+
+  if (greetingPatterns.test(userMsg)) {
+    // Validar llicència ràpidament
+    const licenseHash = await hashKey(license_key);
+    const creditsResult = await useCredits(env, licenseHash, doc_metadata);
+
+    const greetings = [
+      "Hola! 👋 Què puc fer pel teu document?",
+      "Bon dia! En què et puc ajudar?",
+      "Hola! Estic preparat per ajudar-te amb el document.",
+      "Hey! Digue'm què necessites."
+    ];
+    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+
+    return new Response(JSON.stringify({
+      status: 'ok',
+      data: {
+        mode: 'CHAT_ONLY',
+        chat_response: randomGreeting,
+        change_summary: 'Salutació',
+        thought: 'Salutació detectada, resposta ràpida.'
+      },
+      credits_remaining: creditsResult.remaining
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
 
   // v4.0: Detect NL ban patterns (Sprint 3)
   const autoBanWords = detectNLBanPatterns(user_instruction);
