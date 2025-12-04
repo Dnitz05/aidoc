@@ -3266,7 +3266,14 @@
       // Show new folder modal
       // Available icons for folders and recipes
       const FOLDER_ICONS = ['folder', 'folderOpen', 'fileText', 'globe', 'wand', 'ruler', 'star', 'target', 'briefcase'];
-      const RECIPE_ICONS = ['pin', 'edit', 'wand', 'target', 'settings', 'clipboard', 'lightbulb', 'rocket'];
+      const RECIPE_ICONS = [
+        'wand', 'star', 'zap', 'lightbulb', 'rocket', 'target',
+        'edit', 'type', 'list', 'clipboard', 'fileText',
+        'messageSquare', 'messageCircle', 'mail',
+        'globe', 'link', 'tag', 'hash',
+        'book', 'briefcase', 'calendar', 'clock',
+        'check', 'pin', 'eye', 'settings'
+      ];
 
       // Render icon selector buttons
       function renderIconSelector(containerId, icons, selectedIcon, selectFn) {
