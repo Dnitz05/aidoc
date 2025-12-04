@@ -106,6 +106,54 @@ function clearKnowledgeFile() {
   return "Fitxer oblidat.";
 }
 
+// --- SELECTION INFO (v5.3) ---
+
+/**
+ * Get info about the current document selection
+ * Returns word count and character count of selected text
+ */
+function getSelectionInfo() {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    if (!doc) return { hasSelection: false, wordCount: 0, charCount: 0 };
+
+    const selection = doc.getSelection();
+    if (!selection) return { hasSelection: false, wordCount: 0, charCount: 0 };
+
+    const ranges = selection.getRangeElements();
+    if (!ranges || ranges.length === 0) return { hasSelection: false, wordCount: 0, charCount: 0 };
+
+    let totalText = '';
+    for (const range of ranges) {
+      const element = range.getElement();
+      let text = '';
+
+      if (element.getType() === DocumentApp.ElementType.TEXT) {
+        text = element.asText().getText();
+        if (range.isPartial()) {
+          text = text.substring(range.getStartOffset(), range.getEndOffsetInclusive() + 1);
+        }
+      } else if (element.editAsText) {
+        text = element.editAsText().getText();
+      }
+
+      if (text) totalText += text + ' ';
+    }
+
+    totalText = totalText.trim();
+    // v6.1: Regex optimitzat - match és més ràpid que split+filter
+    const wordCount = totalText ? (totalText.match(/\S+/g) || []).length : 0;
+
+    return {
+      hasSelection: true,
+      wordCount: wordCount,
+      charCount: totalText.length
+    };
+  } catch (e) {
+    return { hasSelection: false, wordCount: 0, charCount: 0, error: e.message };
+  }
+}
+
 // --- CREDITS INFO (v5.1) ---
 
 /**
@@ -115,7 +163,7 @@ function getCreditsInfo() {
   const settingsStr = getSettings();
   const settings = JSON.parse(settingsStr);
   if (!settings.license_key) {
-    return { credits_remaining: 0, credits_total: 100, is_active: false };
+    return { status: 'ok', credits_remaining: 0, credits_total: 100, is_active: false };
   }
 
   try {
@@ -123,21 +171,22 @@ function getCreditsInfo() {
       action: 'get_credits',
       license_key: settings.license_key
     });
-    return result;
+    // v5.3: Afegir status: 'ok' per compatibilitat amb frontend
+    return { status: 'ok', ...result };
   } catch (e) {
-    return { credits_remaining: 0, credits_total: 100, is_active: false, error: e.message };
+    return { status: 'error', credits_remaining: 0, credits_total: 100, is_active: false, error: e.message };
   }
 }
 
-// --- KNOWLEDGE LIBRARY (v5.1) ---
+// --- KNOWLEDGE LIBRARY (v6.0 - with Folders) ---
 
 /**
- * Get all files from the knowledge library
+ * Get all files from the knowledge library (with folders)
  */
 function getKnowledgeLibrary() {
   const settingsStr = getSettings();
   const settings = JSON.parse(settingsStr);
-  if (!settings.license_key) return { files: [] };
+  if (!settings.license_key) return { files: [], folders: [] };
 
   try {
     const result = callWorker({
@@ -146,8 +195,55 @@ function getKnowledgeLibrary() {
     });
     return result;
   } catch (e) {
-    return { files: [], error: e.message };
+    return { files: [], folders: [], error: e.message };
   }
+}
+
+/**
+ * Move a file to a folder (v6.0)
+ */
+function moveFileToFolder(fileId, folderName) {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) throw new Error("Falta la llicència API.");
+
+  return callWorker({
+    action: 'move_to_folder',
+    license_key: settings.license_key,
+    file_id: fileId,
+    folder: folderName
+  });
+}
+
+/**
+ * Rename a folder (v6.0)
+ */
+function renameFolder(oldName, newName) {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) throw new Error("Falta la llicència API.");
+
+  return callWorker({
+    action: 'rename_folder',
+    license_key: settings.license_key,
+    old_name: oldName,
+    new_name: newName
+  });
+}
+
+/**
+ * Delete a folder (moves files to root) (v6.0)
+ */
+function deleteFolder(folderName) {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) throw new Error("Falta la llicència API.");
+
+  return callWorker({
+    action: 'delete_folder',
+    license_key: settings.license_key,
+    folder_name: folderName
+  });
 }
 
 /**
@@ -188,7 +284,64 @@ function uploadToKnowledgeLibrary(base64Data, mimeType, fileName) {
 }
 
 /**
- * Link a library file to the current document
+ * Toggle a library file (add/remove from active files)
+ */
+function toggleKnowledgeFile(fileId) {
+  const settingsStr = getSettings();
+  const settings = JSON.parse(settingsStr);
+  if (!settings.license_key) throw new Error("Falta la llicència API.");
+
+  const doc = DocumentApp.getActiveDocument();
+  if (!doc) throw new Error("No hi ha document actiu.");
+
+  const props = PropertiesService.getUserProperties();
+  let activeFiles = [];
+  try {
+    const stored = props.getProperty('DOCMILE_ACTIVE_FILES');
+    if (stored) activeFiles = JSON.parse(stored);
+  } catch (e) { activeFiles = []; }
+
+  // Check if file is already active
+  const existingIndex = activeFiles.findIndex(f => f.id === fileId);
+
+  if (existingIndex >= 0) {
+    // Remove from active files
+    activeFiles.splice(existingIndex, 1);
+    props.setProperty('DOCMILE_ACTIVE_FILES', JSON.stringify(activeFiles));
+
+    callWorker({
+      action: 'unlink_knowledge',
+      license_key: settings.license_key,
+      file_id: fileId,
+      doc_id: doc.getId()
+    });
+
+    return { status: 'ok', action: 'removed', activeFiles: activeFiles };
+  } else {
+    // Add to active files
+    const result = callWorker({
+      action: 'link_knowledge',
+      license_key: settings.license_key,
+      file_id: fileId,
+      doc_id: doc.getId()
+    });
+
+    if (result.status === 'ok') {
+      activeFiles.push({
+        id: fileId,
+        name: result.file_name,
+        uri: result.file_uri,
+        mime: result.mime_type
+      });
+      props.setProperty('DOCMILE_ACTIVE_FILES', JSON.stringify(activeFiles));
+    }
+
+    return { status: result.status, action: 'added', file_name: result.file_name, activeFiles: activeFiles };
+  }
+}
+
+/**
+ * Link a library file to the current document (legacy support + upload)
  */
 function linkKnowledgeFile(fileId) {
   const settingsStr = getSettings();
@@ -206,21 +359,33 @@ function linkKnowledgeFile(fileId) {
   });
 
   if (result.status === 'ok') {
-    // Save as active file for this doc
+    // Add to active files array
     const props = PropertiesService.getUserProperties();
-    props.setProperty('DOCMILE_FILE_URI', result.file_uri);
-    props.setProperty('DOCMILE_FILE_NAME', result.file_name);
-    props.setProperty('DOCMILE_FILE_MIME', result.mime_type);
-    props.setProperty('DOCMILE_ACTIVE_LIBRARY_FILE', fileId);
+    let activeFiles = [];
+    try {
+      const stored = props.getProperty('DOCMILE_ACTIVE_FILES');
+      if (stored) activeFiles = JSON.parse(stored);
+    } catch (e) { activeFiles = []; }
+
+    // Avoid duplicates
+    if (!activeFiles.find(f => f.id === fileId)) {
+      activeFiles.push({
+        id: fileId,
+        name: result.file_name,
+        uri: result.file_uri,
+        mime: result.mime_type
+      });
+      props.setProperty('DOCMILE_ACTIVE_FILES', JSON.stringify(activeFiles));
+    }
   }
 
   return result;
 }
 
 /**
- * Unlink the current knowledge file from this document
+ * Unlink a specific knowledge file (or all if no fileId)
  */
-function unlinkKnowledgeFile() {
+function unlinkKnowledgeFile(fileId) {
   const settingsStr = getSettings();
   const settings = JSON.parse(settingsStr);
   if (!settings.license_key) throw new Error("Falta la llicència API.");
@@ -229,24 +394,39 @@ function unlinkKnowledgeFile() {
   if (!doc) throw new Error("No hi ha document actiu.");
 
   const props = PropertiesService.getUserProperties();
-  const activeFileId = props.getProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
+  let activeFiles = [];
+  try {
+    const stored = props.getProperty('DOCMILE_ACTIVE_FILES');
+    if (stored) activeFiles = JSON.parse(stored);
+  } catch (e) { activeFiles = []; }
 
-  if (activeFileId) {
-    callWorker({
-      action: 'unlink_knowledge',
-      license_key: settings.license_key,
-      file_id: activeFileId,
-      doc_id: doc.getId()
+  if (fileId) {
+    // Remove specific file
+    const index = activeFiles.findIndex(f => f.id === fileId);
+    if (index >= 0) {
+      activeFiles.splice(index, 1);
+      callWorker({
+        action: 'unlink_knowledge',
+        license_key: settings.license_key,
+        file_id: fileId,
+        doc_id: doc.getId()
+      });
+    }
+  } else {
+    // Remove all active files
+    activeFiles.forEach(f => {
+      callWorker({
+        action: 'unlink_knowledge',
+        license_key: settings.license_key,
+        file_id: f.id,
+        doc_id: doc.getId()
+      });
     });
+    activeFiles = [];
   }
 
-  // Clear local properties
-  props.deleteProperty('DOCMILE_FILE_URI');
-  props.deleteProperty('DOCMILE_FILE_NAME');
-  props.deleteProperty('DOCMILE_FILE_MIME');
-  props.deleteProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
-
-  return { success: true };
+  props.setProperty('DOCMILE_ACTIVE_FILES', JSON.stringify(activeFiles));
+  return { success: true, activeFiles: activeFiles };
 }
 
 /**
@@ -263,33 +443,50 @@ function deleteFromKnowledgeLibrary(fileId) {
     file_id: fileId
   });
 
-  // If this was the active file, clear it
+  // If this was an active file, remove it from the list
   const props = PropertiesService.getUserProperties();
-  const activeFileId = props.getProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
-  if (activeFileId === fileId) {
-    props.deleteProperty('DOCMILE_FILE_URI');
-    props.deleteProperty('DOCMILE_FILE_NAME');
-    props.deleteProperty('DOCMILE_FILE_MIME');
-    props.deleteProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
+  let activeFiles = [];
+  try {
+    const stored = props.getProperty('DOCMILE_ACTIVE_FILES');
+    if (stored) activeFiles = JSON.parse(stored);
+  } catch (e) { activeFiles = []; }
+
+  const index = activeFiles.findIndex(f => f.id === fileId);
+  if (index >= 0) {
+    activeFiles.splice(index, 1);
+    props.setProperty('DOCMILE_ACTIVE_FILES', JSON.stringify(activeFiles));
   }
 
   return result;
 }
 
 /**
- * Get info about the currently active knowledge file for this doc
+ * Get info about currently active knowledge files for this doc
+ */
+function getActiveKnowledgeFiles() {
+  const props = PropertiesService.getUserProperties();
+  let activeFiles = [];
+  try {
+    const stored = props.getProperty('DOCMILE_ACTIVE_FILES');
+    if (stored) activeFiles = JSON.parse(stored);
+  } catch (e) { activeFiles = []; }
+
+  return {
+    hasFiles: activeFiles.length > 0,
+    files: activeFiles
+  };
+}
+
+/**
+ * Get info about the currently active knowledge file for this doc (legacy compatibility)
  */
 function getActiveKnowledgeFile() {
-  const props = PropertiesService.getUserProperties();
-  const fileId = props.getProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
-  const fileName = props.getProperty('DOCMILE_FILE_NAME');
-  const fileUri = props.getProperty('DOCMILE_FILE_URI');
-
-  if (fileId && fileName && fileUri) {
+  const result = getActiveKnowledgeFiles();
+  if (result.hasFiles && result.files.length > 0) {
     return {
       hasFile: true,
-      id: fileId,
-      name: fileName
+      id: result.files[0].id,
+      name: result.files[0].name
     };
   }
   return { hasFile: false };
@@ -381,7 +578,7 @@ function cleanMarkdown(text) {
 }
 
 /**
- * Reverteix l'últim canvi fet (v2.6)
+ * Reverteix l'últim canvi fet (v2.6, v6.0 fix)
  * Retorna { success: true } o { success: false, error: string }
  */
 function revertLastEdit() {
@@ -395,12 +592,12 @@ function revertLastEdit() {
     const body = doc.getBody();
     const targetId = parseInt(lastEdit.targetId, 10);
 
-    // v3.10: Usar funcions utilitat refactoritzades
-    const elementsToProcess = getEditableElements(body);
-    const targetElement = findElementByIndex(elementsToProcess, targetId);
+    // v6.0 fix: Usar buildElementMap per consistència amb com es guarden els IDs
+    const mapIdToElement = buildElementMap(body);
+    const targetElement = mapIdToElement[targetId];
 
     if (!targetElement) {
-      return { success: false, error: "No s'ha trobat el paràgraf original." };
+      return { success: false, error: "No s'ha trobat el paràgraf original (ID: " + targetId + ")." };
     }
 
     // Revertir al text original
@@ -437,9 +634,9 @@ function restoreText(targetId, originalText) {
     const body = doc.getBody();
     const numericId = parseInt(targetId, 10);
 
-    // v3.10: Usar funcions utilitat refactoritzades
-    const elementsToProcess = getEditableElements(body);
-    const targetElement = findElementByIndex(elementsToProcess, numericId);
+    // v6.0 fix: Usar buildElementMap per consistència amb com es guarden els IDs
+    const mapIdToElement = buildElementMap(body);
+    const targetElement = mapIdToElement[numericId];
 
     if (!targetElement) {
       return { status: 'error', error: 'No s\'ha trobat el paràgraf (ID: ' + numericId + ')' };
@@ -564,13 +761,16 @@ function captureCurrentSelection() {
     const selection = doc.getSelection();
 
     if (!selection) {
-      return { captured: false, reason: 'no_selection' };
+      return { captured: false, hasSelection: false, wordCount: 0 };
     }
 
     const ranges = selection.getRangeElements() || [];
     if (ranges.length === 0) {
-      return { captured: false, reason: 'empty_ranges' };
+      return { captured: false, hasSelection: false, wordCount: 0 };
     }
+
+    // v5.3: També calcular word count per l'indicador
+    let totalText = '';
 
     // Serialitzar la selecció (guardem índexs dels elements)
     const body = doc.getBody();
@@ -580,6 +780,18 @@ function captureCurrentSelection() {
       const element = range.getElement();
       const parent = element.getType() === DocumentApp.ElementType.TEXT ?
                      element.getParent() : element;
+
+      // v5.3: Extreure text per word count
+      let text = '';
+      if (element.getType() === DocumentApp.ElementType.TEXT) {
+        text = element.asText().getText();
+        if (range.isPartial()) {
+          text = text.substring(range.getStartOffset(), range.getEndOffsetInclusive() + 1);
+        }
+      } else if (element.editAsText) {
+        text = element.editAsText().getText();
+      }
+      if (text) totalText += text + ' ';
 
       // Buscar l'índex de l'element al body
       const numChildren = body.getNumChildren();
@@ -601,8 +813,17 @@ function captureCurrentSelection() {
       }
     });
 
+    // v6.1: Calcular word count amb regex optimitzat
+    totalText = totalText.trim();
+    const wordCount = totalText ? (totalText.match(/\S+/g) || []).length : 0;
+
+    // v5.3: Text preview (primers 40 chars)
+    const textPreview = totalText.length > 40
+      ? totalText.substring(0, 40) + '...'
+      : totalText;
+
     if (selectionData.length === 0) {
-      return { captured: false, reason: 'no_indexable_elements' };
+      return { captured: false, hasSelection: true, wordCount: wordCount, textPreview: textPreview };
     }
 
     // Guardar al cache (60 segons de vida)
@@ -613,10 +834,10 @@ function captureCurrentSelection() {
       elements: selectionData
     }), 60);
 
-    return { captured: true, elements: selectionData.length };
+    return { captured: true, hasSelection: true, wordCount: wordCount, textPreview: textPreview, elements: selectionData.length };
 
   } catch (e) {
-    return { captured: false, reason: 'error', error: e.message };
+    return { captured: false, hasSelection: false, wordCount: 0, error: e.message };
   }
 }
 
@@ -690,11 +911,12 @@ function getDocumentStateHash() {
 
 /**
  * Compta paraules del document
+ * v6.1: Regex optimitzat
  */
 function getDocumentWordCount() {
   try {
-    const text = DocumentApp.getActiveDocument().getBody().getText();
-    return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+    const text = DocumentApp.getActiveDocument().getBody().getText().trim();
+    return text ? (text.match(/\S+/g) || []).length : 0;
   } catch (e) {
     return 0;
   }
@@ -707,11 +929,13 @@ function getDocumentWordCount() {
 function confirmEditHash(eventId) {
   if (!eventId) return;
 
+  const settings = JSON.parse(getSettings());
   const newHash = getDocumentStateHash();
   const wordCount = getDocumentWordCount();
 
   const payload = {
     action: 'confirm_edit',
+    license_key: settings.license_key,
     event_id: eventId,
     final_hash: newHash,
     word_count: wordCount
@@ -790,13 +1014,16 @@ function revertEditEvent(eventId) {
     const json = JSON.parse(response.getContentText());
 
     // If we have restore_text and target_id, apply the revert to the document
-    if (json.status === 'ok' && json.restore_text !== undefined && json.target_id !== null) {
+    if (json.status === 'ok' && json.restore_text && json.target_id !== null) {
       const body = doc.getBody();
       const paragraphs = body.getParagraphs();
 
       if (json.target_id >= 0 && json.target_id < paragraphs.length) {
         paragraphs[json.target_id].setText(json.restore_text);
       }
+    } else if (json.status === 'ok' && !json.restore_text) {
+      // No before_text available - can't revert
+      return { status: 'error', error: 'No hi ha text anterior guardat per aquesta edició' };
     }
 
     return json;
@@ -854,9 +1081,9 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
   const settings = JSON.parse(getSettings());
   if (!settings.license_key) throw new Error("Falta llicència.");
 
-  const fileProps = PropertiesService.getUserProperties();
-  const knowledgeFileUri = fileProps.getProperty('DOCMILE_FILE_URI');
-  const knowledgeFileMime = fileProps.getProperty('DOCMILE_FILE_MIME');
+  // v6.0: Multiple active files support
+  const activeFilesResult = getActiveKnowledgeFiles();
+  const knowledgeFiles = activeFilesResult.files || [];
 
   // v5.2: Preparar elements per la captura (amb fallback a cache)
   let selectedElements = null;
@@ -938,8 +1165,11 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
     doc_metadata: { doc_id: doc.getId() },
     style_guide: settings.style_guide,
     strict_mode: settings.strict_mode,
-    knowledge_file_uri: knowledgeFileUri,
-    knowledge_file_mime: knowledgeFileMime,
+    // v6.0: Multiple knowledge files support
+    knowledge_files: knowledgeFiles.map(f => ({ uri: f.uri, mime: f.mime, name: f.name })),
+    // Legacy single file support (first file if any)
+    knowledge_file_uri: knowledgeFiles.length > 0 ? knowledgeFiles[0].uri : null,
+    knowledge_file_mime: knowledgeFiles.length > 0 ? knowledgeFiles[0].mime : null,
     has_selection: isSelection,
     chat_history: chatHistory || [],
     last_edit: lastEdit,
@@ -1059,7 +1289,8 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
           // Fall through to apply directly
         } else {
           // v3.8: Aplicar preview VISUAL al document (Track Changes)
-          const previewResult = applyInDocumentPreview(changes);
+          // v5.3: Passar mapIdToElement per mantenir consistència amb seleccions
+          const previewResult = applyInDocumentPreview(changes, mapIdToElement);
 
           if (!previewResult.ok) {
             // Si falla el preview in-doc, retornem error
@@ -1419,9 +1650,10 @@ const PREVIEW_COLORS = {
  * - Text nou: fons verd + subratllat
  *
  * @param {Array} changes - Array de {targetId, originalText, proposedText}
+ * @param {Object} existingMap - Mapa ID->Element opcional (per mantenir consistència amb seleccions)
  * @returns {Object} { ok, previews, error }
  */
-function applyInDocumentPreview(changes) {
+function applyInDocumentPreview(changes, existingMap) {
   try {
     if (!changes || !Array.isArray(changes) || changes.length === 0) {
       return { ok: false, error: "No hi ha canvis per previsualitzar" };
@@ -1430,8 +1662,8 @@ function applyInDocumentPreview(changes) {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
 
-    // Reconstruir el mapa d'elements
-    const mapIdToElement = buildElementMap(body);
+    // v5.3: Usar mapa existent si es proporciona (per seleccions), sinó reconstruir
+    const mapIdToElement = existingMap || buildElementMap(body);
     const previews = [];
 
     for (const change of changes) {
@@ -1451,6 +1683,17 @@ function applyInDocumentPreview(changes) {
       if (originalText.trim() === cleanNewText.trim()) {
         console.log('[Preview] No changes for:', targetId);
         continue;
+      }
+
+      // v5.3: Obtenir l'índex real de l'element dins del body per commit posterior
+      let bodyIndex = -1;
+      try {
+        const parent = targetElement.getParent();
+        if (parent && parent.getType() === DocumentApp.ElementType.BODY_SECTION) {
+          bodyIndex = parent.getChildIndex(targetElement);
+        }
+      } catch (e) {
+        console.log('[Preview] Could not get body index:', e.message);
       }
 
       const originalLength = originalText.length;
@@ -1478,7 +1721,8 @@ function applyInDocumentPreview(changes) {
         originalText: originalText,
         newText: cleanNewText,
         originalLength: originalLength,
-        separatorLength: separator.length
+        separatorLength: separator.length,
+        bodyIndex: bodyIndex  // v5.3: Índex real dins el body
       });
     }
 
@@ -1515,7 +1759,12 @@ function commitInDocumentPreview() {
 
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
+
+    // v5.3: Construir mapa usant bodyIndex si disponible, sinó fallback al mapa general
     const mapIdToElement = buildElementMap(body);
+
+    // v5.3: Crear mapa alternatiu usant bodyIndex per seleccions
+    const hasBodyIndices = previews.some(p => p.bodyIndex !== undefined && p.bodyIndex >= 0);
 
     let applied = 0;
     const existingLastEdit = loadLastEdit();
@@ -1523,8 +1772,22 @@ function commitInDocumentPreview() {
     // Processar en ordre INVERS per no afectar índexs
     for (let i = previews.length - 1; i >= 0; i--) {
       const preview = previews[i];
-      const targetId = parseInt(preview.targetId, 10);
-      const targetElement = mapIdToElement[targetId];
+
+      // v5.3: Usar bodyIndex si disponible, sinó fallback a targetId
+      let targetElement = null;
+      if (hasBodyIndices && preview.bodyIndex !== undefined && preview.bodyIndex >= 0) {
+        try {
+          targetElement = body.getChild(preview.bodyIndex);
+        } catch (e) {
+          console.log('[Commit] Could not get element by bodyIndex:', preview.bodyIndex, e.message);
+        }
+      }
+
+      // Fallback: usar el mapa tradicional
+      if (!targetElement) {
+        const targetId = parseInt(preview.targetId, 10);
+        targetElement = mapIdToElement[targetId];
+      }
 
       if (!targetElement) continue;
 
@@ -1592,13 +1855,29 @@ function cancelInDocumentPreview() {
 
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
+
+    // v5.3: Construir mapa usant bodyIndex si disponible
     const mapIdToElement = buildElementMap(body);
+    const hasBodyIndices = previews.some(p => p.bodyIndex !== undefined && p.bodyIndex >= 0);
 
     let cancelled = 0;
 
     for (const preview of previews) {
-      const targetId = parseInt(preview.targetId, 10);
-      const targetElement = mapIdToElement[targetId];
+      // v5.3: Usar bodyIndex si disponible, sinó fallback a targetId
+      let targetElement = null;
+      if (hasBodyIndices && preview.bodyIndex !== undefined && preview.bodyIndex >= 0) {
+        try {
+          targetElement = body.getChild(preview.bodyIndex);
+        } catch (e) {
+          console.log('[Cancel] Could not get element by bodyIndex:', preview.bodyIndex, e.message);
+        }
+      }
+
+      // Fallback: usar el mapa tradicional
+      if (!targetElement) {
+        const targetId = parseInt(preview.targetId, 10);
+        targetElement = mapIdToElement[targetId];
+      }
 
       if (!targetElement) continue;
 

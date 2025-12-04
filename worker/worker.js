@@ -37,6 +37,77 @@ const TIMEOUT_CUTOFF = 25000;  // 25s safety margin (GAS timeout is 30s)
 const MAX_RETRIES = 2;         // Initial attempt + 2 retries max
 
 // ═══════════════════════════════════════════════════════════════
+// FILE VALIDATION CONSTANTS (v6.5)
+// ═══════════════════════════════════════════════════════════════
+
+const ALLOWED_FILE_TYPES = {
+  'application/pdf': { ext: '.pdf', maxSize: 10 * 1024 * 1024 },
+  'text/plain': { ext: '.txt', maxSize: 10 * 1024 * 1024 },
+  'text/csv': { ext: '.csv', maxSize: 10 * 1024 * 1024 },
+  'text/markdown': { ext: '.md', maxSize: 10 * 1024 * 1024 },
+  'text/x-markdown': { ext: '.md', maxSize: 10 * 1024 * 1024 }
+};
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB absolute max
+
+/**
+ * v6.5: Validate uploaded file for security
+ * @param {string} fileData - Base64 encoded file data
+ * @param {string} mimeType - MIME type of the file
+ * @param {string} fileName - Original file name
+ * @returns {object} - { valid: true, sanitizedName } or throws Error
+ */
+function validateUploadedFile(fileData, mimeType, fileName) {
+  // 1. Validate MIME type against whitelist
+  const normalizedType = (mimeType || '').toLowerCase();
+  const typeConfig = ALLOWED_FILE_TYPES[normalizedType];
+
+  if (!typeConfig) {
+    throw new Error("invalid_file_type: Only PDF, TXT, CSV, MD allowed");
+  }
+
+  // 2. Validate file extension matches MIME type
+  const fileExt = (fileName || '').toLowerCase().slice(-4);
+  const allowedExts = normalizedType.includes('markdown') ? ['.md'] : [typeConfig.ext];
+
+  if (!allowedExts.some(ext => fileName.toLowerCase().endsWith(ext))) {
+    throw new Error("file_extension_mismatch: Extension doesn't match type");
+  }
+
+  // 3. Validate file size (base64 is ~33% larger than binary)
+  if (!fileData || typeof fileData !== 'string') {
+    throw new Error("invalid_file_data");
+  }
+
+  const estimatedSize = Math.ceil(fileData.length * 0.75);
+  if (estimatedSize > typeConfig.maxSize) {
+    throw new Error("file_too_large: Max " + (typeConfig.maxSize / 1024 / 1024) + "MB");
+  }
+
+  // 4. Validate magic bytes for PDFs
+  if (normalizedType === 'application/pdf') {
+    try {
+      const decoded = atob(fileData.substring(0, 20));
+      if (!decoded.startsWith('%PDF')) {
+        throw new Error("invalid_pdf_content: Not a valid PDF file");
+      }
+    } catch (e) {
+      if (e.message.includes('invalid_pdf')) throw e;
+      throw new Error("invalid_base64_data");
+    }
+  }
+
+  // 5. Sanitize file name (remove path traversal, special chars)
+  const sanitizedName = fileName
+    .replace(/\.\./g, '')           // Remove path traversal
+    .replace(/[\/\\]/g, '')         // Remove slashes
+    .replace(/[^a-zA-Z0-9._\-\s]/g, '_')  // Keep only safe chars
+    .substring(0, 100);             // Limit length
+
+  return { valid: true, sanitizedName };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // UTILITY FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
 
@@ -2553,11 +2624,16 @@ async function handleUploadToLibrary(body, env, corsHeaders) {
   if (!license_key) throw new Error("missing_license");
   if (!file_data) throw new Error("missing_file_data");
   if (!mime_type) throw new Error("missing_mime_type");
+  if (!file_name) throw new Error("missing_file_name");
+
+  // v6.5: Validate file before processing (security)
+  const validation = validateUploadedFile(file_data, mime_type, file_name);
+  const safeFileName = validation.sanitizedName;
 
   const licenseHash = await hashKey(license_key);
 
-  // 1. Upload to Gemini first
-  const geminiResult = await uploadToGemini(file_data, mime_type, file_name, env);
+  // 1. Upload to Gemini first (using sanitized name)
+  const geminiResult = await uploadToGemini(file_data, mime_type, safeFileName, env);
 
   // 2. Calculate expiry (47h from now for safety margin)
   const expiresAt = new Date(Date.now() + 47 * 60 * 60 * 1000).toISOString();
@@ -2577,7 +2653,7 @@ async function handleUploadToLibrary(body, env, corsHeaders) {
       },
       body: JSON.stringify({
         license_key_hash: licenseHash,
-        file_name: file_name,
+        file_name: safeFileName,  // v6.5: Use sanitized name
         mime_type: mime_type,
         file_size: file_data.length,
         file_data: file_data,
