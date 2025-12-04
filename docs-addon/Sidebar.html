@@ -172,18 +172,17 @@
 
     <!-- Docs Panel (Knowledge) v5.1 - Library System -->
     <div id="docsPanel" class="panel">
-      <!-- Active File Section -->
+      <!-- Active Files Section (v6.0 - Multiple Files) -->
       <div class="settings-card" id="activeFileSection">
         <div class="settings-card-header">
           <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
           <div>
-            <div class="title">Fitxer Actiu</div>
+            <div class="title">Fitxers Actius</div>
             <div class="subtitle" id="activeFileStatus">Cap fitxer seleccionat</div>
           </div>
         </div>
         <div id="activeFileDisplay" class="knowledge-active-file hidden">
-          <span class="knowledge-file-name" id="activeFileName"></span>
-          <button class="knowledge-file-remove" onclick="removeActiveFile()" title="Treure">×</button>
+          <!-- v6.0: Multiple file chips will be rendered here dynamically -->
         </div>
       </div>
 
@@ -207,12 +206,20 @@
         </div>
         <!-- Upload New File -->
         <div class="knowledge-upload-section">
-          <label class="knowledge-upload-btn">
+          <label class="knowledge-upload-btn" id="uploadBtn">
             <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md" onchange="handleFileSelect()">
-            <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
-            Pujar nou fitxer
+            <span class="upload-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+            <span class="upload-text">Pujar fitxer a la biblioteca</span>
           </label>
-          <div id="fileStatusContainer"></div>
+          <div id="uploadProgress" class="upload-progress hidden">
+            <div class="upload-progress-inner">
+              <span class="upload-spinner"></span>
+              <span class="upload-status">Processant fitxer...</span>
+            </div>
+            <div class="upload-progress-bar">
+              <div class="upload-progress-fill"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -338,8 +345,8 @@
           <span class="i i--accent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
           <span>Timeline d'Edicions</span>
         </div>
-        <button class="btn btn-sm" onclick="loadTimeline()" title="Actualitzar">
-          <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span>
+        <button class="btn btn-xs" onclick="loadTimeline(true)" title="Actualitzar" style="padding: 4px; min-width: 24px; height: 24px;">
+          <span class="i i--xs"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span>
         </button>
       </div>
       <div class="timeline-content" id="timelineContent">
@@ -424,20 +431,20 @@
         </label>
       </div>
 
-      <div class="settings-card">
-        <div class="settings-card-header">
-          <span class="i i--error"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span>
-          <div>
-            <div class="title">Paraules Prohibides</div>
-            <div class="subtitle">La IA mai usara aquestes paraules</div>
-          </div>
-        </div>
+      <!-- Banned Words Collapsible -->
+      <button class="collapsible-btn" id="bannedWordsToggle" onclick="toggleBannedWordsPanel()">
+        <span class="collapsible-icon i i--error"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span>
+        <span class="collapsible-text">Paraules Prohibides</span>
+        <span class="collapsible-count" id="bannedWordsCount"></span>
+        <span class="collapsible-arrow"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>
+      </button>
+      <div class="collapsible-content" id="bannedWordsPanel">
         <div class="banned-words-list" id="bannedWordsList">
           <div class="banned-words-empty">Cap paraula prohibida</div>
         </div>
-        <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
-          <input type="text" class="form-input" id="newBannedWord" placeholder="Afegir paraula..." style="flex: 1;">
-          <button class="btn btn-secondary" onclick="addBannedWord()" style="flex: none; padding: 8px 12px;">+ Afegir</button>
+        <div class="banned-words-input">
+          <input type="text" class="form-input" id="newBannedWord" placeholder="Afegir paraula...">
+          <button class="btn btn-sm" onclick="addBannedWord()">+ Afegir</button>
         </div>
       </div>
 
@@ -529,6 +536,12 @@
         </div>
       </div>
 
+      <!-- v5.3: Selection preview (text truncat) -->
+      <div class="selection-indicator hidden" id="selectionIndicator">
+        <span class="i i--xs"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>
+        <span id="selectionPreview"></span>
+      </div>
+
       <!-- Input wrapper amb textarea i send button flotant -->
       <div class="input-wrapper">
         <!-- v5.1: Chat attachment badge -->
@@ -538,13 +551,15 @@
           <button class="chat-attachment-remove" onclick="removeChatAttachment()" title="Treure">×</button>
         </div>
         <div class="input-row">
-          <button class="attach-btn" id="attachBtn" onclick="triggerChatAttachment()" title="Adjuntar fitxer">
-            <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-          </button>
-          <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="2"></textarea>
-          <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Enviar">
-            <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-          </button>
+          <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="1"></textarea>
+          <div class="input-buttons">
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Enviar">
+              <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </button>
+            <button class="attach-btn" id="attachBtn" onclick="triggerChatAttachment()" title="Adjuntar fitxer">
+              <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            </button>
+          </div>
         </div>
         <input type="file" id="chatFileInput" accept=".pdf,.txt,.csv,.md" onchange="handleChatFileSelect()" style="display: none;">
       </div>
@@ -624,7 +639,9 @@
         hash: '<svg viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>',
         mail: '<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',
         link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
-        loader: '<svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>'
+        loader: '<svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>',
+        gripVertical: '<svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>',
+        rotateCcw: '<svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>'
       };
 
       // Helper function to render icons
@@ -695,6 +712,12 @@
       let pendingPreviewChanges = null; // v3.2: Canvis pendents d'aprovar
       let pendingDocSnapshot = null;    // v3.3: Snapshot per detectar race conditions
       let previewModeEnabled = true;    // v3.2: Toggle per activar/desactivar preview
+      let cachedTimelineData = null;    // v4.1: Pre-loaded timeline data
+
+      // v5.3: Selection polling
+      let selectionPollingActive = false;
+      let selectionRequestPending = false;
+      let lastSelectionText = '';
 
       // v5.0: Conversations System
       let currentConversationId = null;
@@ -1190,6 +1213,9 @@
         // v3.4: Load recipes
         loadRecipes();
 
+        // v4.1: Pre-load timeline in background
+        preloadTimeline();
+
         // Enter key handler for banned word input
         document.getElementById('newBannedWord').addEventListener('keydown', function(e) {
           if (e.key === 'Enter') {
@@ -1211,26 +1237,63 @@
           }
         });
 
-        // Auto-resize textarea (v3.2 - expanded limits)
+        // Auto-resize textarea (v5.3 - més compacte)
         const userInput = document.getElementById('userInput');
         userInput.addEventListener('input', function() {
           this.style.height = 'auto';
-          const newHeight = Math.min(Math.max(this.scrollHeight, 44), 200);
+          const newHeight = Math.min(Math.max(this.scrollHeight, 32), 120);
           this.style.height = newHeight + 'px';
         });
 
-        // Ensure minimum height on focus
-        userInput.addEventListener('focus', function() {
-          if (this.scrollHeight < 44) {
-            this.style.height = '44px';
-          }
-        });
+        // v5.3: Polling intel·ligent per selecció (1s)
+        selectionPollingActive = true;
+        selectionRequestPending = false;
 
-        // v5.2: Capturar selecció del document quan el ratolí entra a l'àrea d'input
-        // Això permet detectar seleccions fetes amb el ratolí abans que el focus canviï
-        const inputArea = document.getElementById('inputArea');
-        inputArea.addEventListener('mouseenter', function() {
-          google.script.run.captureCurrentSelection();
+        function pollSelection() {
+          if (!selectionPollingActive || selectionRequestPending) return;
+
+          selectionRequestPending = true;
+          google.script.run
+            .withSuccessHandler(function(info) {
+              selectionRequestPending = false;
+              const indicator = document.getElementById('selectionIndicator');
+              const preview = document.getElementById('selectionPreview');
+              if (!indicator || !preview) return;
+
+              if (info && info.hasSelection && info.textPreview) {
+                // Només actualitzar si ha canviat
+                if (info.textPreview !== lastSelectionText) {
+                  preview.textContent = info.textPreview;
+                  lastSelectionText = info.textPreview;
+                }
+                indicator.classList.remove('hidden');
+              } else {
+                indicator.classList.add('hidden');
+                lastSelectionText = '';
+              }
+            })
+            .withFailureHandler(function() {
+              selectionRequestPending = false;
+            })
+            .captureCurrentSelection();
+        }
+
+        // Polling cada 1 segon
+        setInterval(pollSelection, 1000);
+        // Primera crida immediata
+        pollSelection();
+
+        // Pausar polling mentre escriu
+        let typingTimeout = null;
+        document.getElementById('userInput').addEventListener('input', function() {
+          selectionPollingActive = false;
+          const indicator = document.getElementById('selectionIndicator');
+          if (indicator) indicator.classList.add('hidden');
+
+          clearTimeout(typingTimeout);
+          typingTimeout = setTimeout(function() {
+            selectionPollingActive = true;
+          }, 2000); // Reprendre 2s després d'escriure
         });
 
         // Select first icon
@@ -1333,6 +1396,13 @@
         if (tabName === 'docs') {
           if (typeof initKnowledgePanel === 'function') {
             initKnowledgePanel();
+          }
+        }
+
+        // v4.1: Auto-refresh timeline when opening timeline panel
+        if (tabName === 'timeline') {
+          if (typeof loadTimeline === 'function') {
+            loadTimeline(true); // Always refresh from server
           }
         }
       }
@@ -1911,10 +1981,17 @@
         // v5.0: Store message for later saving to conversation
         lastSentMessage = text;
 
+        // v5.3: Capturar selecció actual per mostrar badge
+        const selectionBadge = lastSelectionText || null;
+
         // v3.10: Simplificat - només 2 modes (edit/chat), sense classificació
-        addBubble('user', text);
+        addBubble('user', text, false, null, selectionBadge);
         input.value = '';
         input.style.height = 'auto';
+
+        // v5.3: Amagar indicador després d'enviar
+        const indicator = document.getElementById('selectionIndicator');
+        if (indicator) indicator.classList.add('hidden');
 
         const btn = document.getElementById('sendBtn');
         btn.disabled = true;
@@ -1927,7 +2004,7 @@
           .processUserCommand(text, getRecentHistory(), getCurrentMode(), previewModeEnabled);
       }
 
-      function addBubble(type, text, isEdit, lastEditWord) {
+      function addBubble(type, text, isEdit, lastEditWord, selectionBadge) {
         const container = document.getElementById('chatHistory');
         const bubble = document.createElement('div');
         bubble.className = 'msg ' + type;
@@ -1937,6 +2014,14 @@
           const div = document.createElement('div');
           div.textContent = t;
           return div.innerHTML.replace(/\n/g, '<br>');
+        }
+
+        // v5.3: Badge de selecció per missatges d'usuari
+        let selectionHtml = '';
+        if (type === 'user' && selectionBadge) {
+          selectionHtml = '<div class="selection-badge">' +
+            '<span class="i i--xs"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>' +
+            '<span class="selection-badge-text">' + sanitizeText(selectionBadge) + '</span></div>';
         }
 
         if (type === 'ai' && isEdit) {
@@ -1957,6 +2042,9 @@
         } else if (type === 'error') {
           // v3.3: Errors poden tenir HTML per botons (controlat internament)
           bubble.innerHTML = text;
+        } else if (type === 'user' && selectionBadge) {
+          // v5.3: Missatge d'usuari amb badge de selecció
+          bubble.innerHTML = selectionHtml + '<div class="user-text">' + sanitizeText(text) + '</div>';
         } else {
           bubble.innerText = text;
         }
@@ -2191,13 +2279,38 @@
       // TIMELINE (v4.0 - Forensic Timeline)
       // ═══════════════════════════════════════════════════════════
 
-      function loadTimeline() {
+      /**
+       * v4.1: Pre-loads timeline data in background (fire-and-forget)
+       * Called on sidebar init to have data ready when user clicks timeline tab
+       */
+      function preloadTimeline() {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.status === 'ok' && result.timeline) {
+              cachedTimelineData = result.timeline;
+            }
+          })
+          .withFailureHandler(function() {
+            // Silent fail - user can refresh manually
+          })
+          .getDocumentTimeline();
+      }
+
+      function loadTimeline(forceRefresh) {
         const container = document.getElementById('timelineContent');
+
+        // v4.1: Use cached data if available and not forcing refresh
+        if (!forceRefresh && cachedTimelineData) {
+          renderTimeline(cachedTimelineData);
+          return;
+        }
+
         container.innerHTML = '<div class="loading-text">Carregant timeline...</div>';
 
         google.script.run
           .withSuccessHandler(function(result) {
             if (result.status === 'ok' && result.timeline) {
+              cachedTimelineData = result.timeline; // v4.1: Cache the data
               renderTimeline(result.timeline);
             } else {
               container.innerHTML = '<div class="timeline-empty"><span class="i i--muted">' + ICONS.clock + '</span><span>No hi ha edicions registrades</span></div>';
@@ -2305,7 +2418,7 @@
           .withSuccessHandler(function(result) {
             if (result.status === 'ok' && result.restore_text !== undefined) {
               showToast('Edició revertida!', 'success');
-              loadTimeline(); // Refresh timeline
+              loadTimeline(true); // Force refresh after revert
             } else {
               showToast('Error: ' + (result.error || 'No s\'ha pogut revertir'), 'error');
             }
@@ -2350,6 +2463,8 @@
           .withSuccessHandler(function(result) {
             if (result && result.confirmed) {
               console.log('[Timeline] Hash confirmed for event:', eventId);
+              // v4.1: Refresh timeline cache in background after successful edit
+              preloadTimeline();
             }
           })
           .withFailureHandler(function(err) {
@@ -2522,7 +2637,7 @@
 
           // Get folder icon (backwards compatible with emojis)
           const folderIconName = mapEmojiToIcon(folder.icon);
-          html += '<div class="folder' + (isCollapsed ? ' collapsed' : '') + '" data-folder-id="' + folder.id + '">' +
+          html += '<div class="folder' + (isCollapsed ? ' collapsed' : '') + '" data-folder-id="' + folder.id + '" data-folder-index="' + folderIndex + '" ondragover="onFolderDragOver(event)" ondragleave="onFolderDragLeave(event)" ondrop="onFolderDrop(event)">' +
             '<div class="folder-header" onclick="toggleFolder(\'' + folder.id + '\')">' +
               '<span class="folder-icon">' + icon(folderIconName, 'i--accent') + '</span>' +
               '<span class="folder-name">' + folder.name + '</span>' +
@@ -2542,7 +2657,8 @@
             // Get recipe icon (backwards compatible with emojis)
             const recipeIconName = mapEmojiToIcon(recipe.icon || recipe.emoji || 'circle');
 
-            html += '<div class="folder-recipe" onclick="runRecipe(\'' + escapedInstruction + '\', \'' + escapedName + '\')">' +
+            html += '<div class="folder-recipe" draggable="true" data-folder-index="' + folderIndex + '" data-recipe-index="' + realRecipeIndex + '" ondragstart="onRecipeDragStart(event)" ondragend="onRecipeDragEnd(event)" onclick="runRecipe(\'' + escapedInstruction + '\', \'' + escapedName + '\')">' +
+              '<span class="folder-recipe-drag-handle">' + icon('gripVertical', 'i--sm i--muted') + '</span>' +
               '<span class="folder-recipe-icon">' + icon(recipeIconName, 'i--default') + '</span>' +
               '<span class="folder-recipe-name">' + recipe.name + '</span>' +
               '<button class="folder-recipe-delete" onclick="event.stopPropagation(); deleteRecipeFromFolder(' + folderIndex + ', ' + realRecipeIndex + ')" title="Esborrar">' + icon('x', 'i--sm') + '</button>' +
@@ -2640,6 +2756,95 @@
         }
       }
 
+      // ═══════════════════════════════════════════════════════════
+      // DRAG AND DROP RECIPES
+      // ═══════════════════════════════════════════════════════════
+      let draggedRecipe = null;
+      let dragSourceFolderIndex = null;
+      let dragSourceRecipeIndex = null;
+
+      function onRecipeDragStart(event) {
+        const recipeEl = event.target.closest('.folder-recipe');
+        dragSourceFolderIndex = parseInt(recipeEl.dataset.folderIndex);
+        dragSourceRecipeIndex = parseInt(recipeEl.dataset.recipeIndex);
+        draggedRecipe = userFolders[dragSourceFolderIndex].recipes[dragSourceRecipeIndex];
+
+        recipeEl.classList.add('dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', ''); // Required for Firefox
+
+        // Add visual feedback to all folders
+        setTimeout(function() {
+          document.querySelectorAll('.folder').forEach(function(folder) {
+            folder.classList.add('drop-target');
+          });
+        }, 0);
+      }
+
+      function onRecipeDragEnd(event) {
+        const recipeEl = event.target.closest('.folder-recipe');
+        if (recipeEl) {
+          recipeEl.classList.remove('dragging');
+        }
+
+        // Remove visual feedback from all folders
+        document.querySelectorAll('.folder').forEach(function(folder) {
+          folder.classList.remove('drop-target', 'drag-over');
+        });
+
+        draggedRecipe = null;
+        dragSourceFolderIndex = null;
+        dragSourceRecipeIndex = null;
+      }
+
+      function onFolderDragOver(event) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+
+        const folderEl = event.target.closest('.folder');
+        if (folderEl && draggedRecipe) {
+          folderEl.classList.add('drag-over');
+        }
+      }
+
+      function onFolderDragLeave(event) {
+        const folderEl = event.target.closest('.folder');
+        if (folderEl) {
+          // Only remove if actually leaving the folder (not entering a child)
+          const relatedTarget = event.relatedTarget;
+          if (!folderEl.contains(relatedTarget)) {
+            folderEl.classList.remove('drag-over');
+          }
+        }
+      }
+
+      function onFolderDrop(event) {
+        event.preventDefault();
+
+        const folderEl = event.target.closest('.folder');
+        if (!folderEl || !draggedRecipe) return;
+
+        const targetFolderIndex = parseInt(folderEl.dataset.folderIndex);
+
+        // Don't do anything if dropping on same folder
+        if (targetFolderIndex === dragSourceFolderIndex) {
+          folderEl.classList.remove('drag-over');
+          return;
+        }
+
+        // Move recipe from source to target folder
+        const recipe = userFolders[dragSourceFolderIndex].recipes.splice(dragSourceRecipeIndex, 1)[0];
+        userFolders[targetFolderIndex].recipes.push(recipe);
+
+        // Expand target folder if collapsed
+        userFolders[targetFolderIndex].collapsed = false;
+
+        saveRecipes();
+        renderFolders();
+
+        showToast('Recepta moguda a "' + userFolders[targetFolderIndex].name + '"', 'success');
+      }
+
       // Show new folder modal
       // Available icons for folders and recipes
       const FOLDER_ICONS = ['folder', 'folderOpen', 'fileText', 'globe', 'wand', 'ruler', 'star', 'target', 'briefcase'];
@@ -2710,13 +2915,13 @@
       // Show new recipe modal (without pre-selected folder)
       function showNewRecipeModal() {
         // If no folders exist, prompt to create one first
-        if (recipeFolders.length === 0) {
+        if (userFolders.length === 0) {
           showToast('Primer crea una carpeta', 'warning');
           showNewFolderModal();
           return;
         }
         // Use first folder as default, or let user choose
-        showAddRecipeToFolder(recipeFolders[0].id);
+        showAddRecipeToFolder(userFolders[0].id);
       }
 
       // Show add recipe to folder modal
@@ -2822,32 +3027,37 @@
       }
 
       // ═══════════════════════════════════════════════════════════
-      // KNOWLEDGE LIBRARY (v5.1)
+      // KNOWLEDGE LIBRARY (v6.0 - Multiple Active Files + Folders)
       // ═══════════════════════════════════════════════════════════
 
       let knowledgeLibrary = [];
-      let activeKnowledgeFileId = null;
+      let knowledgeFolders = []; // v6.0: Array of folder names
+      let currentFolder = null; // v6.0: Current folder (null = root)
+      let activeKnowledgeFiles = []; // v6.0: Array of active files
 
       function initKnowledgePanel() {
-        loadActiveKnowledgeFile();
+        loadActiveKnowledgeFiles();
         refreshKnowledgeLibrary();
       }
 
-      function loadActiveKnowledgeFile() {
+      function loadActiveKnowledgeFiles() {
         google.script.run
           .withSuccessHandler(function(result) {
-            if (result && result.hasFile) {
-              activeKnowledgeFileId = result.id;
-              showActiveFile(result.name);
-              // v5.1: Also show in chat badge
-              showChatAttachment(result.name, false);
+            if (result && result.hasFiles && result.files.length > 0) {
+              activeKnowledgeFiles = result.files;
+              showActiveFiles(result.files);
+              updateChatAttachmentBadge();
             } else {
-              activeKnowledgeFileId = null;
-              hideActiveFile();
+              activeKnowledgeFiles = [];
+              hideActiveFiles();
               hideChatAttachment();
             }
           })
-          .getActiveKnowledgeFile();
+          .getActiveKnowledgeFiles();
+      }
+
+      function isFileActive(fileId) {
+        return activeKnowledgeFiles.some(f => f.id === fileId);
       }
 
       function refreshKnowledgeLibrary() {
@@ -2858,6 +3068,7 @@
           .withSuccessHandler(function(result) {
             if (result && result.files) {
               knowledgeLibrary = result.files;
+              knowledgeFolders = result.folders || [];
               renderKnowledgeLibrary();
             }
           })
@@ -2867,10 +3078,28 @@
           .getKnowledgeLibrary();
       }
 
+      function navigateToFolder(folderName) {
+        currentFolder = folderName;
+        renderKnowledgeLibrary();
+      }
+
+      function navigateToRoot() {
+        currentFolder = null;
+        renderKnowledgeLibrary();
+      }
+
       function renderKnowledgeLibrary() {
         const listEl = document.getElementById('knowledgeLibraryList');
 
-        if (knowledgeLibrary.length === 0) {
+        // Filter files for current folder
+        const currentFiles = knowledgeLibrary.filter(f =>
+          currentFolder === null ? !f.folder : f.folder === currentFolder
+        );
+
+        // Get folders to show (only at root level)
+        const foldersToShow = currentFolder === null ? knowledgeFolders : [];
+
+        if (knowledgeLibrary.length === 0 && knowledgeFolders.length === 0) {
           listEl.innerHTML = `
             <div class="knowledge-empty">
               <span class="i i--muted"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
@@ -2881,19 +3110,78 @@
         }
 
         let html = '';
-        knowledgeLibrary.forEach(function(file) {
-          const isActive = file.id === activeKnowledgeFileId;
+
+        // v6.0: Show breadcrumb navigation if inside a folder
+        if (currentFolder !== null) {
+          html += `
+            <div class="folder-breadcrumb" onclick="navigateToRoot()">
+              <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></span>
+              <span>Tornar</span>
+            </div>
+            <div class="folder-header">
+              <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+              <span class="folder-name">${escapeHtml(currentFolder)}</span>
+              <div class="folder-actions">
+                <button class="file-action-btn" onclick="event.stopPropagation(); promptRenameFolder('${escapeHtml(currentFolder)}')" title="Renombrar">
+                  <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+                </button>
+                <button class="file-action-btn" onclick="event.stopPropagation(); promptDeleteFolder('${escapeHtml(currentFolder)}')" title="Eliminar carpeta">
+                  <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        // v6.0: Render folders (only at root)
+        foldersToShow.forEach(function(folderName) {
+          const filesInFolder = knowledgeLibrary.filter(f => f.folder === folderName).length;
+          html += `
+            <div class="knowledge-folder-item" onclick="navigateToFolder('${escapeHtml(folderName)}')">
+              <span class="folder-icon i i--sm"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+              <div class="file-info">
+                <div class="file-name">${escapeHtml(folderName)}</div>
+                <div class="file-meta">${filesInFolder} fitxer${filesInFolder !== 1 ? 's' : ''}</div>
+              </div>
+              <span class="i i--sm folder-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </div>
+          `;
+        });
+
+        // v6.0: Add "Create folder" button at root
+        if (currentFolder === null) {
+          html += `
+            <div class="knowledge-folder-item new-folder" onclick="promptCreateFolder()">
+              <span class="folder-icon i i--sm"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></span>
+              <div class="file-info">
+                <div class="file-name">Nova carpeta</div>
+              </div>
+            </div>
+          `;
+        }
+
+        // Render files in current folder
+        currentFiles.forEach(function(file) {
+          const isActive = isFileActive(file.id);
           const docsCount = (file.used_in_docs || []).length;
           const sizeKB = Math.round(file.size / 1024);
 
           html += `
-            <div class="knowledge-file-item ${isActive ? 'active' : ''}" onclick="selectKnowledgeFile('${file.id}')">
-              <span class="file-icon i i--sm"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            <div class="knowledge-file-item ${isActive ? 'active' : ''}" onclick="toggleKnowledgeFile('${file.id}')">
+              <span class="file-icon i i--sm">
+                ${isActive
+                  ? '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+                  : '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+                }
+              </span>
               <div class="file-info">
                 <div class="file-name">${escapeHtml(file.name)}</div>
                 <div class="file-meta">${sizeKB}KB · ${docsCount} doc${docsCount !== 1 ? 's' : ''}</div>
               </div>
               <div class="file-actions">
+                <button class="file-action-btn" onclick="event.stopPropagation(); promptMoveFile('${file.id}', '${escapeHtml(file.name)}')" title="Moure">
+                  <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+                </button>
                 <button class="file-action-btn" onclick="event.stopPropagation(); deleteKnowledgeFile('${file.id}')" title="Eliminar">
                   <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
                 </button>
@@ -2902,37 +3190,125 @@
           `;
         });
 
+        // Show empty message if no files in current folder
+        if (currentFiles.length === 0 && currentFolder !== null) {
+          html += `
+            <div class="knowledge-empty">
+              <span>Carpeta buida</span>
+            </div>
+          `;
+        }
+
         listEl.innerHTML = html;
       }
 
-      function selectKnowledgeFile(fileId) {
-        if (fileId === activeKnowledgeFileId) {
-          // Already active, do nothing
-          return;
+      // v6.0: Folder management functions
+      function promptCreateFolder() {
+        const name = prompt('Nom de la nova carpeta:');
+        if (name && name.trim()) {
+          // Create folder by moving a placeholder (folders are implicit)
+          // Just navigate to it - it will be created when a file is moved there
+          const trimmedName = name.trim();
+          if (!knowledgeFolders.includes(trimmedName)) {
+            knowledgeFolders.push(trimmedName);
+          }
+          navigateToFolder(trimmedName);
         }
+      }
 
-        showActiveFile('Carregant...', true);
+      function promptRenameFolder(oldName) {
+        const newName = prompt('Nou nom per la carpeta:', oldName);
+        if (newName && newName.trim() && newName.trim() !== oldName) {
+          google.script.run
+            .withSuccessHandler(function() {
+              currentFolder = newName.trim();
+              refreshKnowledgeLibrary();
+            })
+            .withFailureHandler(function(err) {
+              alert('Error: ' + err.message);
+            })
+            .renameFolder(oldName, newName.trim());
+        }
+      }
 
+      function promptDeleteFolder(folderName) {
+        if (confirm('Eliminar la carpeta "' + folderName + '"? Els fitxers es mouran a l\'arrel.')) {
+          google.script.run
+            .withSuccessHandler(function() {
+              currentFolder = null;
+              refreshKnowledgeLibrary();
+            })
+            .withFailureHandler(function(err) {
+              alert('Error: ' + err.message);
+            })
+            .deleteFolder(folderName);
+        }
+      }
+
+      function promptMoveFile(fileId, fileName) {
+        const options = ['(Arrel)', ...knowledgeFolders.filter(f => f !== currentFolder)];
+        const choice = prompt(
+          'Moure "' + fileName + '" a:\n\n' +
+          options.map((f, i) => (i + 1) + '. ' + f).join('\n') +
+          '\n\nEscriu el número o el nom de la carpeta (o un nom nou per crear-la):'
+        );
+
+        if (choice !== null && choice.trim()) {
+          let targetFolder = null;
+          const num = parseInt(choice.trim());
+
+          if (!isNaN(num) && num >= 1 && num <= options.length) {
+            targetFolder = num === 1 ? null : options[num - 1];
+          } else {
+            // User typed a folder name
+            targetFolder = choice.trim() === '(Arrel)' ? null : choice.trim();
+          }
+
+          google.script.run
+            .withSuccessHandler(function() {
+              refreshKnowledgeLibrary();
+            })
+            .withFailureHandler(function(err) {
+              alert('Error: ' + err.message);
+            })
+            .moveFileToFolder(fileId, targetFolder);
+        }
+      }
+
+      // v6.0: Toggle file activation (add/remove from active list)
+      function toggleKnowledgeFile(fileId) {
         google.script.run
           .withSuccessHandler(function(result) {
             if (result && result.status === 'ok') {
-              activeKnowledgeFileId = fileId;
-              showActiveFile(result.file_name);
+              activeKnowledgeFiles = result.activeFiles || [];
+              showActiveFiles(activeKnowledgeFiles);
+              updateChatAttachmentBadge();
               renderKnowledgeLibrary();
             }
           })
           .withFailureHandler(function(err) {
             alert('Error: ' + err.message);
-            hideActiveFile();
           })
-          .linkKnowledgeFile(fileId);
+          .toggleKnowledgeFile(fileId);
       }
 
-      function removeActiveFile() {
+      function removeActiveFile(fileId) {
         google.script.run
-          .withSuccessHandler(function() {
-            activeKnowledgeFileId = null;
-            hideActiveFile();
+          .withSuccessHandler(function(result) {
+            activeKnowledgeFiles = result.activeFiles || [];
+            showActiveFiles(activeKnowledgeFiles);
+            updateChatAttachmentBadge();
+            renderKnowledgeLibrary();
+          })
+          .unlinkKnowledgeFile(fileId);
+      }
+
+      function removeAllActiveFiles() {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            activeKnowledgeFiles = [];
+            hideActiveFiles();
+            hideChatAttachment();
             renderKnowledgeLibrary();
           })
           .unlinkKnowledgeFile();
@@ -2943,10 +3319,10 @@
 
         google.script.run
           .withSuccessHandler(function() {
-            if (fileId === activeKnowledgeFileId) {
-              activeKnowledgeFileId = null;
-              hideActiveFile();
-            }
+            // Remove from active files if present
+            activeKnowledgeFiles = activeKnowledgeFiles.filter(f => f.id !== fileId);
+            showActiveFiles(activeKnowledgeFiles);
+            updateChatAttachmentBadge();
             refreshKnowledgeLibrary();
           })
           .withFailureHandler(function(err) {
@@ -2955,22 +3331,48 @@
           .deleteFromKnowledgeLibrary(fileId);
       }
 
-      function showActiveFile(name, loading) {
+      // v6.0: Show multiple active files
+      function showActiveFiles(files) {
         const displayEl = document.getElementById('activeFileDisplay');
-        const nameEl = document.getElementById('activeFileName');
         const statusEl = document.getElementById('activeFileStatus');
 
-        nameEl.textContent = (loading ? '⏳ ' : '📄 ') + name;
+        if (!files || files.length === 0) {
+          hideActiveFiles();
+          return;
+        }
+
+        let html = '';
+        files.forEach(function(file) {
+          html += `
+            <div class="active-file-chip">
+              <span class="chip-name">${escapeHtml(file.name)}</span>
+              <button class="chip-remove" onclick="removeActiveFile('${file.id}')" title="Treure">×</button>
+            </div>
+          `;
+        });
+
+        displayEl.innerHTML = html;
         displayEl.classList.remove('hidden');
-        statusEl.textContent = loading ? 'Carregant...' : 'Fitxer actiu';
+        statusEl.textContent = files.length === 1 ? 'Fitxer actiu' : files.length + ' fitxers actius';
       }
 
-      function hideActiveFile() {
+      function hideActiveFiles() {
         const displayEl = document.getElementById('activeFileDisplay');
         const statusEl = document.getElementById('activeFileStatus');
 
+        displayEl.innerHTML = '';
         displayEl.classList.add('hidden');
         statusEl.textContent = 'Cap fitxer seleccionat';
+      }
+
+      function updateChatAttachmentBadge() {
+        if (activeKnowledgeFiles.length === 0) {
+          hideChatAttachment();
+        } else if (activeKnowledgeFiles.length === 1) {
+          showChatAttachment(activeKnowledgeFiles[0].name, false);
+        } else {
+          showChatAttachment(activeKnowledgeFiles.length + ' fitxers', false);
+        }
       }
 
       function handleFileSelect() {
@@ -2979,45 +3381,90 @@
 
         const file = fileInput.files[0];
         if (file.size > 10 * 1024 * 1024) {
-          alert('Maxim 10MB');
+          alert('Màxim 10MB');
+          fileInput.value = '';
           return;
         }
 
-        showFileStatus(file.name, true);
+        // Show upload progress
+        showUploadProgress(file.name, 'llegint');
 
         const reader = new FileReader();
         reader.onload = function(e) {
+          showUploadProgress(file.name, 'pujant');
+
           const base64 = e.target.result.split(',')[1];
           google.script.run
             .withSuccessHandler(function(res) {
-              showFileStatus(null);
               if (res && res.status === 'ok' && res.file) {
-                activeKnowledgeFileId = res.file.id;
-                showActiveFile(res.file.name);
+                showUploadProgress(file.name, 'completat');
+                // v6.0: Add to active files array
+                if (!activeKnowledgeFiles.find(f => f.id === res.file.id)) {
+                  activeKnowledgeFiles.push({ id: res.file.id, name: res.file.name });
+                }
+                showActiveFiles(activeKnowledgeFiles);
+                updateChatAttachmentBadge();
                 refreshKnowledgeLibrary();
+
+                // Hide progress after success animation
+                setTimeout(hideUploadProgress, 1500);
+              } else {
+                hideUploadProgress();
+                alert('Error pujant el fitxer');
               }
             })
             .withFailureHandler(function(err) {
-              showFileStatus(null);
+              hideUploadProgress();
               alert('Error: ' + err.message);
             })
             .uploadToKnowledgeLibrary(base64, file.type, file.name);
         };
         reader.readAsDataURL(file);
+        fileInput.value = '';
+      }
+
+      function showUploadProgress(fileName, stage) {
+        const uploadBtn = document.getElementById('uploadBtn');
+        const progress = document.getElementById('uploadProgress');
+        const statusEl = progress.querySelector('.upload-status');
+        const fillEl = progress.querySelector('.upload-progress-fill');
+
+        uploadBtn.classList.add('hidden');
+        progress.classList.remove('hidden');
+
+        const stages = {
+          'llegint': { text: 'Llegint ' + fileName + '...', percent: 30 },
+          'pujant': { text: 'Pujant a la biblioteca...', percent: 70 },
+          'completat': { text: '✓ Fitxer afegit!', percent: 100 }
+        };
+
+        const stageData = stages[stage] || stages['llegint'];
+        statusEl.textContent = stageData.text;
+        fillEl.style.width = stageData.percent + '%';
+
+        if (stage === 'completat') {
+          progress.classList.add('success');
+        }
+      }
+
+      function hideUploadProgress() {
+        const uploadBtn = document.getElementById('uploadBtn');
+        const progress = document.getElementById('uploadProgress');
+        const fillEl = progress.querySelector('.upload-progress-fill');
+
+        progress.classList.add('hidden');
+        progress.classList.remove('success');
+        uploadBtn.classList.remove('hidden');
+        fillEl.style.width = '0%';
       }
 
       function showFileStatus(name, uploading) {
-        const container = document.getElementById('fileStatusContainer');
+        // Legacy function - redirects to new progress system
         if (!name) {
-          container.innerHTML = '';
-          return;
+          hideUploadProgress();
+        } else if (uploading) {
+          showUploadProgress(name, 'pujant');
         }
-
-        container.innerHTML = `
-          <div style="padding: 8px; text-align: center; color: var(--text-muted); font-size: 12px;">
-            ⏳ Pujant ${name}...
-          </div>
-        `;
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -3048,10 +3495,12 @@
           google.script.run
             .withSuccessHandler(function(res) {
               if (res && res.status === 'ok' && res.file) {
-                activeKnowledgeFileId = res.file.id;
-                showChatAttachment(res.file.name, false);
-                // Also update Knowledge panel
-                showActiveFile(res.file.name);
+                // v6.0: Add to active files array
+                if (!activeKnowledgeFiles.find(f => f.id === res.file.id)) {
+                  activeKnowledgeFiles.push({ id: res.file.id, name: res.file.name });
+                }
+                updateChatAttachmentBadge();
+                showActiveFiles(activeKnowledgeFiles);
                 refreshKnowledgeLibrary();
               } else {
                 hideChatAttachment();
@@ -3086,15 +3535,17 @@
 
       function removeChatAttachment() {
         hideChatAttachment();
-        hideActiveFile();
-        activeKnowledgeFileId = null;
+        hideActiveFiles();
+        activeKnowledgeFiles = [];
         renderKnowledgeLibrary();
         google.script.run.unlinkKnowledgeFile();
       }
 
       function clearFile() {
         google.script.run.withSuccessHandler(function() {
-          hideActiveFile();
+          activeKnowledgeFiles = [];
+          hideActiveFiles();
+          hideChatAttachment();
         }).clearKnowledgeFile();
       }
 
@@ -3118,7 +3569,13 @@
 
       function renderBannedWordsList() {
         const container = document.getElementById('bannedWordsList');
+        const countEl = document.getElementById('bannedWordsCount');
         if (!container) return;
+
+        // Update count badge
+        if (countEl) {
+          countEl.textContent = bannedWords.length > 0 ? bannedWords.length : '';
+        }
 
         if (bannedWords.length === 0) {
           container.innerHTML = '<div class="banned-words-empty">Cap paraula prohibida</div>';
@@ -3131,6 +3588,20 @@
             '<button class="remove-btn" onclick="removeBannedWord(' + index + ')"><span class="i i--sm"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>' +
             '</span>';
         }).join('');
+      }
+
+      function toggleBannedWordsPanel() {
+        const btn = document.getElementById('bannedWordsToggle');
+        const panel = document.getElementById('bannedWordsPanel');
+        const isOpen = panel.classList.contains('open');
+
+        if (isOpen) {
+          panel.classList.remove('open');
+          btn.classList.remove('open');
+        } else {
+          panel.classList.add('open');
+          btn.classList.add('open');
+        }
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -3417,13 +3888,16 @@
         bannedWords.push(word.toLowerCase());
         input.value = '';
 
+        // v4.1: Optimistic UI - render immediately, save in background
+        renderBannedWordsList();
+
         google.script.run
           .withSuccessHandler(function() {
-            renderBannedWordsList();
-            showToast('"' + word + '" afegit a prohibides', 'ban');
+            showToast('"' + word + '" afegit', 'ban');
           })
           .withFailureHandler(function(err) {
             bannedWords.pop(); // Rollback
+            renderBannedWordsList();
             showToast('Error: ' + err.message, 'error');
           })
           .saveBannedWords(bannedWords);
@@ -3432,13 +3906,16 @@
       function removeBannedWord(index) {
         const removed = bannedWords.splice(index, 1)[0];
 
+        // v4.1: Optimistic UI - render immediately, save in background
+        renderBannedWordsList();
+
         google.script.run
           .withSuccessHandler(function() {
-            renderBannedWordsList();
-            showToast('"' + removed + '" eliminat de prohibides', 'success');
+            showToast('"' + removed + '" eliminat', 'success');
           })
           .withFailureHandler(function(err) {
             bannedWords.splice(index, 0, removed); // Rollback
+            renderBannedWordsList();
             showToast('Error: ' + err.message, 'error');
           })
           .saveBannedWords(bannedWords);
@@ -3449,14 +3926,18 @@
 
         bannedWords.push(word.toLowerCase());
 
+        // v4.1: Optimistic UI - render immediately, save in background
+        renderBannedWordsList();
+        renderConstraintChips();
+
         google.script.run
           .withSuccessHandler(function() {
-            renderBannedWordsList();
-            renderConstraintChips(); // Also update chips
-            showToast('"' + word + '" afegit a prohibides', 'ban');
+            showToast('"' + word + '" afegit', 'ban');
           })
           .withFailureHandler(function(err) {
             bannedWords.pop(); // Rollback
+            renderBannedWordsList();
+            renderConstraintChips();
             console.error('Error adding banned word:', err);
           })
           .saveBannedWords(bannedWords);

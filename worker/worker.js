@@ -351,11 +351,12 @@ async function detectAndRecordGap(env, licenseHash, docId, clientHash, wordCount
     const baseline = await saveEditEvent(env, {
       license_key_hash: licenseHash,
       doc_id: docId,
-      operation: 'baseline',
+      event_type: 'baseline',
       source: 'baseline',
       doc_hash: clientHash,
       hash_confirmed: true,
-      word_count: wordCount
+      word_count: wordCount,
+      after_text: '[baseline]'
     });
     console.log(`[Timeline] Baseline created for doc ${docId}`);
     return { type: 'baseline', event: baseline };
@@ -367,12 +368,13 @@ async function detectAndRecordGap(env, licenseHash, docId, clientHash, wordCount
     const gapEvent = await saveEditEvent(env, {
       license_key_hash: licenseHash,
       doc_id: docId,
-      operation: 'manual_gap',
+      event_type: 'manual_gap',
       source: 'manual',
       doc_hash: clientHash,
       hash_confirmed: true,
       word_count: wordCount,
-      words_changed: wordsChanged
+      words_changed: wordsChanged,
+      after_text: '[edició manual]'
     });
     console.log(`[Timeline] Gap detected: ${wordsChanged > 0 ? '+' : ''}${wordsChanged} words`);
     return { type: 'gap', event: gapEvent, wordsChanged };
@@ -1095,6 +1097,16 @@ export default {
       }
       if (body.action === 'delete_from_library') {
         return await handleDeleteFromLibrary(body, env, corsHeaders);
+      }
+      // v6.0: Folder management endpoints
+      if (body.action === 'move_to_folder') {
+        return await handleMoveToFolder(body, env, corsHeaders);
+      }
+      if (body.action === 'rename_folder') {
+        return await handleRenameFolder(body, env, corsHeaders);
+      }
+      if (body.action === 'delete_folder') {
+        return await handleDeleteFolder(body, env, corsHeaders);
       }
 
       // Default: Chat handler
@@ -2389,7 +2401,7 @@ async function handleDeleteConversation(body, env, corsHeaders) {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Get all knowledge files for the user
+ * Get all knowledge files for the user (v6.0 - with folders)
  */
 async function handleGetKnowledgeLibrary(body, env, corsHeaders) {
   const { license_key } = body;
@@ -2398,7 +2410,7 @@ async function handleGetKnowledgeLibrary(body, env, corsHeaders) {
   const licenseHash = await hashKey(license_key);
 
   const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/knowledge_library?license_key_hash=eq.${licenseHash}&order=last_used_at.desc&select=id,file_name,mime_type,file_size,gemini_file_uri,gemini_expires_at,used_in_docs,created_at`,
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library?license_key_hash=eq.${licenseHash}&order=folder.asc.nullsfirst,last_used_at.desc&select=id,file_name,mime_type,file_size,gemini_file_uri,gemini_expires_at,used_in_docs,created_at,folder`,
     {
       method: 'GET',
       headers: {
@@ -2415,8 +2427,12 @@ async function handleGetKnowledgeLibrary(body, env, corsHeaders) {
 
   const files = await response.json();
 
+  // Extract unique folders from files
+  const folders = [...new Set(files.map(f => f.folder).filter(f => f))].sort();
+
   return new Response(JSON.stringify({
     status: "ok",
+    folders: folders,
     files: files.map(f => ({
       id: f.id,
       name: f.file_name,
@@ -2424,8 +2440,107 @@ async function handleGetKnowledgeLibrary(body, env, corsHeaders) {
       size: f.file_size,
       has_valid_uri: f.gemini_file_uri && new Date(f.gemini_expires_at) > new Date(),
       used_in_docs: f.used_in_docs || [],
-      created_at: f.created_at
+      created_at: f.created_at,
+      folder: f.folder || null
     }))
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Move a file to a folder (v6.0)
+ */
+async function handleMoveToFolder(body, env, corsHeaders) {
+  const { license_key, file_id, folder } = body;
+  if (!license_key) throw new Error("missing_license");
+  if (!file_id) throw new Error("missing_file_id");
+
+  const licenseHash = await hashKey(license_key);
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library?id=eq.${file_id}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ folder: folder || null })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  return new Response(JSON.stringify({
+    status: "ok"
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Rename a folder (moves all files to new folder name) (v6.0)
+ */
+async function handleRenameFolder(body, env, corsHeaders) {
+  const { license_key, old_name, new_name } = body;
+  if (!license_key) throw new Error("missing_license");
+  if (!old_name) throw new Error("missing_old_name");
+  if (!new_name) throw new Error("missing_new_name");
+
+  const licenseHash = await hashKey(license_key);
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library?folder=eq.${encodeURIComponent(old_name)}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ folder: new_name })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  return new Response(JSON.stringify({
+    status: "ok"
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * Delete a folder (moves all files to root) (v6.0)
+ */
+async function handleDeleteFolder(body, env, corsHeaders) {
+  const { license_key, folder_name } = body;
+  if (!license_key) throw new Error("missing_license");
+  if (!folder_name) throw new Error("missing_folder_name");
+
+  const licenseHash = await hashKey(license_key);
+
+  // Move all files from this folder to root (folder = null)
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/knowledge_library?folder=eq.${encodeURIComponent(folder_name)}&license_key_hash=eq.${licenseHash}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ folder: null })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("supabase_error: " + await response.text());
+  }
+
+  return new Response(JSON.stringify({
+    status: "ok"
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
