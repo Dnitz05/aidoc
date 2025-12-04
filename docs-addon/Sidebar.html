@@ -60,7 +60,7 @@
         </button>
         <button class="tab" data-tab="docs" onclick="switchTab('docs')" title="Coneixement">
           <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          <span class="tab-label">Docs</span>
+          <span class="tab-label">Coneixement</span>
         </button>
         <button class="tab" data-tab="recipes" onclick="switchTab('recipes')" title="Receptes">
           <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -2004,6 +2004,79 @@
           .processUserCommand(text, getRecentHistory(), getCurrentMode(), previewModeEnabled);
       }
 
+      // ═══════════════════════════════════════════════════════════
+      // MARKDOWN RENDERER (v6.5)
+      // ═══════════════════════════════════════════════════════════
+
+      /**
+       * Lightweight markdown parser for AI responses
+       * Supports: code blocks, inline code, bold, italic, lists, links, blockquotes
+       */
+      function renderMarkdown(text) {
+        if (!text) return '';
+
+        // 1. Escape HTML first (security)
+        let html = text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        // 2. Code blocks (```) - process first to avoid conflicts
+        html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, function(match, lang, code) {
+          const langClass = lang ? ' class="language-' + lang + '"' : '';
+          return '<pre class="md-pre"><code' + langClass + '>' + code.trim() + '</code></pre>';
+        });
+
+        // 3. Inline code (`)
+        html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
+
+        // 4. Bold (**text** or __text__)
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+        // 5. Italic (*text* or _text_) - careful not to conflict with bold
+        html = html.replace(/(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+        html = html.replace(/(?<!_)_(?!_)([^_]+?)(?<!_)_(?!_)/g, '<em>$1</em>');
+
+        // 6. Strikethrough (~~text~~)
+        html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+        // 7. Headers (## ## ###) - only h4-h6 to not break layout
+        html = html.replace(/^#### (.+)$/gm, '<h6 class="md-header">$1</h6>');
+        html = html.replace(/^### (.+)$/gm, '<h5 class="md-header">$1</h5>');
+        html = html.replace(/^## (.+)$/gm, '<h4 class="md-header">$1</h4>');
+
+        // 8. Unordered lists (- item or * item)
+        html = html.replace(/^[\-\*] (.+)$/gm, '<li class="md-li">$1</li>');
+        html = html.replace(/(<li class="md-li">.*<\/li>\n?)+/g, '<ul class="md-list">$&</ul>');
+
+        // 9. Ordered lists (1. item)
+        html = html.replace(/^\d+\. (.+)$/gm, '<li class="md-li-num">$1</li>');
+        html = html.replace(/(<li class="md-li-num">.*<\/li>\n?)+/g, '<ol class="md-list-num">$&</ol>');
+
+        // 10. Links [text](url) - only safe HTTPS URLs
+        html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+          '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>');
+
+        // 11. Blockquotes (&gt; text - already escaped)
+        html = html.replace(/^&gt; (.+)$/gm, '<blockquote class="md-quote">$1</blockquote>');
+
+        // 12. Horizontal rule (---)
+        html = html.replace(/^---+$/gm, '<hr class="md-hr">');
+
+        // 13. Line breaks
+        html = html.replace(/\n\n/g, '</p><p class="md-para">');
+        html = html.replace(/\n/g, '<br>');
+
+        // 14. Wrap in paragraph if no block elements
+        if (!html.includes('<p') && !html.includes('<pre') && !html.includes('<ul') &&
+            !html.includes('<ol') && !html.includes('<h') && !html.includes('<blockquote')) {
+          html = '<p class="md-para">' + html + '</p>';
+        }
+
+        return html;
+      }
+
       function addBubble(type, text, isEdit, lastEditWord, selectionBadge) {
         const container = document.getElementById('chatHistory');
         const bubble = document.createElement('div');
@@ -2037,8 +2110,11 @@
           }
 
           badgeHtml += '</div>';
-          // v3.3: Escapar text per evitar XSS
-          bubble.innerHTML = badgeHtml + sanitizeText(text);
+          // v6.5: Use markdown for AI responses with edit badge
+          bubble.innerHTML = badgeHtml + '<div class="md-content">' + renderMarkdown(text) + '</div>';
+        } else if (type === 'ai') {
+          // v6.5: AI responses with markdown rendering
+          bubble.innerHTML = '<div class="md-content">' + renderMarkdown(text) + '</div>';
         } else if (type === 'error') {
           // v3.3: Errors poden tenir HTML per botons (controlat internament)
           bubble.innerHTML = text;
