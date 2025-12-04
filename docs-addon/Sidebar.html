@@ -1114,7 +1114,8 @@
             chatHistory.scrollTop = chatHistory.scrollHeight;
           }
         } else if (!prepend) {
-          chatHistory.innerHTML = '<div class="msg system">Conversa buida. Escriu un missatge!</div>';
+          // v7.1: Mostrar landing per converses buides
+          showChatLanding();
         }
       }
 
@@ -1151,9 +1152,8 @@
         updateConversationTitle('Nova conversa');
         closeConversationsDrawer();
 
-        // Clear chat
-        const chatHistory = document.getElementById('chatHistory');
-        chatHistory.innerHTML = '<div class="msg system">Hola! Soc Docmile, el teu assistent d\'escriptura.</div>';
+        // v7.1: Mostrar landing interactiva en lloc de missatge simple
+        showChatLanding();
 
         // Update drawer if open
         updateActiveConversation(null);
@@ -2478,6 +2478,75 @@
           .clearReferenceHighlights();
       }
 
+      // ═══════════════════════════════════════════════════════════
+      // v7.1: CHAT LANDING - Pantalla inicial interactiva
+      // ═══════════════════════════════════════════════════════════
+
+      /**
+       * Mostra la landing del xat si no hi ha missatges
+       */
+      function showChatLanding() {
+        const container = document.getElementById('chatHistory');
+        const existingLanding = document.getElementById('chatLanding');
+
+        // Si ja existeix, només mostrar-la
+        if (existingLanding) {
+          existingLanding.classList.remove('hidden');
+          return;
+        }
+
+        const suggestions = [
+          { icon: '✏️', text: "Corregeix l'ortografia", prompt: "Corregeix l'ortografia", cat: 'edit' },
+          { icon: '🌍', text: 'Tradueix al castellà', prompt: 'Tradueix al castellà', cat: 'translate' },
+          { icon: '📝', text: 'Resumeix el document', prompt: 'Resumeix el document en 3 punts clau', cat: 'analyze' },
+          { icon: '🔍', text: 'Detecta repeticions', prompt: 'Detecta repeticions de paraules', cat: 'reference' },
+          { icon: '✨', text: "Millora l'estil", prompt: "Millora l'estil del text", cat: 'edit' },
+          { icon: '📧', text: 'Escriu un email', prompt: 'Escriu un email formal basat en aquest contingut', cat: 'create' }
+        ];
+
+        let cardsHtml = suggestions.map(function(s) {
+          return '<button class="suggestion-card cat-' + s.cat + '" onclick="useSuggestion(\'' + s.prompt.replace(/'/g, "\\'") + '\')">' +
+            '<span class="suggestion-icon">' + s.icon + '</span>' +
+            '<span class="suggestion-text">' + s.text + '</span>' +
+            '</button>';
+        }).join('');
+
+        const landingHtml = '<div id="chatLanding" class="chat-landing">' +
+          '<div class="landing-greeting">' +
+            '<div class="landing-logo"><span class="landing-wave">👋</span></div>' +
+            '<h2 class="landing-title">Hola! Sóc Docmile</h2>' +
+            '<p class="landing-subtitle">El teu assistent d\'escriptura</p>' +
+          '</div>' +
+          '<div class="landing-suggestions">' +
+            '<p class="landing-hint">Prova alguna d\'aquestes accions:</p>' +
+            '<div class="suggestion-grid">' + cardsHtml + '</div>' +
+          '</div>' +
+          '<p class="landing-footer">💡 O escriu la teva pròpia instrucció</p>' +
+        '</div>';
+
+        container.innerHTML = landingHtml;
+      }
+
+      /**
+       * Usa un suggeriment de la landing
+       */
+      function useSuggestion(prompt) {
+        hideChatLanding();
+        const input = document.getElementById('userInput');
+        input.value = prompt;
+        sendMessage();
+      }
+
+      /**
+       * Amaga la landing del xat
+       */
+      function hideChatLanding() {
+        const landing = document.getElementById('chatLanding');
+        if (landing) {
+          landing.remove();
+        }
+      }
+
       function showThinking() {
         const container = document.getElementById('chatHistory');
         const thinking = document.createElement('div');
@@ -3728,18 +3797,6 @@
           `;
         });
 
-        // v6.0: Add "Create folder" button at root
-        if (currentFolder === null) {
-          html += `
-            <div class="knowledge-folder-item new-folder" onclick="promptCreateFolder()">
-              <span class="folder-icon i i--sm"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></span>
-              <div class="file-info">
-                <div class="file-name">Nova carpeta</div>
-              </div>
-            </div>
-          `;
-        }
-
         // Render files in current folder
         currentFiles.forEach(function(file) {
           const isActive = isFileActive(file.id);
@@ -3783,19 +3840,6 @@
       }
 
       // v6.0: Folder management functions
-      function promptCreateFolder() {
-        const name = prompt('Nom de la nova carpeta:');
-        if (name && name.trim()) {
-          // Create folder by moving a placeholder (folders are implicit)
-          // Just navigate to it - it will be created when a file is moved there
-          const trimmedName = name.trim();
-          if (!knowledgeFolders.includes(trimmedName)) {
-            knowledgeFolders.push(trimmedName);
-          }
-          navigateToFolder(trimmedName);
-        }
-      }
-
       function promptRenameFolder(oldName) {
         const newName = prompt('Nou nom per la carpeta:', oldName);
         if (newName && newName.trim() && newName.trim() !== oldName) {
