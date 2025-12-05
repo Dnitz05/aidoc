@@ -543,12 +543,12 @@
       <div class="preview-bar-header">
         <div class="preview-bar-status">
           <span class="i i--accent"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-          <span>Preview actiu al document</span>
+          <span>Revisa els canvis al document</span>
           <span class="count" id="previewCount">1</span>
         </div>
       </div>
       <div class="preview-bar-hint">
-        Mira el document per veure els canvis proposats
+        He marcat els canvis directament al text
         <span class="preview-legend">
           <span class="legend-item delete"><span class="i i--error i--sm"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Eliminar</span>
           <span class="legend-item add"><span class="i i--success i--sm"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> Afegir</span>
@@ -1319,8 +1319,8 @@
           .withSuccessHandler(function(result) {
             hideInDocPreviewBar();
             if (result && result.ok) {
-              showToast(result.message || 'Canvis aplicats!', 'success');
-              addMessage('assistant', icon('checkCircle', 'i--success') + ' S\'han aplicat ' + result.applied + ' canvis al document.');
+              showToast(result.message || 'Fet!', 'success');
+              addMessage('assistant', icon('checkCircle', 'i--success') + ' He aplicat ' + result.applied + ' canvi' + (result.applied !== 1 ? 's' : '') + '.');
             } else {
               showToast(result?.message || 'Error aplicant canvis', 'warning');
               addMessage('assistant', icon('alertTriangle', 'i--warning') + ' Error: ' + (result?.message || 'No s\'han pogut aplicar els canvis'));
@@ -1725,9 +1725,9 @@
             // v3.3: Get text, removing entire edit badge block if present
             let text = msg.innerText.trim();
 
-            // Remove complete badge line (Document modificat + Desfer + Prohibir)
+            // Remove complete badge line (Fet! + Desfer + Prohibir)
             // Note: Icons render as empty spans, so innerText has just button text
-            text = text.replace(/^Document modificat\s*(Desfer)?\s*(Prohibir)?\s*/i, '');
+            text = text.replace(/^(Document modificat|Fet!)\s*(Desfer)?\s*(Prohibir)?\s*/i, '');
 
             // Also clean any remaining button artifacts
             text = text.replace(/^Desfer\s*/i, '');
@@ -1775,7 +1775,7 @@
 
         // Handle preview with 0 changes (fallback - IDs didn't match)
         if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-          addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No s\'han pogut identificar els canvis específics.', true);
+          addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.', true);
           if (res.credits !== undefined) {
             updateCredits(res.credits);
           }
@@ -1785,7 +1785,7 @@
         // v3.8: Handle In-Document Preview (Track Changes style)
         if (res.status === 'in_doc_preview') {
           const previewCount = res.changes_count || res.preview_info?.count || 1;
-          addBubble('ai', res.ai_response + '\n\n' + icon('search', 'i--sm i--accent') + ' **Preview actiu al document** - Mira el document per veure els canvis proposats.', false);
+          addBubble('ai', res.ai_response + '\n\n' + icon('eye', 'i--sm i--accent') + ' Revisa els canvis que he marcat al document.', false);
           showInDocPreviewBar(previewCount);
           if (res.credits !== undefined) {
             updateCredits(res.credits);
@@ -2435,7 +2435,7 @@
 
         if (type === 'ai' && isEdit) {
           // v10.0: Badge només mostra indicador + Prohibir (el Desfer està a l'Undo Bar)
-          let badgeHtml = '<div class="edit-badge">' + icon('check', 'i--sm i--success') + ' Document modificat';
+          let badgeHtml = '<div class="edit-badge">' + icon('check', 'i--sm i--success') + ' Fet!';
 
           // v2.8: Add "ban word" button if we have a recently changed word
           if (lastEditWord) {
@@ -2749,7 +2749,7 @@
         undoBar.innerHTML = `
           <div class="undo-bar-text">
             <span class="i i--sm i--warning"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
-            <span>Canvi aplicat</span>
+            <span>Text modificat</span>
           </div>
           <div class="undo-bar-actions">
             <button class="btn-icon confirm" onclick="commitChange()"><span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> Acceptar</button>
@@ -2769,7 +2769,7 @@
         // L'usuari accepta el canvi - simplement amaguem la barra
         pendingUndo = null;
         hideUndoBar();
-        addBubble('system', icon('check', 'i--sm i--success') + ' Canvi confirmat');
+        addBubble('system', icon('check', 'i--sm i--success') + ' Perfecte!');
       }
 
       function triggerUndo() {
@@ -2792,7 +2792,7 @@
             hideUndoBar();
             if (res.status === 'restored') {
               pendingUndo = null;
-              addBubble('system', icon('undo', 'i--sm i--accent') + ' Text original restaurat');
+              addBubble('system', icon('undo', 'i--sm i--accent') + ' Restaurat!');
             } else {
               addBubble('error', 'Error: ' + (res.error || 'No s\'ha pogut restaurar'));
             }
@@ -2911,7 +2911,7 @@
 
             // Handle preview with 0 changes (fallback)
             if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-              addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No s\'han pogut identificar els canvis específics.', true);
+              addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.', true);
               if (res.credits !== undefined) {
                 updateCredits(res.credits);
               }
@@ -3467,7 +3467,7 @@
 
             // Handle preview with 0 changes (fallback)
             if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-              addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No s\'han pogut identificar els canvis específics.', true);
+              addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.', true);
               if (res.credits !== undefined) {
                 updateCredits(res.credits);
               }
@@ -5288,7 +5288,7 @@
             pendingDocSnapshot = null; // v3.3: Clear snapshot
 
             if (res.ok) {
-              addBubble('system', icon('checkCircle', 'i--success') + ' ' + res.applied + ' canvi(s) aplicat(s)');
+              addBubble('system', icon('checkCircle', 'i--success') + ' He aplicat ' + res.applied + ' canvi' + (res.applied !== 1 ? 's' : '') + '.');
 
               // Show undo bar for reverting
               if (res.undoSnapshots && res.undoSnapshots.length > 0) {
@@ -5315,7 +5315,7 @@
         pendingPreviewChanges = null;
         pendingDocSnapshot = null; // v3.3: Clear snapshot
         hidePreviewPanel();
-        addBubble('system', icon('undo', 'i--default') + ' Canvis descartats');
+        addBubble('system', icon('undo', 'i--default') + ' Cancel·lat');
       }
 
       function clearKnowledgeFileAndRetry() {
@@ -5377,8 +5377,8 @@
               // Mark as shown
               sessionStorage.setItem(HINT_SHOWN_KEY, 'true');
               // Show hint in chat
-              addBubble('system', icon('lightbulb', 'i--warning') + ' Tip: El document té ' + summary.visual_headings +
-                ' títols visuals sense format. Ves a Estructura > Auto-Structure per millorar-lo.');
+              addBubble('system', icon('lightbulb', 'i--warning') + ' He detectat ' + summary.visual_headings +
+                ' títols sense format. Pots arreglar-ho a Estructura > Auto-Structure.');
             }
           })
           .getContextSummary();
@@ -5811,7 +5811,7 @@
               badge.style.color = 'var(--warning)';
 
               // Add system message
-              addBubble('system', 'S\'ha desfet l\'últim canvi.');
+              addBubble('system', icon('undo', 'i--sm i--accent') + ' Desfet!');
             } else {
               btn.disabled = false;
               btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Desfer';
@@ -5944,7 +5944,7 @@
               // Refresh the history list
               refreshHistory();
               // Add system message to chat
-              addBubble('system', icon('undo', 'i--default') + ' S\'ha desfet una edició de l\'historial.');
+              addBubble('system', icon('undo', 'i--default') + ' Edició desfeta');
             } else {
               if (btn) {
                 btn.disabled = false;
