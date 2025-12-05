@@ -3119,42 +3119,8 @@ function findAndHighlight(searchText) {
     const element = searchResult.getElement();
     const startOffset = searchResult.getStartOffset();
     const endOffset = searchResult.getEndOffsetInclusive();
-    const textElement = element.asText();
 
-    // Guardar referència per netejar després
-    const props = PropertiesService.getDocumentProperties();
-
-    // Netejar highlight anterior si existeix
-    const prevHighlight = props.getProperty('docRefHighlight');
-    if (prevHighlight) {
-      try {
-        const prev = JSON.parse(prevHighlight);
-        const prevEl = body.getChild(prev.childIndex);
-        if (prevEl) {
-          prevEl.asText().setBackgroundColor(prev.start, prev.end, null);
-        }
-      } catch (e) {}
-    }
-
-    // Aplicar highlight blau més visible per trobar-lo fàcilment
-    const highlightColor = '#90caf9'; // Blau més intens
-    if (startOffset >= 0 && endOffset >= 0) {
-      textElement.setBackgroundColor(startOffset, endOffset, highlightColor);
-
-      // Guardar per netejar després
-      const parentElement = element.getParent();
-      let childIndex = -1;
-      if (parentElement.getType() === DocumentApp.ElementType.BODY_SECTION) {
-        childIndex = parentElement.getChildIndex(element);
-      }
-      props.setProperty('docRefHighlight', JSON.stringify({
-        childIndex: childIndex,
-        start: startOffset,
-        end: endOffset
-      }));
-    }
-
-    // Seleccionar per fer scroll (el blau es veurà encara que perdi focus)
+    // Seleccionar el text (fa scroll automàtic + highlight natiu de Google Docs)
     const rangeBuilder = doc.newRange();
     if (startOffset >= 0 && endOffset >= 0) {
       rangeBuilder.addElement(element, startOffset, endOffset);
@@ -3165,9 +3131,9 @@ function findAndHighlight(searchText) {
 
     return {
       success: true,
-      foundText: textElement.getText().substring(
+      foundText: element.asText().getText().substring(
         Math.max(0, startOffset - 10),
-        Math.min(textElement.getText().length, endOffset + 10)
+        Math.min(element.asText().getText().length, endOffset + 10)
       )
     };
 

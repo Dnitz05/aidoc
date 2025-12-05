@@ -2529,6 +2529,11 @@
             '<span class="selection-badge-text">' + sanitizeText(selectionBadge) + '</span></div>';
         }
 
+        // Eye button for AI bubbles (top-right corner)
+        const eyeBtn = '<button class="bubble-eye-btn" onclick="scrollToLastEdit()" title="Veure al document">' +
+          '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
+          '</button>';
+
         if (type === 'ai' && isEdit) {
           // v10.0: Badge només mostra indicador + Prohibir (el Desfer està a l'Undo Bar)
           let badgeHtml = '<div class="edit-badge">' + icon('check', 'i--sm i--success') + ' Fet!';
@@ -2542,10 +2547,10 @@
 
           badgeHtml += '</div>';
           // v6.5: Use markdown for AI responses with edit badge
-          bubble.innerHTML = badgeHtml + '<div class="md-content">' + renderMarkdown(text) + '</div>';
+          bubble.innerHTML = eyeBtn + badgeHtml + '<div class="md-content">' + renderMarkdown(text) + '</div>';
         } else if (type === 'ai') {
           // v6.5: AI responses with markdown rendering
-          bubble.innerHTML = '<div class="md-content">' + renderMarkdown(text) + '</div>';
+          bubble.innerHTML = eyeBtn + '<div class="md-content">' + renderMarkdown(text) + '</div>';
         } else if (type === 'error' || type === 'system') {
           // v3.3: Errors i system poden tenir HTML per icones (controlat internament)
           bubble.innerHTML = text;
