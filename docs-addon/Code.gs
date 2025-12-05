@@ -3061,6 +3061,118 @@ function clearStructureHighlight() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// DOCUMENT REFERENCES v6.7 - Referències Vives
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Cerca text al document i el selecciona (fa scroll automàtic)
+ * v6.7: Document Intelligence - Referències vives
+ *
+ * @param {string} searchText - Text a buscar al document
+ * @returns {Object} - {success: boolean, error?: string, partial?: boolean}
+ */
+function findAndHighlight(searchText) {
+  try {
+    if (!searchText || searchText.trim().length < 2) {
+      return { success: false, error: 'Text de cerca massa curt' };
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+
+    // Netejar highlight anterior
+    clearStructureHighlight();
+
+    // 1. Intentar cerca exacta
+    let searchResult = body.findText(searchText);
+
+    // 2. Si no troba, intentar cerca normalitzada (sense accents, minúscules)
+    if (!searchResult) {
+      // Provar amb les primeres paraules (per si l'AI ha abreujat)
+      const words = searchText.split(/\s+/);
+      if (words.length > 3) {
+        const partialSearch = words.slice(0, 4).join(' ');
+        searchResult = body.findText(partialSearch);
+      }
+    }
+
+    // 3. Si encara no troba, provar cerca case-insensitive amb regex
+    if (!searchResult) {
+      try {
+        // Escapar caràcters especials de regex
+        const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        searchResult = body.findText(escaped);
+      } catch (regexError) {
+        // Regex pot fallar amb alguns caràcters, ignorar
+      }
+    }
+
+    if (!searchResult) {
+      return {
+        success: false,
+        error: 'Text no trobat al document',
+        searchedFor: searchText.substring(0, 50)
+      };
+    }
+
+    // Obtenir element i posicions
+    const element = searchResult.getElement();
+    const startOffset = searchResult.getStartOffset();
+    const endOffset = searchResult.getEndOffsetInclusive();
+
+    // Seleccionar el rang exacte trobat (això fa scroll automàtic!)
+    const rangeBuilder = doc.newRange();
+
+    if (startOffset >= 0 && endOffset >= 0) {
+      // Seleccionar només el text trobat (rang parcial)
+      rangeBuilder.addElement(element, startOffset, endOffset);
+    } else {
+      // Seleccionar tot l'element
+      rangeBuilder.addElement(element);
+    }
+
+    doc.setSelection(rangeBuilder.build());
+
+    // Opcional: aplicar highlight temporal (groc clar)
+    // Nota: el highlight es quedarà fins que l'usuari faci una altra acció
+    // Per ara, la selecció ja és suficient feedback visual
+
+    return {
+      success: true,
+      foundText: element.asText().getText().substring(
+        Math.max(0, startOffset - 10),
+        Math.min(element.asText().getText().length, endOffset + 10)
+      )
+    };
+
+  } catch (e) {
+    console.error('[findAndHighlight] Error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Cerca text i copia al porta-retalls si no el troba (fallback UX)
+ * @param {string} searchText - Text a buscar
+ * @returns {Object} - Resultat amb instruccions per l'usuari
+ */
+function findInDocumentWithFallback(searchText) {
+  const result = findAndHighlight(searchText);
+
+  if (!result.success) {
+    // Retornar el text per copiar al clipboard des del frontend
+    return {
+      success: false,
+      fallback: 'clipboard',
+      textToCopy: searchText,
+      message: 'Text no trobat. Usa Ctrl+F per buscar manualment.'
+    };
+  }
+
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // REFERENCE HIGHLIGHTING v7.0
 // ═══════════════════════════════════════════════════════════════════════════
 

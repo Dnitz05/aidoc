@@ -889,6 +889,40 @@ Si alguna d'aquestes paraules apareix al text que estàs editant, REEMPLAÇA-LA 
 `;
   }
 
+  // v6.7: Document References - Referències vives
+  if (docStats || docSkeleton) {
+    prompt += `
+═══════════════════════════════════════════════════════════════
+📍 REFERÈNCIES AL DOCUMENT (v6.7)
+═══════════════════════════════════════════════════════════════
+Quan responguis preguntes sobre el CONTINGUT del document, CITA la font
+amb el text exacte entre [[dobles claudàtors]].
+
+FORMAT: [[text exacte del document]]
+
+EXEMPLES:
+- "La clau urbanística és 10b [[clau urbanística aplicable és 10b]]"
+- "L'import total és [[45.320,00€ IVA inclòs]]"
+- "Segons [[l'article 5.2 del reglament]], el termini és..."
+- "El projecte té 3 fases: [[Fase 1: Disseny]], [[Fase 2: Implementació]]..."
+
+REGLES:
+1. Usa text EXACTE del document (permet localitzar-lo automàticament)
+2. Prou llarg per ser únic (no [[10b]] sol, sinó [[clau urbanística 10b]])
+3. NO inventis text - només cita el que existeix al document
+4. Múltiples cites en una resposta = múltiples [[...]]
+
+QUAN USAR:
+✅ "Quin és l'import?" → cita l'import amb context
+✅ "On parla de X?" → cita la frase on apareix X
+✅ "Quines dates hi ha?" → cita cada data trobada
+❌ "Millora el text" → NO cal citar (és edició, no consulta)
+❌ Preguntes generals sense document → NO cal citar
+
+Això permet a l'usuari fer CLIC i veure exactament d'on treus la informació.
+`;
+  }
+
   return prompt;
 }
 
@@ -2615,12 +2649,20 @@ async function handleGenerateTitle(body, env, corsHeaders) {
   }
 
   // Generate title with Gemini
-  const prompt = `Genera un títol molt curt (màxim 4 paraules) per aquesta conversa. Ha de ser concís i descriptiu. Només respon amb el títol, sense cometes ni explicacions.
+  const prompt = `Ets un expert en generar títols curts per converses. La teva tasca és crear un títol que RESUMEIXI el tema principal, NO copiar text.
+
+REGLES IMPORTANTS:
+- Màxim 4 paraules
+- Ha de ser un RESUM del tema, NO una còpia del missatge
+- Usa substantius i temes (ex: "Revisió CSS sidebar", "Error login API", "Format taules Word")
+- MAI copiïs literalment el text de l'usuari
+- Si l'usuari demana ajuda amb codi, indica el tipus (ex: "Debug funció Python")
+- Si és una pregunta, indica el tema (ex: "Consulta bases de dades")
 
 Conversa:
-${msgs.map(m => `${m.role === 'user' ? 'Usuari' : 'Assistent'}: ${m.content.substring(0, 150)}`).join('\n')}
+${msgs.map(m => `${m.role === 'user' ? 'Usuari' : 'Assistent'}: ${m.content.substring(0, 200)}`).join('\n')}
 
-Títol:`;
+Respon NOMÉS amb el títol (sense cometes ni explicacions):`;
 
   const geminiResponse = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
@@ -2630,8 +2672,8 @@ Títol:`;
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 30
+          temperature: 0.9,
+          maxOutputTokens: 20
         }
       })
     }

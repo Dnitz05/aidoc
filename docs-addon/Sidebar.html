@@ -2413,7 +2413,99 @@
           html = '<p class="md-para">' + html + '</p>';
         }
 
+        // 15. v6.7: Document References - [[text]] → botons clicables
+        html = parseDocumentReferences(html);
+
         return html;
+      }
+
+      /**
+       * v6.7: Parseja referències [[text]] i les converteix en botons clicables
+       * @param {string} html - HTML amb possibles referències
+       * @returns {string} - HTML amb botons de referència
+       */
+      function parseDocumentReferences(html) {
+        // Regex: [[text]] - captura el contingut entre dobles claudàtors
+        const refPattern = /\[\[([^\]]+)\]\]/g;
+
+        return html.replace(refPattern, function(match, searchText) {
+          // Escapar cometes per l'onclick
+          const escaped = searchText
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '&quot;');
+
+          // Preview del text per al tooltip
+          const preview = searchText.length > 30
+            ? searchText.substring(0, 30) + '...'
+            : searchText;
+
+          return '<button class="doc-ref-btn" onclick="findInDocument(\'' + escaped + '\')" ' +
+                 'title="Mostrar: ' + preview.replace(/"/g, '&quot;') + '">' +
+                 '<span class="doc-ref-icon">📍</span></button>';
+        });
+      }
+
+      /**
+       * v6.7: Cerca text al document i fa scroll/highlight
+       * @param {string} searchText - Text a buscar
+       */
+      function findInDocument(searchText) {
+        // Buscar el botó per donar feedback visual
+        const btn = event && event.target ? event.target.closest('.doc-ref-btn') : null;
+        if (btn) btn.classList.add('loading');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (btn) btn.classList.remove('loading');
+
+            if (result.success) {
+              // Feedback visual: el botó fa "pulse" verd
+              if (btn) {
+                btn.classList.add('success');
+                setTimeout(function() { btn.classList.remove('success'); }, 1500);
+              }
+            } else {
+              // Fallback: copiar al clipboard
+              if (result.fallback === 'clipboard' || result.textToCopy) {
+                copyToClipboardFallback(result.textToCopy || searchText);
+                showToast('Text copiat. Usa Ctrl+F per buscar.', 'info');
+              } else {
+                showToast(result.error || 'No trobat', 'error');
+              }
+            }
+          })
+          .withFailureHandler(function(error) {
+            if (btn) btn.classList.remove('loading');
+            // Fallback: copiar al clipboard
+            copyToClipboardFallback(searchText);
+            showToast('Error. Text copiat - usa Ctrl+F', 'error');
+          })
+          .findInDocumentWithFallback(searchText);
+      }
+
+      /**
+       * v6.7: Copia text al clipboard com a fallback
+       */
+      function copyToClipboardFallback(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).catch(function() {
+            // Fallback per navegadors antics
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+          });
+        } else {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+        }
       }
 
       function addBubble(type, text, isEdit, lastEditWord, selectionBadge) {
