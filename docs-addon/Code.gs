@@ -3136,8 +3136,8 @@ function findAndHighlight(searchText) {
       } catch (e) {}
     }
 
-    // Aplicar highlight blau clar (com la selecció de Google Docs)
-    const highlightColor = '#a8d4ff'; // Blau clar similar a selecció
+    // Aplicar highlight blau més visible per trobar-lo fàcilment
+    const highlightColor = '#90caf9'; // Blau més intens
     if (startOffset >= 0 && endOffset >= 0) {
       textElement.setBackgroundColor(startOffset, endOffset, highlightColor);
 
