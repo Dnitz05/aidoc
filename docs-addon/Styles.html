@@ -1574,6 +1574,106 @@
         color: var(--error);
       }
 
+      /* v8.0: Session files bar (persistent files) */
+      .session-files-bar {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-xs) var(--space-sm);
+        margin-bottom: var(--space-xs);
+        background: var(--accent-muted);
+        border-radius: var(--radius-sm);
+        font-size: 11px;
+      }
+
+      .session-files-bar.hidden {
+        display: none;
+      }
+
+      .session-files-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--accent);
+        font-weight: 500;
+        flex-shrink: 0;
+      }
+
+      .session-files-label svg {
+        opacity: 0.8;
+      }
+
+      .session-files-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .session-file-chip {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 2px 6px;
+        background: var(--bg-primary);
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        max-width: 120px;
+      }
+
+      .session-file-name {
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 10px;
+      }
+
+      .session-file-remove {
+        width: 14px;
+        height: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 12px;
+        line-height: 1;
+        padding: 0;
+        border-radius: var(--radius-full);
+        flex-shrink: 0;
+      }
+
+      .session-file-remove:hover {
+        background: var(--error-muted);
+        color: var(--error);
+      }
+
+      .session-files-clear {
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        padding: 0;
+        border-radius: var(--radius-full);
+        flex-shrink: 0;
+      }
+
+      .session-files-clear:hover {
+        background: var(--error-muted);
+        color: var(--error);
+      }
+
       /* v8.0: File bubble in chat */
       .chat-file-bubble {
         display: flex;

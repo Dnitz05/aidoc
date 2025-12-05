@@ -1088,7 +1088,8 @@ function revertEditEvent(eventId) {
 }
 
 // --- NUCLI DEL PROCESSAMENT (v3.10 simplificat - 2 modes) ---
-function processUserCommand(instruction, chatHistory, userMode, previewMode) {
+// v8.0: Added chatAttachments parameter for temporary file attachments
+function processUserCommand(instruction, chatHistory, userMode, previewMode, chatAttachments) {
   // v3.7: Iniciar col·lector de mètriques
   const metrics = createMetricsCollector();
 
@@ -1252,7 +1253,9 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode) {
     },
     // v4.0: Timeline hash fields
     client_hash: getDocumentStateHash(),
-    word_count: getDocumentWordCount()
+    word_count: getDocumentWordCount(),
+    // v8.0: Chat attachments (temporary files)
+    chat_attachments: chatAttachments || []
   };
 
   const options = {

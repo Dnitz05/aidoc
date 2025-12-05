@@ -670,6 +670,15 @@
           </div>
           <button class="attachment-preview-remove" onclick="removeChatAttachment()" title="Treure">×</button>
         </div>
+        <!-- v8.0: Session files bar (persistent files) -->
+        <div class="session-files-bar hidden" id="sessionFilesBar">
+          <div class="session-files-label">
+            <svg viewBox="0 0 24 24" width="12" height="12"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            <span>Fitxers de sessió:</span>
+          </div>
+          <div class="session-files-list" id="sessionFilesList"></div>
+          <button class="session-files-clear" onclick="clearSessionFiles()" title="Esborrar tots">×</button>
+        </div>
         <div class="input-row">
           <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="1"></textarea>
           <div class="input-buttons">
@@ -1979,8 +1988,8 @@
 
             conversationMessageCount += messagesToSave.length;
 
-            // Trigger auto-title after first exchange (4 messages = 2 turns)
-            if (conversationMessageCount === 4) {
+            // Trigger auto-title after first AI response (2 messages = 1 turn)
+            if (conversationMessageCount === 2) {
               triggerAutoTitle();
             }
             showSaveIndicator('saved');
@@ -2243,7 +2252,7 @@
         const text = input.value.trim();
 
         // v8.0: Allow sending file without text, or text without file
-        if (!text && chatAttachments.length === 0) return;
+        if (!text && !pendingAttachment) return;
 
         // v7.1: Amagar landing quan s'envia missatge
         hideChatLanding();
@@ -2254,13 +2263,19 @@
         // v5.3: Capturar selecció actual per mostrar badge
         const selectionBadge = lastSelectionText || null;
 
-        // v8.0: Build message HTML with file bubbles + text
+        // v8.0: If there's a pending attachment, add it to session files
+        if (pendingAttachment) {
+          sessionFiles.push(pendingAttachment);
+          updateSessionFilesBar();
+        }
+
+        // v8.0: Build message HTML with file bubble (only for new attachment) + text
         let messageHtml = '';
 
-        // Add file bubbles first
-        chatAttachments.forEach(function(att) {
-          messageHtml += createFileBubbleHtml(att);
-        });
+        // Add file bubble only if there's a new attachment this message
+        if (pendingAttachment) {
+          messageHtml += createFileBubbleHtml(pendingAttachment);
+        }
 
         // Add text message
         if (text) {
@@ -2269,7 +2284,7 @@
         }
 
         // v8.0: Use addBubbleHtml for file+text messages
-        if (chatAttachments.length > 0) {
+        if (pendingAttachment) {
           addBubbleHtml('user', messageHtml, selectionBadge);
         } else {
           addBubble('user', text, false, null, selectionBadge);
@@ -2285,8 +2300,8 @@
         const btn = document.getElementById('sendBtn');
         btn.disabled = true;
 
-        // v8.0: Prepare attachments for backend
-        const attachmentsToSend = chatAttachments.map(function(att) {
+        // v8.0: Prepare ALL session files for backend (persistent throughout session)
+        const attachmentsToSend = sessionFiles.map(function(att) {
           return {
             name: att.name,
             size: att.size,
@@ -2296,8 +2311,8 @@
           };
         });
 
-        // v8.0: Clear attachments and hide preview
-        chatAttachments = [];
+        // v8.0: Clear pending attachment and hide preview (files stay in sessionFiles)
+        pendingAttachment = null;
         hideChatAttachmentPreview();
 
         showThinking();
@@ -3933,8 +3948,9 @@
       let currentFolder = null; // v6.0: Current folder (null = root)
       let activeKnowledgeFiles = []; // v6.0: Array of active files
 
-      // v8.0: Chat attachments (temporary files in memory)
-      let chatAttachments = [];
+      // v8.0: Session files (persistent throughout the session)
+      let sessionFiles = [];      // Files that persist for the entire session
+      let pendingAttachment = null; // File being uploaded (before send)
 
       function initKnowledgePanel() {
         loadActiveKnowledgeFiles();
@@ -4448,8 +4464,8 @@
             }
           }
 
-          // Add to chat attachments array
-          chatAttachments = [attachment]; // Only one at a time for simplicity
+          // Store as pending attachment (will be added to sessionFiles on send)
+          pendingAttachment = attachment;
 
           // Show preview (loaded)
           showChatAttachmentPreview(file.name, file.size, false);
@@ -4478,11 +4494,60 @@
       function hideChatAttachmentPreview() {
         const preview = document.getElementById('chatAttachmentPreview');
         preview.classList.add('hidden');
-        chatAttachments = [];
+        // Note: pendingAttachment is cleared in removeChatAttachment() or moved to sessionFiles in sendMessage()
       }
 
       function removeChatAttachment() {
+        pendingAttachment = null;
         hideChatAttachmentPreview();
+      }
+
+      // v8.0: Update session files bar
+      function updateSessionFilesBar() {
+        const bar = document.getElementById('sessionFilesBar');
+        const list = document.getElementById('sessionFilesList');
+
+        if (sessionFiles.length === 0) {
+          bar.classList.add('hidden');
+          list.innerHTML = '';
+          return;
+        }
+
+        // Build chips for each file
+        let html = '';
+        sessionFiles.forEach(function(file, index) {
+          html += '<div class="session-file-chip" title="' + file.name + '">' +
+            '<span class="session-file-name">' + truncateFileName(file.name, 15) + '</span>' +
+            '<button class="session-file-remove" onclick="removeSessionFile(' + index + ')" title="Treure">×</button>' +
+          '</div>';
+        });
+
+        list.innerHTML = html;
+        bar.classList.remove('hidden');
+      }
+
+      // v8.0: Truncate filename for display
+      function truncateFileName(name, maxLen) {
+        if (name.length <= maxLen) return name;
+        const ext = name.lastIndexOf('.') > 0 ? name.substring(name.lastIndexOf('.')) : '';
+        const base = name.substring(0, name.length - ext.length);
+        const maxBase = maxLen - ext.length - 2;
+        if (maxBase < 3) return name.substring(0, maxLen - 2) + '..';
+        return base.substring(0, maxBase) + '..' + ext;
+      }
+
+      // v8.0: Remove a single session file
+      function removeSessionFile(index) {
+        if (index >= 0 && index < sessionFiles.length) {
+          sessionFiles.splice(index, 1);
+          updateSessionFilesBar();
+        }
+      }
+
+      // v8.0: Clear all session files
+      function clearSessionFiles() {
+        sessionFiles = [];
+        updateSessionFilesBar();
       }
 
       // v8.0: Create file bubble HTML for chat

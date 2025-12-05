@@ -1305,7 +1305,8 @@ async function handleChat(body, env, corsHeaders) {
     doc_skeleton,  // v2.9: Document structure (headings, sections, entities)
     doc_stats,     // v3.7: Universal Doc Reader stats
     client_hash,   // v4.0: Timeline - document hash before action
-    word_count     // v4.0: Timeline - word count for delta tracking
+    word_count,    // v4.0: Timeline - word count for delta tracking
+    chat_attachments  // v8.0: Temporary file attachments from chat
   } = body;
 
   if (!license_key) throw new Error("missing_license");
@@ -1428,13 +1429,37 @@ async function handleChat(body, env, corsHeaders) {
 
   // Build current context message
   const instruction = user_instruction || "Processa el text";
+
+  // v8.0: Build chat attachments context
+  let attachmentsContext = '';
+  if (chat_attachments && chat_attachments.length > 0) {
+    attachmentsContext = '\n\n═══ FITXERS ADJUNTS AL XAT (temporals) ═══\n';
+    chat_attachments.forEach((att, i) => {
+      const sizeKb = att.size ? (att.size / 1024).toFixed(1) + ' KB' : 'desconegut';
+      attachmentsContext += `\n--- Fitxer ${i + 1}: ${att.name} (${sizeKb}) ---\n`;
+      if (att.text) {
+        attachmentsContext += att.text;
+      } else if (att.content) {
+        // Try to decode base64 for text-based files
+        try {
+          attachmentsContext += atob(att.content);
+        } catch (e) {
+          attachmentsContext += '[Contingut binari - no es pot mostrar com a text]';
+        }
+      } else {
+        attachmentsContext += '[No s\'ha pogut extreure el contingut]';
+      }
+      attachmentsContext += '\n--- Fi del fitxer ---\n';
+    });
+  }
+
   let currentMessage = `CONTEXT FÍSIC:
 - Text Seleccionat: ${has_selection ? 'SÍ' : 'NO'}
 - Document ID: ${doc_metadata?.doc_id || 'unknown'}
 
 TEXT ACTUAL DEL DOCUMENT:
 ${text}
-
+${attachmentsContext}
 INSTRUCCIÓ DE L'USUARI:
 "${instruction}"`;
 
@@ -2524,10 +2549,10 @@ async function handleGenerateTitle(body, env, corsHeaders) {
   }
 
   // Generate title with Gemini
-  const prompt = `Genera un títol curt (3-6 paraules) per aquesta conversa. Només respon amb el títol, sense cometes ni explicacions.
+  const prompt = `Genera un títol molt curt (màxim 4 paraules) per aquesta conversa. Ha de ser concís i descriptiu. Només respon amb el títol, sense cometes ni explicacions.
 
 Conversa:
-${msgs.map(m => `${m.role === 'user' ? 'Usuari' : 'Assistent'}: ${m.content.substring(0, 200)}`).join('\n')}
+${msgs.map(m => `${m.role === 'user' ? 'Usuari' : 'Assistent'}: ${m.content.substring(0, 150)}`).join('\n')}
 
 Títol:`;
 
@@ -2553,9 +2578,9 @@ Títol:`;
   const geminiResult = await geminiResponse.json();
   let title = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || conv.title;
 
-  // Clean up title
+  // Clean up title (max 40 chars for short titles)
   title = title.replace(/^["']|["']$/g, '').trim();
-  if (title.length > 60) title = title.substring(0, 57) + '...';
+  if (title.length > 40) title = title.substring(0, 37) + '...';
 
   // Save title using stored procedure
   const updateResponse = await fetch(
