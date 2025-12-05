@@ -2648,21 +2648,31 @@ async function handleGenerateTitle(body, env, corsHeaders) {
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  // Generate title with Gemini
-  const prompt = `Ets un expert en generar títols curts per converses. La teva tasca és crear un títol que RESUMEIXI el tema principal, NO copiar text.
+  // Generate title with Gemini - extract user question and AI response
+  const userMsg = msgs.find(m => m.role === 'user');
+  const aiMsg = msgs.find(m => m.role === 'assistant' || m.role === 'model');
 
-REGLES IMPORTANTS:
-- Màxim 4 paraules
-- Ha de ser un RESUM del tema, NO una còpia del missatge
-- Usa substantius i temes (ex: "Revisió CSS sidebar", "Error login API", "Format taules Word")
-- MAI copiïs literalment el text de l'usuari
-- Si l'usuari demana ajuda amb codi, indica el tipus (ex: "Debug funció Python")
-- Si és una pregunta, indica el tema (ex: "Consulta bases de dades")
+  const prompt = `Crea un títol CURT (2-4 paraules) que identifiqui el TEMA de la conversa.
 
-Conversa:
-${msgs.map(m => `${m.role === 'user' ? 'Usuari' : 'Assistent'}: ${m.content.substring(0, 200)}`).join('\n')}
+EXEMPLES DE TÍTOLS CORRECTES:
+- Pregunta sobre CSS → "Estils CSS"
+- Com puc exportar a PDF? → "Exportació PDF"
+- Tinc un error al login → "Error autenticació"
+- Ajuda'm amb aquest codi Python → "Codi Python"
+- Quina és la capital de França? → "Geografia França"
 
-Respon NOMÉS amb el títol (sense cometes ni explicacions):`;
+EXEMPLES DE TÍTOLS INCORRECTES (NO facis això):
+❌ "Com puc exportar..." (copiar pregunta)
+❌ "Tinc un error al..." (copiar inici)
+❌ "Ajuda'm amb aquest..." (copiar literal)
+
+PREGUNTA DE L'USUARI:
+${userMsg ? userMsg.content.substring(0, 300) : 'No disponible'}
+
+RESPOSTA DE L'ASSISTENT:
+${aiMsg ? aiMsg.content.substring(0, 300) : 'No disponible'}
+
+Escriu NOMÉS el títol (2-4 paraules, sense copiar el text original):`;
 
   const geminiResponse = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
