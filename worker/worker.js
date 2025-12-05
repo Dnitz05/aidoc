@@ -343,6 +343,45 @@ async function markEventReverted(env, eventId, revertedByEventId) {
 }
 
 /**
+ * v4.3: Invalidate all events that occurred AFTER a specific event
+ * Used when reverting to mark future events as no longer valid
+ */
+async function invalidateEventsAfter(env, licenseHash, docId, afterTimestamp) {
+  try {
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/edit_events?` +
+      `license_key_hash=eq.${licenseHash}&` +
+      `doc_id=eq.${docId}&` +
+      `created_at=gt.${afterTimestamp}&` +
+      `invalidated_at=is.null`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          invalidated_at: new Date().toISOString()
+        })
+      }
+    );
+
+    if (!response.ok) {
+      console.error('Failed to invalidate events:', await response.text());
+      return 0;
+    }
+
+    const invalidated = await response.json();
+    return invalidated.length;
+  } catch (e) {
+    console.error('Error invalidating events:', e);
+    return 0;
+  }
+}
+
+/**
  * v4.2: Get the last event for a specific target_id
  * Used to find before_text from previous edits to the same paragraph
  */
@@ -2082,11 +2121,21 @@ async function handleRevertEdit(body, env, corsHeaders) {
     await markEventReverted(env, event_id, revertEvent.id);
   }
 
+  // 4. v4.3: Invalidate all events that occurred AFTER the original event
+  // This marks future events as no longer valid since we reverted to this point
+  const invalidatedCount = await invalidateEventsAfter(
+    env,
+    licenseHash,
+    doc_id,
+    originalEvent.created_at
+  );
+
   return new Response(JSON.stringify({
     status: "ok",
     revert_event: revertEvent ? { id: revertEvent.id } : null,
     restore_text: originalEvent.before_text,  // The text to restore in the document
-    target_id: originalEvent.target_id
+    target_id: originalEvent.target_id,
+    invalidated_count: invalidatedCount
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
@@ -2171,6 +2220,7 @@ async function handleGetTimeline(body, env, corsHeaders) {
     hash_confirmed: e.hash_confirmed,
     created_at: e.created_at,
     reverted_at: e.reverted_at,
+    invalidated_at: e.invalidated_at,  // v4.3: Track invalidated events
     // v4.0: Include text for diff display
     before_text: e.before_text,
     after_text: e.after_text,

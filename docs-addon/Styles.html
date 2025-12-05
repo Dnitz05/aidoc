@@ -415,6 +415,45 @@
         word-break: break-word;
       }
 
+      /* v6.7: Save prompt button */
+      .msg.user {
+        position: relative;
+      }
+
+      .save-prompt-btn {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        border: none;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.15);
+        color: rgba(255, 255, 255, 0.6);
+        cursor: pointer;
+        opacity: 0;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .msg.user:hover .save-prompt-btn {
+        opacity: 1;
+      }
+
+      .save-prompt-btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+        color: white;
+      }
+
+      .save-prompt-btn.saved {
+        background: var(--success);
+        color: white;
+        opacity: 1;
+      }
+
       /* ═══════════════════════════════════════════════════════════
          MARKDOWN STYLES (v6.5)
          ═══════════════════════════════════════════════════════════ */
@@ -3347,6 +3386,47 @@
         margin-top: var(--space-xs);
         padding-top: var(--space-xs);
         border-top: 1px dashed var(--border);
+      }
+
+      /* v4.3: Invalidated events - shown faded */
+      .timeline-card.timeline-invalidated {
+        opacity: 0.45;
+        border-left-color: var(--text-muted) !important;
+      }
+
+      .timeline-card.timeline-invalidated:hover {
+        opacity: 0.6;
+      }
+
+      .timeline-invalidated-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 9px;
+        color: var(--text-muted);
+        background: color-mix(in srgb, var(--text-muted) 15%, transparent);
+        padding: 1px 5px;
+        border-radius: var(--radius-sm);
+        margin-left: 6px;
+      }
+
+      /* v4.3: Current version indicator */
+      .timeline-current-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 9px;
+        color: var(--success);
+        background: color-mix(in srgb, var(--success) 15%, transparent);
+        padding: 2px 6px;
+        border-radius: var(--radius-sm);
+        margin-left: 6px;
+        font-weight: 600;
+      }
+
+      .timeline-card.timeline-current {
+        border-color: var(--success);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--success) 30%, transparent);
       }
 
       /* Expandable cards */
