@@ -1775,7 +1775,8 @@
 
         // Handle preview with 0 changes (fallback - IDs didn't match)
         if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-          addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.', true);
+          addBubble('ai', res.ai_response, true);
+          addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.');
           if (res.credits !== undefined) {
             updateCredits(res.credits);
           }
@@ -1785,7 +1786,8 @@
         // v3.8: Handle In-Document Preview (Track Changes style)
         if (res.status === 'in_doc_preview') {
           const previewCount = res.changes_count || res.preview_info?.count || 1;
-          addBubble('ai', res.ai_response + '\n\n' + icon('eye', 'i--sm i--accent') + ' Revisa els canvis que he marcat al document.', false);
+          addBubble('ai', res.ai_response, false);
+          addBubble('system', icon('eye', 'i--sm i--accent') + ' Revisa els canvis que he marcat al document.');
           showInDocPreviewBar(previewCount);
           if (res.credits !== undefined) {
             updateCredits(res.credits);
@@ -1795,7 +1797,8 @@
 
         // Handle in_doc_preview with error
         if (res.status === 'in_doc_preview_error') {
-          addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' ' + (res.preview_error || 'Error aplicant preview al document'), true);
+          addBubble('ai', res.ai_response, true);
+          addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' ' + (res.preview_error || 'Error aplicant preview al document'));
           if (res.credits !== undefined) {
             updateCredits(res.credits);
           }
@@ -2911,7 +2914,8 @@
 
             // Handle preview with 0 changes (fallback)
             if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-              addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.', true);
+              addBubble('ai', res.ai_response, true);
+          addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.');
               if (res.credits !== undefined) {
                 updateCredits(res.credits);
               }
@@ -3467,7 +3471,8 @@
 
             // Handle preview with 0 changes (fallback)
             if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-              addBubble('ai', res.ai_response + '\n\n' + icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.', true);
+              addBubble('ai', res.ai_response, true);
+          addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.');
               if (res.credits !== undefined) {
                 updateCredits(res.credits);
               }
