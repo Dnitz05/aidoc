@@ -5939,6 +5939,18 @@
         flex-shrink: 0;
       }
 
+      /* v8.1: Landing active - amagar elements del header */
+      #chatPanel.landing-active .chat-header {
+        border-bottom: none;
+        background: transparent;
+      }
+
+      #chatPanel.landing-active .chat-current-title,
+      #chatPanel.landing-active .save-indicator,
+      #chatPanel.landing-active .chat-new-btn {
+        display: none;
+      }
+
       .chat-header-left {
         display: flex;
         align-items: center;

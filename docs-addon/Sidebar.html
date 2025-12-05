@@ -83,7 +83,7 @@
       <div class="chat-header">
         <div class="chat-header-left">
           <button class="chat-history-btn" onclick="openConversationsDrawer()" title="Historial de converses">
-            <span class="i i--sm"><svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
+            <span class="i i--sm"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
           </button>
           <span class="chat-current-title" id="chatCurrentTitle" onclick="editCurrentTitle()" title="Clic per editar">Hola.</span>
           <span class="save-indicator" id="saveIndicator"></span>
@@ -604,6 +604,7 @@
     <div class="selection-indicator hidden" id="selectionIndicator">
       <span class="i i--xs"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>
       <span id="selectionPreview"></span>
+      <span class="selection-word-count" id="selectionWordCount"></span>
     </div>
 
     <!-- Input Area (Footer) - v3.2 Redesign -->
@@ -677,7 +678,7 @@
           <button class="session-files-clear" onclick="clearSessionFiles()" title="Esborrar tots">×</button>
         </div>
         <div class="input-row">
-          <textarea id="userInput" placeholder="Escriu el teu missatge..." rows="1"></textarea>
+          <textarea id="userInput" placeholder="Escriu la teva instrucció..." rows="1"></textarea>
           <div class="input-buttons">
             <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Enviar">
               <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
@@ -872,9 +873,17 @@
       console.log('[Docmile v6.5] Loaded - Paginated Conversations');
 
       const MODES = {
-        edit: { icon: 'edit', label: 'Edit' },
-        chat: { icon: 'messageCircle', label: 'Xat' }
+        edit: { icon: 'edit', label: 'Edit', labelDoc: 'Edit document', labelSel: 'Edit selection' },
+        chat: { icon: 'messageCircle', label: 'Xat', labelDoc: 'Chat document', labelSel: 'Chat selection' }
       };
+
+      let hasActiveSelection = false;
+
+      function updateModeLabel() {
+        const mode = MODES[currentMode];
+        const label = hasActiveSelection ? mode.labelSel : mode.labelDoc;
+        document.getElementById('modeLabel').textContent = label;
+      }
 
       // ═══════════════════════════════════════════════════════════
       // CONVERSATIONS SYSTEM (v5.0)
@@ -1291,9 +1300,16 @@
       }
 
       function initPreviewMode() {
+        // v6.6: Migració - forçar preview activat per defecte
+        const migrated = localStorage.getItem('docmile-preview-v2');
+        if (!migrated) {
+          localStorage.setItem('docmile-preview', 'true');
+          localStorage.setItem('docmile-preview-v2', '1');
+        }
+
         const saved = localStorage.getItem('docmile-preview');
-        // Default is true (preview enabled)
         previewModeEnabled = saved !== 'false';
+
         const btn = document.getElementById('previewToggle');
         if (btn) {
           btn.classList.toggle('active', previewModeEnabled);
@@ -1527,11 +1543,24 @@
                 if (info.textPreview !== lastSelectionText) {
                   preview.textContent = info.textPreview;
                   lastSelectionText = info.textPreview;
+                  // Mostrar word count
+                  const wordCountEl = document.getElementById('selectionWordCount');
+                  if (wordCountEl && info.wordCount) {
+                    wordCountEl.textContent = '(' + info.wordCount + ' p.)';
+                  }
                 }
                 indicator.classList.remove('hidden');
+                if (!hasActiveSelection) {
+                  hasActiveSelection = true;
+                  updateModeLabel();
+                }
               } else {
                 indicator.classList.add('hidden');
                 lastSelectionText = '';
+                if (hasActiveSelection) {
+                  hasActiveSelection = false;
+                  updateModeLabel();
+                }
               }
             })
             .withFailureHandler(function() {
@@ -1540,8 +1569,8 @@
             .captureCurrentSelection();
         }
 
-        // Polling cada 1 segon
-        setInterval(pollSelection, 1000);
+        // Polling cada 0.4 segons
+        setInterval(pollSelection, 400);
         // Primera crida immediata
         pollSelection();
 
@@ -1555,8 +1584,28 @@
           clearTimeout(typingTimeout);
           typingTimeout = setTimeout(function() {
             selectionPollingActive = true;
-          }, 2000); // Reprendre 2s després d'escriure
+          }, 500); // Reprendre 0.5s després d'escriure
         });
+
+        // Poll immediat quan l'usuari interactua amb el sidebar
+        let lastImmediatePoll = 0;
+        function triggerImmediatePoll() {
+          const now = Date.now();
+          // Throttle: mínim 150ms entre polls manuals
+          if (now - lastImmediatePoll < 150) return;
+          if (selectionRequestPending) return;
+          lastImmediatePoll = now;
+          pollSelection();
+        }
+
+        // Detectar quan el ratolí entra a l'àrea d'input
+        const inputArea = document.getElementById('inputArea');
+        if (inputArea) {
+          inputArea.addEventListener('mouseenter', triggerImmediatePoll);
+        }
+
+        // Detectar quan l'usuari fa focus al textarea
+        document.getElementById('userInput').addEventListener('focus', triggerImmediatePoll);
 
         // Select first icon
         selectIcon('zap');
@@ -1591,7 +1640,7 @@
 
         // Update button display
         document.getElementById('modeIcon').innerHTML = icon(MODES[mode].icon, 'i--sm');
-        document.getElementById('modeLabel').textContent = MODES[mode].label;
+        updateModeLabel();
 
         // Update selected state in dropdown
         document.querySelectorAll('.mode-option').forEach(function(opt) {
@@ -2607,6 +2656,10 @@
       function showChatLanding() {
         const container = document.getElementById('chatHistory');
         const existingLanding = document.getElementById('chatLanding');
+        const chatPanel = document.getElementById('chatPanel');
+
+        // Afegir classe per amagar elements del header
+        if (chatPanel) chatPanel.classList.add('landing-active');
 
         // Si ja existeix, només mostrar-la
         if (existingLanding) {
@@ -2665,8 +2718,8 @@
             '<div class="suggestion-grid">' + cardsHtml + '</div>' +
           '</div>' +
           '<div class="landing-tip">' +
-            '<div class="tip-row"><span class="tip-icon">✂️</span><span class="tip-text">Selecció → només el text</span></div>' +
-            '<div class="tip-row"><span class="tip-icon">📄</span><span class="tip-text">Sense → tot el document</span></div>' +
+            '<svg class="tip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>' +
+            '<span class="tip-text">Selecciona text al document per actuar només sobre la selecció</span>' +
           '</div>' +
         '</div>';
 
@@ -2688,6 +2741,11 @@
        */
       function hideChatLanding() {
         const landing = document.getElementById('chatLanding');
+        const chatPanel = document.getElementById('chatPanel');
+
+        // Treure classe per mostrar elements del header
+        if (chatPanel) chatPanel.classList.remove('landing-active');
+
         if (landing) {
           landing.remove();
         }
