@@ -605,14 +605,31 @@ function revertLastEdit() {
 
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
-    const targetId = parseInt(lastEdit.targetId, 10);
 
-    // v6.0 fix: Usar buildElementMap per consistència amb com es guarden els IDs
-    const mapIdToElement = buildElementMap(body);
-    const targetElement = mapIdToElement[targetId];
+    // v6.6: Primer intentar amb bodyIndex (més fiable si el document no ha canviat)
+    let targetElement = null;
+    if (lastEdit.bodyIndex !== undefined && lastEdit.bodyIndex >= 0) {
+      try {
+        const candidate = body.getChild(lastEdit.bodyIndex);
+        // Verificar que és un element editable
+        if (candidate && (candidate.getType() === DocumentApp.ElementType.PARAGRAPH ||
+                         candidate.getType() === DocumentApp.ElementType.LIST_ITEM)) {
+          targetElement = candidate;
+        }
+      } catch (e) {
+        console.log('[Revert] bodyIndex fallback failed:', e.message);
+      }
+    }
+
+    // Fallback: usar mapa d'IDs (ara sincronitzat amb processElement)
+    if (!targetElement) {
+      const targetId = parseInt(lastEdit.targetId, 10);
+      const mapIdToElement = buildElementMap(body);
+      targetElement = mapIdToElement[targetId];
+    }
 
     if (!targetElement) {
-      return { success: false, error: "No s'ha trobat el paràgraf original (ID: " + targetId + ")." };
+      return { success: false, error: "No s'ha trobat el paràgraf original." };
     }
 
     // Revertir al text original
@@ -636,7 +653,7 @@ function revertLastEdit() {
  * @param {string} originalText - El text original a restaurar
  * @returns {Object} { status: 'restored' } o { status: 'error', error: string }
  */
-function restoreText(targetId, originalText) {
+function restoreText(targetId, originalText, bodyIndex) {
   try {
     if (targetId === null || targetId === undefined) {
       return { status: 'error', error: 'No hi ha targetId' };
@@ -647,14 +664,30 @@ function restoreText(targetId, originalText) {
 
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
-    const numericId = parseInt(targetId, 10);
 
-    // v6.0 fix: Usar buildElementMap per consistència amb com es guarden els IDs
-    const mapIdToElement = buildElementMap(body);
-    const targetElement = mapIdToElement[numericId];
+    // v6.6: Primer intentar amb bodyIndex (més fiable)
+    let targetElement = null;
+    if (bodyIndex !== undefined && bodyIndex >= 0) {
+      try {
+        const candidate = body.getChild(bodyIndex);
+        if (candidate && (candidate.getType() === DocumentApp.ElementType.PARAGRAPH ||
+                         candidate.getType() === DocumentApp.ElementType.LIST_ITEM)) {
+          targetElement = candidate;
+        }
+      } catch (e) {
+        console.log('[RestoreText] bodyIndex fallback failed:', e.message);
+      }
+    }
+
+    // Fallback: usar mapa d'IDs (ara sincronitzat amb processElement)
+    if (!targetElement) {
+      const numericId = parseInt(targetId, 10);
+      const mapIdToElement = buildElementMap(body);
+      targetElement = mapIdToElement[numericId];
+    }
 
     if (!targetElement) {
-      return { status: 'error', error: 'No s\'ha trobat el paràgraf (ID: ' + numericId + ')' };
+      return { status: 'error', error: 'No s\'ha trobat el paràgraf' };
     }
 
     // Restaurar el text original
@@ -1477,7 +1510,8 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           // v2.6 Snapshot: Capturar ABANS de modificar
           undoSnapshot = {
             targetId: id,
-            originalText: currentDocText
+            originalText: currentDocText,
+            bodyIndex: getBodyIndex(targetElement)  // v6.6: Per undo més fiable
           };
 
           // v3.7: Aplicar edició amb validació
@@ -1509,7 +1543,8 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           capturedLastEdit = {
             targetId: id,
             originalText: preservedOriginal,
-            currentText: cleanNewText
+            currentText: cleanNewText,
+            bodyIndex: getBodyIndex(targetElement)  // v6.6: Per undo més fiable
           };
 
           // v2.8: Extraure la primera paraula diferent per al botó "Prohibir"
@@ -1688,7 +1723,8 @@ function applyPendingChanges(changes, expectedSnapshot) {
         // Guardar snapshot per undo
         undoSnapshots.push({
           targetId: change.targetId,
-          originalText: currentDocText
+          originalText: currentDocText,
+          bodyIndex: getBodyIndex(targetElement)  // v6.6: Per undo més fiable
         });
 
         // Aplicar el canvi
@@ -1706,7 +1742,8 @@ function applyPendingChanges(changes, expectedSnapshot) {
           saveLastEdit({
             targetId: change.targetId,
             originalText: preservedOriginal,
-            currentText: change.proposedText
+            currentText: change.proposedText,
+            bodyIndex: getBodyIndex(targetElement)  // v6.6: Per undo més fiable
           });
         }
       }
@@ -1922,7 +1959,8 @@ function commitInDocumentPreview() {
         saveLastEdit({
           targetId: preview.targetId,
           originalText: preservedOriginal,
-          currentText: preview.newText
+          currentText: preview.newText,
+          bodyIndex: preview.bodyIndex !== undefined ? preview.bodyIndex : getBodyIndex(targetElement)  // v6.6
         });
       }
     }
@@ -2020,6 +2058,10 @@ function cancelInDocumentPreview() {
 
 /**
  * Construeix el mapa ID -> Element del document
+ * v6.6: Unificat amb processElement() per evitar desincronització d'IDs
+ *
+ * IMPORTANT: Ha de comptar elements en el MATEIX ordre que processElement()
+ * per garantir que els IDs coincideixin quan hi ha taules/imatges/etc.
  */
 function buildElementMap(body) {
   const mapIdToElement = {};
@@ -2028,17 +2070,80 @@ function buildElementMap(body) {
 
   for (let i = 0; i < numChildren; i++) {
     const child = body.getChild(i);
-    if (child.getType() === DocumentApp.ElementType.PARAGRAPH ||
-        child.getType() === DocumentApp.ElementType.LIST_ITEM) {
-      const text = child.asText().getText();
-      if (text.trim().length > 0) {
-        mapIdToElement[currentIndex] = child;
+    const elementType = child.getType();
+
+    switch (elementType) {
+      case DocumentApp.ElementType.PARAGRAPH:
+      case DocumentApp.ElementType.LIST_ITEM:
+        // Elements editables: afegir al mapa SI tenen contingut
+        try {
+          const text = child.asText().getText();
+          if (text.trim().length > 0) {
+            mapIdToElement[currentIndex] = child;
+            mapIdToElement[currentIndex]._bodyIndex = i; // v6.6: Guardar índex real
+            currentIndex++;
+          }
+        } catch (e) {
+          // Element sense text vàlid, saltar
+        }
+        break;
+
+      case DocumentApp.ElementType.TABLE:
+        // Taules: incrementar només si tenen contingut (igual que processElement)
+        try {
+          const table = child.asTable();
+          if (table && table.getNumRows() > 0) {
+            currentIndex++;
+          }
+        } catch (e) {
+          currentIndex++; // En cas de dubte, incrementar
+        }
+        break;
+
+      case DocumentApp.ElementType.TABLE_OF_CONTENTS:
+        // TOC: incrementar només si té contingut (igual que processElement)
+        try {
+          const tocText = child.asTableOfContents().getText();
+          if (tocText && tocText.trim()) {
+            currentIndex++;
+          }
+        } catch (e) {
+          currentIndex++; // En cas de dubte, incrementar
+        }
+        break;
+
+      case DocumentApp.ElementType.INLINE_IMAGE:
+      case DocumentApp.ElementType.INLINE_DRAWING:
+        // Imatges i dibuixos: sempre incrementen (igual que processElement)
         currentIndex++;
-      }
+        break;
+
+      case DocumentApp.ElementType.HORIZONTAL_RULE:
+        // Regles horitzontals: NO incrementen el comptador (igual que processElement)
+        break;
+
+      default:
+        // Altres elements: ignorar completament
+        break;
     }
   }
 
   return mapIdToElement;
+}
+
+/**
+ * v6.6: Obté l'índex real d'un element dins del body
+ */
+function getBodyIndex(element) {
+  try {
+    const parent = element.getParent();
+    if (parent && parent.getType() === DocumentApp.ElementType.BODY_SECTION) {
+      return parent.getChildIndex(element);
+    }
+  } catch (e) {
+    // Element sense parent vàlid
+  }
+  return -1;
 }
 
 /**

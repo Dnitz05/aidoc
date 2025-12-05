@@ -621,7 +621,7 @@ async function handleLogDiagnostic(body, env, corsHeaders) {
 // SYSTEM PROMPT v3 - "Document Engineering Engine" (Lovable-style)
 // ═══════════════════════════════════════════════════════════════
 
-function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode, negativeConstraints, docSkeleton, docStats) {
+function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode, negativeConstraints, docSkeleton, docStats, userMode) {
   // v3.7: UNIVERSAL DOC READER - Build complete document stats string
   let docStatsStr = '';
   if (docStats) {
@@ -661,9 +661,19 @@ El camp "thought" és OBLIGATORI en TOTES les respostes.
 ═══════════════════════════════════════════════════════════════
 CONTEXT ACTUAL
 ═══════════════════════════════════════════════════════════════
+- Mode usuari: ${userMode === 'chat' ? 'XAT (NO pots editar el document)' : 'EDICIÓ (pots editar el document)'}
 - Selecció activa: ${hasSelection ? 'SÍ (l\'usuari ha seleccionat text específic)' : 'NO'}
 - Fitxer de coneixement: ${hasFile ? 'SÍ (usa\'l com a font)' : 'NO'}${docStatsStr}
+${userMode === 'chat' ? `
+⚠️ IMPORTANT - MODE XAT ACTIU:
+Estàs en mode XAT, no pots fer canvis al document.
+Si l'usuari demana una EDICIÓ (corregir, traduir, millorar, canviar, escurçar, etc.),
+respon amb la teva resposta normal però AFEGEIX al final:
 
+💡 Per aplicar aquest canvi al document, canvia a mode **Edit** (botó superior esquerre).
+
+Exemples de peticions d'edició: "corregeix", "tradueix", "millora", "escurça", "canvia X per Y", "elimina", "afegeix"
+` : ''}
 ═══════════════════════════════════════════════════════════════
 FORMAT DEL TEXT D'ENTRADA (v3.7)
 ═══════════════════════════════════════════════════════════════
@@ -1370,6 +1380,7 @@ async function handleChat(body, env, corsHeaders) {
 
   // 2. Build system prompt (context-driven)
   // v3.7: Afegim doc_stats per UNIVERSAL DOC READER
+  // v6.6: Afegim user_mode per detectar intents d'edició en mode xat
   const systemPrompt = buildSystemPrompt(
     has_selection || false,
     !!knowledge_file_uri,
@@ -1377,7 +1388,8 @@ async function handleChat(body, env, corsHeaders) {
     strict_mode,
     negative_constraints,  // v2.8: Banned words
     doc_skeleton,          // v2.9: Document structure
-    doc_stats              // v3.7: Universal Doc Reader stats
+    doc_stats,             // v3.7: Universal Doc Reader stats
+    user_mode              // v6.6: User-selected mode (edit | chat)
   );
 
   // 3. Build contents array with chat history (MEMORY)

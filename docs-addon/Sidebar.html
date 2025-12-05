@@ -1459,12 +1459,15 @@
         preloadTimeline();
 
         // Enter key handler for banned word input
-        document.getElementById('newBannedWord').addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            addBannedWord();
-          }
-        });
+        const bannedWordInput = document.getElementById('newBannedWord');
+        if (bannedWordInput) {
+          bannedWordInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addBannedWord();
+            }
+          });
+        }
 
         // Load file info
         google.script.run.withSuccessHandler(function(info) {
@@ -1643,12 +1646,15 @@
         // Update pill position
         updateNavPill();
 
-        // Show/hide input area (hide for settings/recipes/structure/timeline panels)
+        // Show/hide input area and selection indicator (hide for settings/recipes/structure/timeline panels)
         const inputArea = document.getElementById('inputArea');
+        const selectionInd = document.getElementById('selectionIndicator');
         if (tabName === 'brain' || tabName === 'docs' || tabName === 'recipes' || tabName === 'structure' || tabName === 'timeline') {
           inputArea.classList.add('hidden');
+          if (selectionInd) selectionInd.style.display = 'none';
         } else {
           inputArea.classList.remove('hidden');
+          if (selectionInd) selectionInd.style.display = '';
         }
 
         // v3.9: Auto-refresh structure when opening structure panel
@@ -2795,7 +2801,7 @@
             hideUndoBar();
             addBubble('error', 'Error: ' + err.message);
           })
-          .restoreText(pendingUndo.targetId, pendingUndo.originalText);
+          .restoreText(pendingUndo.targetId, pendingUndo.originalText, pendingUndo.bodyIndex);  // v6.6: bodyIndex
       }
 
       // ═══════════════════════════════════════════════════════════
