@@ -2707,13 +2707,15 @@
         display: flex;
         flex-direction: column;
         gap: 0;
+        padding-left: 0;
+        padding-right: 0;
       }
 
       .folders-container.view-1 .folder-recipe {
         display: flex;
         align-items: center;
-        padding: 10px 4px;
-        gap: 6px;
+        padding: 9px 2px;
+        gap: 4px;
         border-bottom: 1px solid var(--border);
       }
 
@@ -2734,7 +2736,7 @@
         font-weight: 600;
         font-size: 12px;
         color: var(--text-primary);
-        max-width: 110px;
+        max-width: 100px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -2742,13 +2744,14 @@
 
       .folders-container.view-1 .folder-recipe-preview {
         flex: 1;
+        min-width: 0;
         display: block;
         font-size: 11px;
         color: var(--text-muted);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        padding-left: 8px;
+        padding-left: 6px;
         border-left: 1px solid var(--border);
       }
 
@@ -5439,10 +5442,37 @@
       }
 
       .selection-indicator #selectionPreview {
+        flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         font-style: italic;
+      }
+
+      .selection-word-count {
+        flex-shrink: 0;
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-left: auto;
+      }
+
+      .selection-indicator.loading #selectionPreview {
+        opacity: 0.5;
+      }
+
+      .selection-indicator.loading::after {
+        content: '';
+        width: 10px;
+        height: 10px;
+        border: 2px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        margin-left: 8px;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
       }
 
       @keyframes fadeIn {
