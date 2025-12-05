@@ -85,7 +85,7 @@
           <button class="chat-history-btn" onclick="openConversationsDrawer()" title="Historial de converses">
             <span class="i i--sm"><svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
           </button>
-          <span class="chat-current-title" id="chatCurrentTitle" onclick="editCurrentTitle()" title="Clic per editar">Nova conversa</span>
+          <span class="chat-current-title" id="chatCurrentTitle" onclick="editCurrentTitle()" title="Clic per editar">Hola.</span>
           <span class="save-indicator" id="saveIndicator"></span>
         </div>
         <button class="chat-new-btn" onclick="createNewConversation()">+ Nova</button>
@@ -600,6 +600,12 @@
       </div>
     </div>
 
+    <!-- v5.3: Selection preview (fora de l'àrea ombrejada) -->
+    <div class="selection-indicator hidden" id="selectionIndicator">
+      <span class="i i--xs"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>
+      <span id="selectionPreview"></span>
+    </div>
+
     <!-- Input Area (Footer) - v3.2 Redesign -->
     <div id="inputArea" class="input-area">
       <!-- Header: Mode selector + Preview toggle -->
@@ -615,7 +621,7 @@
               <span class="i"><svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></span>
               <div class="details">
                 <div class="name">Edit</div>
-                <div class="desc">La IA interpreta i edita el document</div>
+                <div class="desc">La IA pot editar el document</div>
               </div>
             </button>
             <button class="mode-option" data-mode="chat" onclick="selectMode('chat')">
@@ -646,12 +652,6 @@
           <input type="text" class="constraint-input" id="constraintInput" placeholder="Afegir paraula..." onkeydown="handleConstraintInputKey(event)">
           <button class="constraint-input-confirm" onclick="addConstraintFromInput()"><span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span></button>
         </div>
-      </div>
-
-      <!-- v5.3: Selection preview (text truncat) -->
-      <div class="selection-indicator hidden" id="selectionIndicator">
-        <span class="i i--xs"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>
-        <span id="selectionPreview"></span>
       </div>
 
       <!-- Input wrapper amb textarea i send button flotant -->
@@ -1185,7 +1185,7 @@
       }
 
       function updateConversationTitle(title) {
-        document.getElementById('chatCurrentTitle').textContent = title || 'Nova conversa';
+        document.getElementById('chatCurrentTitle').textContent = title || 'Hola.';
       }
 
       function updateActiveConversation(activeId) {
@@ -1201,7 +1201,7 @@
       function createNewConversation() {
         currentConversationId = null;
         conversationMessageCount = 0; // v5.2: Reset counter
-        updateConversationTitle('Nova conversa');
+        updateConversationTitle('Hola.');
         closeConversationsDrawer();
 
         // v7.1: Mostrar landing interactiva en lloc de missatge simple
@@ -2662,10 +2662,12 @@
             '<p class="landing-subtitle">El teu assistent d\'escriptura</p>' +
           '</div>' +
           '<div class="landing-suggestions">' +
-            '<p class="landing-hint">Prova alguna d\'aquestes accions:</p>' +
             '<div class="suggestion-grid">' + cardsHtml + '</div>' +
           '</div>' +
-          '<p class="landing-footer">💡 O escriu la teva pròpia instrucció</p>' +
+          '<div class="landing-tip">' +
+            '<div class="tip-row"><span class="tip-icon">✂️</span><span class="tip-text">Selecció → només el text</span></div>' +
+            '<div class="tip-row"><span class="tip-icon">📄</span><span class="tip-text">Sense → tot el document</span></div>' +
+          '</div>' +
         '</div>';
 
         container.innerHTML = landingHtml;
