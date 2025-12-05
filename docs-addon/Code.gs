@@ -3119,29 +3119,55 @@ function findAndHighlight(searchText) {
     const element = searchResult.getElement();
     const startOffset = searchResult.getStartOffset();
     const endOffset = searchResult.getEndOffsetInclusive();
+    const textElement = element.asText();
 
-    // Seleccionar el rang exacte trobat (això fa scroll automàtic!)
-    const rangeBuilder = doc.newRange();
+    // Guardar referència per netejar després
+    const props = PropertiesService.getDocumentProperties();
 
-    if (startOffset >= 0 && endOffset >= 0) {
-      // Seleccionar només el text trobat (rang parcial)
-      rangeBuilder.addElement(element, startOffset, endOffset);
-    } else {
-      // Seleccionar tot l'element
-      rangeBuilder.addElement(element);
+    // Netejar highlight anterior si existeix
+    const prevHighlight = props.getProperty('docRefHighlight');
+    if (prevHighlight) {
+      try {
+        const prev = JSON.parse(prevHighlight);
+        const prevEl = body.getChild(prev.childIndex);
+        if (prevEl) {
+          prevEl.asText().setBackgroundColor(prev.start, prev.end, null);
+        }
+      } catch (e) {}
     }
 
-    doc.setSelection(rangeBuilder.build());
+    // Aplicar highlight blau clar (com la selecció de Google Docs)
+    const highlightColor = '#a8d4ff'; // Blau clar similar a selecció
+    if (startOffset >= 0 && endOffset >= 0) {
+      textElement.setBackgroundColor(startOffset, endOffset, highlightColor);
 
-    // Opcional: aplicar highlight temporal (groc clar)
-    // Nota: el highlight es quedarà fins que l'usuari faci una altra acció
-    // Per ara, la selecció ja és suficient feedback visual
+      // Guardar per netejar després
+      const parentElement = element.getParent();
+      let childIndex = -1;
+      if (parentElement.getType() === DocumentApp.ElementType.BODY_SECTION) {
+        childIndex = parentElement.getChildIndex(element);
+      }
+      props.setProperty('docRefHighlight', JSON.stringify({
+        childIndex: childIndex,
+        start: startOffset,
+        end: endOffset
+      }));
+    }
+
+    // Seleccionar per fer scroll (el blau es veurà encara que perdi focus)
+    const rangeBuilder = doc.newRange();
+    if (startOffset >= 0 && endOffset >= 0) {
+      rangeBuilder.addElement(element, startOffset, endOffset);
+    } else {
+      rangeBuilder.addElement(element);
+    }
+    doc.setSelection(rangeBuilder.build());
 
     return {
       success: true,
-      foundText: element.asText().getText().substring(
+      foundText: textElement.getText().substring(
         Math.max(0, startOffset - 10),
-        Math.min(element.asText().getText().length, endOffset + 10)
+        Math.min(textElement.getText().length, endOffset + 10)
       )
     };
 
