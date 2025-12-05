@@ -836,35 +836,23 @@
 
       /* Landing Tip */
       .landing-tip {
-        margin-top: 16px;
-        padding: 10px 14px;
-        background: var(--bg-secondary);
-        border-radius: var(--radius-md);
-        border: 1px solid var(--border);
-      }
-
-      .tip-row {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 3px 0;
+        justify-content: center;
+        gap: 6px;
+        margin-top: 20px;
       }
 
-      .tip-row:first-child {
-        border-bottom: 1px solid var(--border);
-        padding-bottom: 6px;
-        margin-bottom: 3px;
-      }
-
-      .tip-icon {
-        font-size: 12px;
+      .landing-tip .tip-icon {
+        width: 24px;
+        height: 24px;
+        color: #f59e0b;
         flex-shrink: 0;
       }
 
-      .tip-text {
-        font-size: 10px;
+      .landing-tip .tip-text {
+        font-size: 11px;
         color: var(--text-muted);
-        letter-spacing: -0.01em;
       }
 
       /* Revert Button */
@@ -2702,7 +2690,7 @@
         display: none;
       }
 
-      /* View 1: List (1 column) - Horizontal: name left, description right */
+      /* View 1: List (1 column) - Name on top, description below */
       .folders-container.view-1 .folder-content {
         display: flex;
         flex-direction: column;
@@ -2712,10 +2700,14 @@
       }
 
       .folders-container.view-1 .folder-recipe {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto auto 1fr auto auto;
+        grid-template-areas:
+          "drag icon name edit delete"
+          ". . preview preview preview";
         align-items: center;
-        padding: 9px 2px;
-        gap: 4px;
+        padding: 8px 2px 10px 0;
+        gap: 2px 4px;
         border-bottom: 1px solid var(--border);
       }
 
@@ -2724,40 +2716,38 @@
       }
 
       .folders-container.view-1 .folder-recipe-drag-handle {
-        flex-shrink: 0;
+        grid-area: drag;
       }
 
       .folders-container.view-1 .folder-recipe-icon {
-        flex-shrink: 0;
+        grid-area: icon;
       }
 
       .folders-container.view-1 .folder-recipe-name {
-        flex-shrink: 0;
+        grid-area: name;
         font-weight: 600;
         font-size: 12px;
         color: var(--text-primary);
-        max-width: 100px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
       .folders-container.view-1 .folder-recipe-preview {
-        flex: 1;
-        min-width: 0;
+        grid-area: preview;
         display: block;
         font-size: 11px;
         color: var(--text-muted);
+        line-height: 1.4;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        padding-left: 6px;
-        border-left: 1px solid var(--border);
+        padding-right: 2px;
       }
 
-      .folders-container.view-1 .folder-recipe-edit,
+      .folders-container.view-1 .folder-recipe-edit {
+        grid-area: edit;
+      }
+
       .folders-container.view-1 .folder-recipe-delete {
-        flex-shrink: 0;
+        grid-area: delete;
       }
 
       /* View 2: Grid 2 columns - Cards with preview */
@@ -5422,10 +5412,9 @@
         align-items: center;
         gap: 6px;
         padding: 8px 12px;
-        margin: 0 0 8px 0;
+        margin: 0 12px 8px 12px;
         background: var(--bg-secondary);
-        border: 1px solid var(--accent);
-        border-left: 3px solid var(--accent);
+        border: 1px solid var(--border);
         border-radius: var(--radius-sm);
         font-size: 11px;
         color: var(--text-primary);
@@ -5454,25 +5443,6 @@
         font-size: 10px;
         color: var(--text-muted);
         margin-left: auto;
-      }
-
-      .selection-indicator.loading #selectionPreview {
-        opacity: 0.5;
-      }
-
-      .selection-indicator.loading::after {
-        content: '';
-        width: 10px;
-        height: 10px;
-        border: 2px solid var(--border);
-        border-top-color: var(--accent);
-        border-radius: 50%;
-        animation: spin 0.6s linear infinite;
-        margin-left: 8px;
-      }
-
-      @keyframes spin {
-        to { transform: rotate(360deg); }
       }
 
       @keyframes fadeIn {
