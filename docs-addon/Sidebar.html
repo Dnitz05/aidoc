@@ -2614,23 +2614,27 @@
           return;
         }
 
-        // Icones SVG
+        // Icones SVG minimalistes
         const icons = {
-          edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
-          translate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
-          analyze: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>',
-          style: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>'
+          edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>',
+          translate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>',
+          summarize: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg>',
+          style: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>',
+          shrink: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 12h16M4 18h16"/><path d="M12 2v4m0 12v4M8 6l4-4 4 4M8 18l4 4 4-4"/></svg>',
+          expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8h16M4 16h16"/><path d="M12 2v2m0 16v2M8 4l4-2 4 2M8 20l4 2 4-2"/></svg>'
         };
 
         const suggestions = [
-          { icon: icons.edit, text: "Corregeix", prompt: "Corregeix l'ortografia", cat: 'edit' },
-          { icon: icons.translate, text: 'Tradueix', prompt: 'Tradueix al castellà', cat: 'translate' },
-          { icon: icons.analyze, text: 'Resumeix', prompt: 'Resumeix el document en 3 punts clau', cat: 'analyze' },
-          { icon: icons.style, text: "Millora", prompt: "Millora l'estil del text", cat: 'edit' }
+          { icon: icons.edit, text: "Corregeix", prompt: "Corregeix l'ortografia i la gramàtica" },
+          { icon: icons.translate, text: 'Tradueix', prompt: 'Tradueix al castellà' },
+          { icon: icons.summarize, text: 'Resumeix', prompt: 'Resumeix el document en 3 punts clau' },
+          { icon: icons.style, text: "Millora", prompt: "Millora l'estil i la claredat del text" },
+          { icon: icons.shrink, text: "Escurça", prompt: "Escurça el text mantenint la informació clau" },
+          { icon: icons.expand, text: "Expandeix", prompt: "Expandeix i desenvolupa més el contingut" }
         ];
 
         let cardsHtml = suggestions.map(function(s) {
-          return '<button class="suggestion-card cat-' + s.cat + '" onclick="useSuggestion(\'' + s.prompt.replace(/'/g, "\\'") + '\')">' +
+          return '<button class="suggestion-card" onclick="useSuggestion(\'' + s.prompt.replace(/'/g, "\\'") + '\')">' +
             '<span class="suggestion-icon">' + s.icon + '</span>' +
             '<span class="suggestion-text">' + s.text + '</span>' +
             '</button>';
@@ -3392,7 +3396,8 @@
             // Get recipe icon (backwards compatible with emojis)
             const recipeIconName = mapEmojiToIcon(recipe.icon || recipe.emoji || 'circle');
             // v8.1: Preview text for 1 and 2 column views
-            const previewText = getRecipePreview(recipe.instruction, 80);
+            // v8.1: Use AI summary if available, otherwise preview of instruction
+            const previewText = recipe.summary || getRecipePreview(recipe.instruction, 80);
 
             html += '<div class="folder-recipe" draggable="true" data-folder-index="' + folderIndex + '" data-recipe-index="' + realRecipeIndex + '" ondragstart="onRecipeDragStart(event)" ondragend="onRecipeDragEnd(event)" onclick="runRecipe(\'' + escapedInstruction + '\', \'' + escapedName + '\')">' +
               '<span class="folder-recipe-drag-handle">' + icon('gripVertical', 'i--sm i--muted') + '</span>' +
@@ -3844,6 +3849,26 @@
         return emojiMap[emoji] || (ICONS[emoji] ? emoji : 'circle');
       }
 
+      // v8.1: Generate recipe summary using AI
+      function generateRecipeSummary(name, instruction, callback) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.status === 'ok' && res.summary) {
+              callback(res.summary);
+            } else {
+              callback(null);
+            }
+          })
+          .withFailureHandler(function() {
+            callback(null);
+          })
+          .callWorker({
+            action: 'generate_recipe_summary',
+            name: name,
+            instruction: instruction
+          });
+      }
+
       // Save new recipe to folder
       function saveNewRecipe() {
         const name = document.getElementById('newRecipeName').value.trim();
@@ -3864,16 +3889,24 @@
           return;
         }
 
-        folder.recipes.push({
-          id: 'recipe_' + Date.now(),
-          name: name,
-          icon: selectedRecipeIcon, // Now uses icon name instead of emoji
-          instruction: instruction
-        });
-
-        saveRecipes();
-        renderFolders();
+        // Hide modal immediately for better UX
         hideNewRecipeModal();
+        showToast('Generant descripció...', 'info');
+
+        // Generate AI summary
+        generateRecipeSummary(name, instruction, function(summary) {
+          folder.recipes.push({
+            id: 'recipe_' + Date.now(),
+            name: name,
+            icon: selectedRecipeIcon,
+            instruction: instruction,
+            summary: summary || '' // v8.1: AI-generated summary
+          });
+
+          saveRecipes();
+          renderFolders();
+          showToast('Recepta creada', 'success');
+        });
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -3934,13 +3967,29 @@
         }
 
         if (userFolders[folderIndex] && userFolders[folderIndex].recipes[recipeIndex]) {
-          userFolders[folderIndex].recipes[recipeIndex].name = name;
-          userFolders[folderIndex].recipes[recipeIndex].instruction = instruction;
-          userFolders[folderIndex].recipes[recipeIndex].icon = selectedEditRecipeIcon;
-          saveRecipes();
-          renderFolders();
+          const recipe = userFolders[folderIndex].recipes[recipeIndex];
+          const instructionChanged = recipe.instruction !== instruction;
+
+          recipe.name = name;
+          recipe.instruction = instruction;
+          recipe.icon = selectedEditRecipeIcon;
+
           hideEditRecipeModal();
-          showToast('Recepta actualitzada', 'success');
+
+          // v8.1: Regenerate summary if instruction changed
+          if (instructionChanged) {
+            showToast('Actualitzant descripció...', 'info');
+            generateRecipeSummary(name, instruction, function(summary) {
+              recipe.summary = summary || '';
+              saveRecipes();
+              renderFolders();
+              showToast('Recepta actualitzada', 'success');
+            });
+          } else {
+            saveRecipes();
+            renderFolders();
+            showToast('Recepta actualitzada', 'success');
+          }
         }
       }
 

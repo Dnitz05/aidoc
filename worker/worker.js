@@ -1239,6 +1239,10 @@ export default {
       if (body.action === 'generate_title') {
         return await handleGenerateTitle(body, env, corsHeaders);
       }
+      // v8.1: Generate recipe summary
+      if (body.action === 'generate_recipe_summary') {
+        return await handleGenerateRecipeSummary(body, env, corsHeaders);
+      }
 
       // v5.1: Knowledge Library endpoints
       if (body.action === 'get_knowledge_library') {
@@ -2609,6 +2613,72 @@ Títol:`;
     title: title,
     generated: true
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * GENERATE recipe summary using AI (v8.1)
+ * body: { instruction, name }
+ * Returns a short description of what the recipe does
+ */
+async function handleGenerateRecipeSummary(body, env, corsHeaders) {
+  const { instruction, name } = body;
+
+  if (!instruction) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "missing_instruction"
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  // Generate summary with Gemini
+  const prompt = `Ets un assistent que genera descripcions curtes per receptes/prompts d'edició de documents.
+
+Nom de la recepta: "${name || 'Sense nom'}"
+Instrucció completa:
+${instruction.substring(0, 500)}
+
+Genera una descripció molt curta (màxim 15 paraules) en català que expliqui què fa aquesta recepta. Ha de ser clara i descriptiva. Només respon amb la descripció, sense cometes ni explicacions addicionals.
+
+Descripció:`;
+
+  try {
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.5,
+            maxOutputTokens: 50
+          }
+        })
+      }
+    );
+
+    if (!geminiResponse.ok) {
+      throw new Error("gemini_error");
+    }
+
+    const geminiResult = await geminiResponse.json();
+    let summary = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+
+    // Clean up summary
+    summary = summary.replace(/^["']|["']$/g, '').trim();
+    if (summary.length > 120) summary = summary.substring(0, 117) + '...';
+
+    return new Response(JSON.stringify({
+      status: "ok",
+      summary: summary
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+  } catch (err) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: err.message
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
 }
 
 /**

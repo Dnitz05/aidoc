@@ -714,7 +714,8 @@
         align-items: center;
         justify-content: center;
         padding: 24px 16px;
-        min-height: 280px;
+        height: 100%;
+        min-height: 100%;
         animation: landingFadeIn 0.4s ease;
       }
 
@@ -768,97 +769,65 @@
         margin: 0 0 10px 0;
       }
 
-      /* Grid de targetes */
+      /* Grid de targetes - 3 columnes minimalista */
       .suggestion-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
       }
 
-      /* Targeta individual */
+      /* Targeta minimalista */
       .suggestion-card {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 4px;
-        padding: 12px 8px;
-        background: var(--bg-secondary);
+        justify-content: center;
+        gap: 6px;
+        padding: 14px 6px;
+        background: transparent;
         border: 1px solid var(--border);
         border-radius: var(--radius-md);
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
         text-align: center;
       }
 
       .suggestion-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        background: var(--bg-elevated);
+        border-color: var(--accent);
+      }
+
+      .suggestion-card:hover .suggestion-icon {
+        color: var(--accent);
+        transform: scale(1.1);
       }
 
       .suggestion-card:active {
-        transform: translateY(0);
+        transform: scale(0.97);
       }
 
       .suggestion-icon {
-        font-size: 18px;
+        width: 20px;
+        height: 20px;
+        color: var(--text-muted);
+        transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .suggestion-icon svg {
+        width: 100%;
+        height: 100%;
       }
 
       .suggestion-text {
         font-size: 10px;
         font-weight: 500;
+        color: var(--text-secondary);
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+      }
+
+      .suggestion-card:hover .suggestion-text {
         color: var(--text-primary);
-        line-height: 1.3;
-      }
-
-      /* Colors per categoria */
-      .suggestion-card.cat-edit {
-        border-left: 3px solid #10B981;
-      }
-      .suggestion-card.cat-edit:hover {
-        background: rgba(16, 185, 129, 0.08);
-        border-color: #10B981;
-      }
-
-      .suggestion-card.cat-translate {
-        border-left: 3px solid #3B82F6;
-      }
-      .suggestion-card.cat-translate:hover {
-        background: rgba(59, 130, 246, 0.08);
-        border-color: #3B82F6;
-      }
-
-      .suggestion-card.cat-analyze {
-        border-left: 3px solid #8B5CF6;
-      }
-      .suggestion-card.cat-analyze:hover {
-        background: rgba(139, 92, 246, 0.08);
-        border-color: #8B5CF6;
-      }
-
-      .suggestion-card.cat-reference {
-        border-left: 3px solid #EC4899;
-      }
-      .suggestion-card.cat-reference:hover {
-        background: rgba(236, 72, 153, 0.08);
-        border-color: #EC4899;
-      }
-
-      .suggestion-card.cat-create {
-        border-left: 3px solid #F59E0B;
-      }
-      .suggestion-card.cat-create:hover {
-        background: rgba(245, 158, 11, 0.08);
-        border-color: #F59E0B;
-      }
-
-      /* Footer */
-      .landing-footer {
-        margin-top: 16px;
-        font-size: 10px;
-        color: var(--text-muted);
-        display: flex;
-        align-items: center;
-        gap: 4px;
       }
 
       /* Revert Button */
@@ -2696,7 +2665,7 @@
         display: none;
       }
 
-      /* View 1: List (1 column) - With separators and preview */
+      /* View 1: List (1 column) - Vertical layout with multiline description */
       .folders-container.view-1 .folder-content {
         display: flex;
         flex-direction: column;
@@ -2704,10 +2673,15 @@
       }
 
       .folders-container.view-1 .folder-recipe {
-        display: flex;
-        align-items: flex-start;
-        padding: 12px 10px;
-        gap: 10px;
+        display: grid;
+        grid-template-columns: auto auto 1fr auto auto;
+        grid-template-rows: auto auto;
+        grid-template-areas:
+          "drag icon name edit delete"
+          ". . preview preview preview";
+        align-items: center;
+        padding: 14px 12px;
+        gap: 4px 10px;
         border-bottom: 1px solid var(--border);
       }
 
@@ -2715,39 +2689,39 @@
         border-bottom: none;
       }
 
+      .folders-container.view-1 .folder-recipe-drag-handle {
+        grid-area: drag;
+      }
+
       .folders-container.view-1 .folder-recipe-icon {
-        flex-shrink: 0;
-        margin-top: 2px;
+        grid-area: icon;
       }
 
       .folders-container.view-1 .folder-recipe-name {
-        font-weight: 500;
-        white-space: nowrap;
-        flex-shrink: 0;
-        max-width: 140px;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        grid-area: name;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-primary);
       }
 
       .folders-container.view-1 .folder-recipe-preview {
-        display: block;
-        flex: 1;
-        font-size: 11px;
-        color: var(--text-muted);
-        white-space: nowrap;
+        grid-area: preview;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
         overflow: hidden;
-        text-overflow: ellipsis;
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--text-muted);
         margin-top: 2px;
       }
 
-      .folders-container.view-1 .folder-recipe-drag-handle {
-        margin-top: 2px;
+      .folders-container.view-1 .folder-recipe-edit {
+        grid-area: edit;
       }
 
-      .folders-container.view-1 .folder-recipe-edit,
       .folders-container.view-1 .folder-recipe-delete {
-        flex-shrink: 0;
-        margin-top: 2px;
+        grid-area: delete;
       }
 
       /* View 2: Grid 2 columns - Cards with preview */
