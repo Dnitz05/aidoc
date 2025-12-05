@@ -2420,9 +2420,9 @@
       }
 
       /**
-       * v6.7: Parseja referències [[text]] i les converteix en botons clicables
+       * v6.7: Parseja referències [[text]] i les converteix en text + icona clicable
        * @param {string} html - HTML amb possibles referències
-       * @returns {string} - HTML amb botons de referència
+       * @returns {string} - HTML amb text visible i botó per navegar
        */
       function parseDocumentReferences(html) {
         // Regex: [[text]] - captura el contingut entre dobles claudàtors
@@ -2435,14 +2435,15 @@
             .replace(/'/g, "\\'")
             .replace(/"/g, '&quot;');
 
-          // Preview del text per al tooltip
-          const preview = searchText.length > 30
-            ? searchText.substring(0, 30) + '...'
-            : searchText;
-
-          return '<button class="doc-ref-btn" onclick="findInDocument(\'' + escaped + '\')" ' +
-                 'title="Mostrar: ' + preview.replace(/"/g, '&quot;') + '">' +
-                 '<span class="doc-ref-icon">📍</span></button>';
+          // Mostrar el TEXT COMPLET + icona d'ull per navegar
+          return '<span class="doc-ref">' +
+                 '<span class="doc-ref-text">' + searchText + '</span>' +
+                 '<button class="doc-ref-btn" onclick="findInDocument(\'' + escaped + '\')" ' +
+                 'title="Mostrar al document">' +
+                 '<svg class="doc-ref-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                 '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>' +
+                 '<circle cx="12" cy="12" r="3"/>' +
+                 '</svg></button></span>';
         });
       }
 
