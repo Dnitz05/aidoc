@@ -1378,26 +1378,6 @@
         gap: 12px;
       }
 
-      /* Avoid Words Button */
-      .avoid-words-btn {
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--text-muted);
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 4px 0;
-        transition: color 0.2s ease;
-      }
-
-      .avoid-words-btn:hover {
-        color: var(--text-secondary);
-      }
-
-      .avoid-words-btn.active {
-        color: var(--accent);
-      }
-
       /* Switch Toggle (iOS style) */
       .switch-container {
         display: flex;
@@ -1767,14 +1747,14 @@
       }
 
       .send-btn {
-        width: 28px;
-        height: 28px;
+        width: 24px;
+        height: 24px;
         display: flex;
         align-items: center;
         justify-content: center;
         background: var(--accent);
         border: none;
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-sm);
         color: white;
         cursor: pointer;
         transition: all 0.15s ease;
@@ -1791,22 +1771,23 @@
       }
 
       .send-btn svg {
-        width: 14px;
-        height: 14px;
+        width: 12px;
+        height: 12px;
         stroke: currentColor;
         stroke-width: 2.5;
         fill: none;
       }
 
-      .attach-btn {
-        width: 28px;
-        height: 28px;
+      .attach-btn,
+      .ban-btn {
+        width: 24px;
+        height: 24px;
         display: flex;
         align-items: center;
         justify-content: center;
         background: transparent;
         border: 1px solid var(--border);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-sm);
         color: var(--text-muted);
         cursor: pointer;
         transition: all 0.15s ease;
@@ -1818,9 +1799,22 @@
         border-color: var(--accent);
       }
 
-      .attach-btn svg {
-        width: 14px;
-        height: 14px;
+      .ban-btn:hover {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border-color: #ef4444;
+      }
+
+      .ban-btn.active {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        border-color: #ef4444;
+      }
+
+      .attach-btn svg,
+      .ban-btn svg {
+        width: 12px;
+        height: 12px;
         stroke: currentColor;
         stroke-width: 2;
         fill: none;
@@ -2697,32 +2691,70 @@
          RECIPES VIEW MODES (1, 2, 3 columns)
          ═══════════════════════════════════════════════════════════ */
 
-      /* View 1: List (default - 1 column) */
+      /* Default: hide preview in all views, show in specific ones */
+      .folder-recipe-preview {
+        display: none;
+      }
+
+      /* View 1: List (1 column) - With separators and preview */
       .folders-container.view-1 .folder-content {
         display: flex;
         flex-direction: column;
-        gap: var(--space-xs);
+        gap: 0;
       }
 
       .folders-container.view-1 .folder-recipe {
         display: flex;
-        align-items: center;
-        padding: 8px 10px;
-        gap: 8px;
+        align-items: flex-start;
+        padding: 12px 10px;
+        gap: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .folders-container.view-1 .folder-recipe:last-child {
+        border-bottom: none;
+      }
+
+      .folders-container.view-1 .folder-recipe-icon {
+        flex-shrink: 0;
+        margin-top: 2px;
       }
 
       .folders-container.view-1 .folder-recipe-name {
-        flex: 1;
+        font-weight: 500;
         white-space: nowrap;
+        flex-shrink: 0;
+        max-width: 140px;
         overflow: hidden;
         text-overflow: ellipsis;
       }
 
-      /* View 2: Grid 2 columns */
+      .folders-container.view-1 .folder-recipe-preview {
+        display: block;
+        flex: 1;
+        font-size: 11px;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 2px;
+      }
+
+      .folders-container.view-1 .folder-recipe-drag-handle {
+        margin-top: 2px;
+      }
+
+      .folders-container.view-1 .folder-recipe-edit,
+      .folders-container.view-1 .folder-recipe-delete {
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+
+      /* View 2: Grid 2 columns - Cards with preview */
       .folders-container.view-2 .folder-content {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: var(--space-xs);
+        gap: var(--space-sm);
       }
 
       .folders-container.view-2 .folder-recipe {
@@ -2730,16 +2762,26 @@
         flex-direction: column;
         align-items: center;
         text-align: center;
-        padding: 12px 8px;
+        padding: 14px 10px 12px;
         gap: 6px;
+        position: relative;
+        background: var(--bg-secondary);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+      }
+
+      .folders-container.view-2 .folder-recipe:hover {
+        border-color: var(--accent);
+        background: var(--bg-elevated);
       }
 
       .folders-container.view-2 .folder-recipe-icon {
-        font-size: 20px;
+        font-size: 22px;
       }
 
       .folders-container.view-2 .folder-recipe-name {
-        font-size: 11px;
+        font-size: 12px;
+        font-weight: 500;
         line-height: 1.3;
         display: -webkit-box;
         -webkit-line-clamp: 2;
@@ -2748,11 +2790,30 @@
         word-break: break-word;
       }
 
+      .folders-container.view-2 .folder-recipe-preview {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        font-size: 10px;
+        color: var(--text-muted);
+        line-height: 1.4;
+        margin-top: 2px;
+      }
+
       .folders-container.view-2 .folder-recipe-drag-handle,
       .folders-container.view-2 .folder-recipe-edit,
       .folders-container.view-2 .folder-recipe-delete {
         position: absolute;
         top: 4px;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+
+      .folders-container.view-2 .folder-recipe:hover .folder-recipe-drag-handle,
+      .folders-container.view-2 .folder-recipe:hover .folder-recipe-edit,
+      .folders-container.view-2 .folder-recipe:hover .folder-recipe-delete {
+        opacity: 1;
       }
 
       .folders-container.view-2 .folder-recipe-drag-handle {
@@ -2767,11 +2828,7 @@
         right: 4px;
       }
 
-      .folders-container.view-2 .folder-recipe {
-        position: relative;
-      }
-
-      /* View 3: Grid 3 columns (compact) */
+      /* View 3: Grid 3 columns (compact) - No preview */
       .folders-container.view-3 .folder-content {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -2785,6 +2842,7 @@
         text-align: center;
         padding: 10px 4px;
         gap: 4px;
+        position: relative;
       }
 
       .folders-container.view-3 .folder-recipe-icon {
@@ -2801,26 +2859,34 @@
         word-break: break-word;
       }
 
+      .folders-container.view-3 .folder-recipe-preview {
+        display: none;
+      }
+
       .folders-container.view-3 .folder-recipe-drag-handle {
         display: none;
       }
 
-      .folders-container.view-3 .folder-recipe-edit {
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        padding: 2px;
-      }
-
+      .folders-container.view-3 .folder-recipe-edit,
       .folders-container.view-3 .folder-recipe-delete {
         position: absolute;
         top: 2px;
-        right: 2px;
         padding: 2px;
+        opacity: 0;
+        transition: opacity 0.15s ease;
       }
 
-      .folders-container.view-3 .folder-recipe {
-        position: relative;
+      .folders-container.view-3 .folder-recipe:hover .folder-recipe-edit,
+      .folders-container.view-3 .folder-recipe:hover .folder-recipe-delete {
+        opacity: 1;
+      }
+
+      .folders-container.view-3 .folder-recipe-edit {
+        left: 2px;
+      }
+
+      .folders-container.view-3 .folder-recipe-delete {
+        right: 2px;
       }
 
       /* Icon Selector (Modal) */

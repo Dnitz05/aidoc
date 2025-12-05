@@ -3272,6 +3272,20 @@
         3: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="5" height="5" rx="1"/><rect x="10" y="3" width="5" height="5" rx="1"/><rect x="17" y="3" width="5" height="5" rx="1"/><rect x="3" y="10" width="5" height="5" rx="1"/><rect x="10" y="10" width="5" height="5" rx="1"/><rect x="17" y="10" width="5" height="5" rx="1"/><rect x="3" y="17" width="5" height="5" rx="1"/><rect x="10" y="17" width="5" height="5" rx="1"/><rect x="17" y="17" width="5" height="5" rx="1"/></svg>'
       };
 
+      // v8.1: Get preview text from instruction
+      function getRecipePreview(instruction, maxLen) {
+        if (!instruction) return '';
+        // Clean up: remove extra whitespace, newlines
+        let preview = instruction.replace(/\s+/g, ' ').trim();
+        // Escape HTML
+        preview = preview.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // Truncate
+        if (preview.length > maxLen) {
+          preview = preview.substring(0, maxLen - 1) + '…';
+        }
+        return preview;
+      }
+
       function initRecipesView() {
         const saved = localStorage.getItem('recipesViewMode');
         if (saved) {
@@ -3388,11 +3402,14 @@
             const escapedName = recipe.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             // Get recipe icon (backwards compatible with emojis)
             const recipeIconName = mapEmojiToIcon(recipe.icon || recipe.emoji || 'circle');
+            // v8.1: Preview text for 1 and 2 column views
+            const previewText = getRecipePreview(recipe.instruction, 80);
 
             html += '<div class="folder-recipe" draggable="true" data-folder-index="' + folderIndex + '" data-recipe-index="' + realRecipeIndex + '" ondragstart="onRecipeDragStart(event)" ondragend="onRecipeDragEnd(event)" onclick="runRecipe(\'' + escapedInstruction + '\', \'' + escapedName + '\')">' +
               '<span class="folder-recipe-drag-handle">' + icon('gripVertical', 'i--sm i--muted') + '</span>' +
               '<span class="folder-recipe-icon">' + icon(recipeIconName, 'i--default') + '</span>' +
               '<span class="folder-recipe-name">' + recipe.name + '</span>' +
+              '<span class="folder-recipe-preview">' + previewText + '</span>' +
               '<button class="folder-recipe-edit" onclick="event.stopPropagation(); showEditRecipeModal(' + folderIndex + ', ' + realRecipeIndex + ')" title="Editar">' + icon('edit', 'i--sm') + '</button>' +
               '<button class="folder-recipe-delete" onclick="event.stopPropagation(); deleteRecipeFromFolder(' + folderIndex + ', ' + realRecipeIndex + ')" title="Esborrar">' + icon('x', 'i--sm') + '</button>' +
             '</div>';
