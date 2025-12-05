@@ -712,7 +712,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
         padding: 24px 16px;
         height: 100%;
         min-height: 100%;
@@ -758,6 +758,10 @@
 
       /* Suggeriments */
       .landing-suggestions {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
         width: 100%;
         max-width: 280px;
       }
@@ -828,6 +832,39 @@
 
       .suggestion-card:hover .suggestion-text {
         color: var(--text-primary);
+      }
+
+      /* Landing Tip */
+      .landing-tip {
+        margin-top: 16px;
+        padding: 10px 14px;
+        background: var(--bg-secondary);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+      }
+
+      .tip-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 3px 0;
+      }
+
+      .tip-row:first-child {
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 6px;
+        margin-bottom: 3px;
+      }
+
+      .tip-icon {
+        font-size: 12px;
+        flex-shrink: 0;
+      }
+
+      .tip-text {
+        font-size: 10px;
+        color: var(--text-muted);
+        letter-spacing: -0.01em;
       }
 
       /* Revert Button */
@@ -1357,7 +1394,7 @@
       }
 
       .switch-label {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 500;
         color: var(--text-muted);
         transition: color 0.2s ease;
@@ -1369,8 +1406,8 @@
 
       .switch {
         position: relative;
-        width: 36px;
-        height: 20px;
+        width: 28px;
+        height: 16px;
         cursor: pointer;
       }
 
@@ -1379,7 +1416,7 @@
         inset: 0;
         background: var(--bg-tertiary);
         border: 1px solid var(--border);
-        border-radius: 10px;
+        border-radius: 8px;
         transition: all 0.25s ease;
       }
 
@@ -1387,12 +1424,12 @@
         position: absolute;
         top: 2px;
         left: 2px;
-        width: 14px;
-        height: 14px;
+        width: 10px;
+        height: 10px;
         background: var(--text-muted);
         border-radius: 50%;
         transition: all 0.25s ease;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.2);
       }
 
       /* Active state */
@@ -1402,7 +1439,7 @@
       }
 
       .switch.active .switch-thumb {
-        left: 18px;
+        left: 14px;
         background: white;
       }
 
@@ -1698,7 +1735,7 @@
         line-height: 1.4;
         resize: none;
         outline: none;
-        min-height: 32px;
+        min-height: 38px;
         max-height: 120px;
         padding: 6px 0;
       }
@@ -1711,7 +1748,7 @@
       .input-buttons {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 4px;
         flex-shrink: 0;
       }
 
@@ -2665,7 +2702,7 @@
         display: none;
       }
 
-      /* View 1: List (1 column) - Vertical layout with multiline description */
+      /* View 1: List (1 column) - Horizontal: name left, description right */
       .folders-container.view-1 .folder-content {
         display: flex;
         flex-direction: column;
@@ -2673,15 +2710,10 @@
       }
 
       .folders-container.view-1 .folder-recipe {
-        display: grid;
-        grid-template-columns: auto auto 1fr auto auto;
-        grid-template-rows: auto auto;
-        grid-template-areas:
-          "drag icon name edit delete"
-          ". . preview preview preview";
+        display: flex;
         align-items: center;
-        padding: 14px 12px;
-        gap: 4px 10px;
+        padding: 10px 4px;
+        gap: 6px;
         border-bottom: 1px solid var(--border);
       }
 
@@ -2690,38 +2722,39 @@
       }
 
       .folders-container.view-1 .folder-recipe-drag-handle {
-        grid-area: drag;
+        flex-shrink: 0;
       }
 
       .folders-container.view-1 .folder-recipe-icon {
-        grid-area: icon;
+        flex-shrink: 0;
       }
 
       .folders-container.view-1 .folder-recipe-name {
-        grid-area: name;
+        flex-shrink: 0;
         font-weight: 600;
-        font-size: 13px;
+        font-size: 12px;
         color: var(--text-primary);
+        max-width: 110px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .folders-container.view-1 .folder-recipe-preview {
-        grid-area: preview;
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
+        flex: 1;
+        display: block;
         font-size: 11px;
-        line-height: 1.5;
         color: var(--text-muted);
-        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-left: 8px;
+        border-left: 1px solid var(--border);
       }
 
-      .folders-container.view-1 .folder-recipe-edit {
-        grid-area: edit;
-      }
-
+      .folders-container.view-1 .folder-recipe-edit,
       .folders-container.view-1 .folder-recipe-delete {
-        grid-area: delete;
+        flex-shrink: 0;
       }
 
       /* View 2: Grid 2 columns - Cards with preview */
@@ -5380,18 +5413,19 @@
         display: none;
       }
 
-      /* v5.3: Selection indicator - text preview */
+      /* v5.3: Selection indicator - text preview (fora de l'àrea ombrejada) */
       .selection-indicator {
         display: flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 10px;
-        margin: 0 var(--space-sm) 6px;
-        background: var(--bg-tertiary);
-        border: 1px solid var(--border);
+        padding: 8px 12px;
+        margin: 0 0 8px 0;
+        background: var(--bg-secondary);
+        border: 1px solid var(--accent);
+        border-left: 3px solid var(--accent);
         border-radius: var(--radius-sm);
         font-size: 11px;
-        color: var(--text-secondary);
+        color: var(--text-primary);
         animation: fadeIn 0.15s ease-out;
       }
 
