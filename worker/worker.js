@@ -342,6 +342,40 @@ async function markEventReverted(env, eventId, revertedByEventId) {
   }
 }
 
+/**
+ * v4.2: Get the last event for a specific target_id
+ * Used to find before_text from previous edits to the same paragraph
+ */
+async function getLastEventForTarget(env, licenseHash, docId, targetId) {
+  try {
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/edit_events?` +
+      `license_key_hash=eq.${licenseHash}&` +
+      `doc_id=eq.${docId}&` +
+      `target_id=eq.${targetId}&` +
+      `event_type=neq.baseline&` +
+      `event_type=neq.manual_gap&` +
+      `order=created_at.desc&` +
+      `limit=1`,
+      {
+        method: 'GET',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) return null;
+    const events = await response.json();
+    return events.length > 0 ? events[0] : null;
+  } catch (e) {
+    console.error('Error getting last event for target:', e);
+    return null;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // TIMELINE GAP DETECTION (v4.0)
 // ═══════════════════════════════════════════════════════════════
@@ -1577,21 +1611,34 @@ INSTRUCCIÓ DE L'USUARI:
       const [targetId, afterText] = updateEntries[0];
       const targetIdNum = parseInt(targetId, 10);
 
-      // v4.1: Extreure before_text del document marcat o de last_edit
+      // v4.2: Extreure before_text amb 3 fallbacks
       let beforeText = null;
 
-      // Primer intent: extreure del document marcat amb regex {{ID}}contingut
+      // Intent 1: Extreure del document marcat amb regex millorat
       if (text) {
-        const regex = new RegExp(`\\{\\{${targetId}\\}\\}([\\s\\S]*?)(?=\\{\\{\\d+\\}\\}|$)`);
+        const regex = new RegExp(`\\{\\{${targetId}\\}\\}\\s*([\\s\\S]*?)(?=\\{\\{(?:\\d+|T:\\d+|TOC:\\d+)\\}\\}|\\[CAPÇALERA|\\[PEU|$)`);
         const match = text.match(regex);
-        if (match) {
+        if (match && match[1]) {
           beforeText = match[1].trim();
         }
       }
 
-      // Fallback: usar last_edit si existeix i coincideix (comparant com a números)
+      // Intent 2: Fallback a last_edit si existeix i coincideix
       if (!beforeText && last_edit && parseInt(last_edit.targetId, 10) === targetIdNum) {
         beforeText = last_edit.originalText;
+      }
+
+      // Intent 3: Buscar a l'historial d'events anteriors del mateix paràgraf
+      if (!beforeText && doc_metadata?.doc_id) {
+        try {
+          const prevEvent = await getLastEventForTarget(env, licenseHash, doc_metadata.doc_id, targetIdNum);
+          if (prevEvent && prevEvent.after_text && !prevEvent.after_text.startsWith('[')) {
+            beforeText = prevEvent.after_text;
+            console.log(`[Timeline] before_text recovered from history for target ${targetIdNum}`);
+          }
+        } catch (histErr) {
+          console.warn('[Timeline] History lookup failed:', histErr.message);
+        }
       }
 
       const eventData = {

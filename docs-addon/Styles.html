@@ -188,6 +188,8 @@
         border-radius: var(--radius-md);
         position: relative;
         transition: background-color 0.2s ease;
+        width: 100%;
+        justify-content: space-between;
       }
 
       .nav-pill {
@@ -737,9 +739,8 @@
       }
 
       .landing-logo-img {
-        width: 48px;
-        height: 48px;
-        border-radius: var(--radius-md);
+        height: 36px;
+        width: auto;
       }
 
       .landing-title {
@@ -3121,6 +3122,47 @@
         gap: 6px;
       }
 
+      /* v4.2: Botó revert mini visible al header */
+      .timeline-header-right {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+      }
+
+      .timeline-revert-btn-mini {
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        opacity: 0.4;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-sm);
+        color: var(--text-secondary);
+      }
+
+      .timeline-revert-btn-mini:hover {
+        opacity: 1;
+        background: var(--accent-muted);
+        color: var(--accent);
+        transform: rotate(-30deg);
+      }
+
+      .timeline-card:hover .timeline-revert-btn-mini {
+        opacity: 0.7;
+      }
+
+      .timeline-no-revert {
+        font-size: 11px;
+        opacity: 0.4;
+        cursor: help;
+        margin-left: var(--space-xs);
+      }
+
       /* ═══════════════════════════════════════════════════════════
          SETTINGS PANEL (CERVELL)
          ═══════════════════════════════════════════════════════════ */
@@ -3128,17 +3170,6 @@
       #brainPanel {
         padding: var(--space-lg);
         overflow-y: auto;
-      }
-
-      #docsPanel {
-        padding: var(--space-lg);
-        overflow-y: auto;
-        flex-direction: column;
-        gap: var(--space-md);
-      }
-
-      #docsPanel.active {
-        display: flex;
       }
 
       #docsPanel .settings-card,
