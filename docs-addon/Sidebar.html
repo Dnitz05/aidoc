@@ -2417,9 +2417,8 @@
         }
 
         if (type === 'ai' && isEdit) {
-          let badgeHtml = '<div class="edit-badge">Document modificat' +
-            '<button class="revert-btn" onclick="revertLastEdit(this)" title="Desfer canvi">' +
-            '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Desfer</button>';
+          // v10.0: Badge només mostra indicador + Prohibir (el Desfer està a l'Undo Bar)
+          let badgeHtml = '<div class="edit-badge">' + icon('check', 'i--sm i--success') + ' Document modificat';
 
           // v2.8: Add "ban word" button if we have a recently changed word
           if (lastEditWord) {
