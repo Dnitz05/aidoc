@@ -1538,17 +1538,15 @@
         // Primera crida immediata
         pollSelection();
 
-        // Pausar polling mentre escriu
+        // Pausar polling mentre escriu (però NO amagar l'indicador)
         let typingTimeout = null;
         document.getElementById('userInput').addEventListener('input', function() {
           selectionPollingActive = false;
-          const indicator = document.getElementById('selectionIndicator');
-          if (indicator) indicator.classList.add('hidden');
 
           clearTimeout(typingTimeout);
           typingTimeout = setTimeout(function() {
             selectionPollingActive = true;
-          }, 500); // Reprendre 0.5s després d'escriure
+          }, 800); // Reprendre 0.8s després d'escriure
         });
 
         // Poll immediat quan l'usuari interactua amb el sidebar
