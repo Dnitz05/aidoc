@@ -208,7 +208,7 @@
               <div class="title">Biblioteca</div>
               <div class="subtitle">Fitxers pujats anteriorment</div>
             </div>
-            <button class="knowledge-refresh-btn" onclick="refreshKnowledgeLibrary()" title="Actualitzar">
+            <button class="knowledge-refresh-btn" onclick="refreshKnowledgeLibrary(true)" title="Actualitzar">
               <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
             </button>
           </div>
@@ -1661,10 +1661,10 @@
           }
         }
 
-        // v4.1: Auto-refresh timeline when opening timeline panel
+        // v4.1: Load timeline when opening timeline panel (uses cache if available)
         if (tabName === 'timeline') {
           if (typeof loadTimeline === 'function') {
-            loadTimeline(true); // Always refresh from server
+            loadTimeline(false); // v8.1: Use cache, don't force refresh
           }
         }
       }
@@ -3741,7 +3741,7 @@
         google.script.run
           .withSuccessHandler(function(result) {
             if (result && result.status === 'ok') {
-              refreshKnowledgeLibrary();
+              refreshKnowledgeLibrary(true);
               hideNewKnowledgeFolderModal();
               showToast('Carpeta creada: ' + name, 'success');
             }
@@ -3946,6 +3946,7 @@
       let knowledgeFolders = []; // v6.0: Array of folder names
       let currentFolder = null; // v6.0: Current folder (null = root)
       let activeKnowledgeFiles = []; // v6.0: Array of active files
+      let knowledgeLibraryLoaded = false; // v8.1: Cache flag
 
       // v8.0: Session files (persistent throughout the session)
       let sessionFiles = [];      // Files that persist for the entire session
@@ -3953,7 +3954,10 @@
 
       function initKnowledgePanel() {
         loadActiveKnowledgeFiles();
-        refreshKnowledgeLibrary();
+        // v8.1: Only load library if not already loaded
+        if (!knowledgeLibraryLoaded) {
+          refreshKnowledgeLibrary(true);
+        }
       }
 
       function loadActiveKnowledgeFiles() {
@@ -3976,12 +3980,20 @@
         return activeKnowledgeFiles.some(f => f.id === fileId);
       }
 
-      function refreshKnowledgeLibrary() {
+      function refreshKnowledgeLibrary(forceRefresh) {
         const listEl = document.getElementById('knowledgeLibraryList');
+
+        // v8.1: Si ja està carregat i no forcem, només renderitzar
+        if (knowledgeLibraryLoaded && !forceRefresh && knowledgeLibrary.length > 0) {
+          renderKnowledgeLibrary();
+          return;
+        }
+
         listEl.innerHTML = '<div class="knowledge-empty"><span>Carregant...</span></div>';
 
         google.script.run
           .withSuccessHandler(function(result) {
+            knowledgeLibraryLoaded = true; // v8.1: Marcar com carregat
             if (result && result.files) {
               knowledgeLibrary = result.files;
               knowledgeFolders = result.folders || [];
@@ -4113,7 +4125,7 @@
           google.script.run
             .withSuccessHandler(function() {
               currentFolder = newName.trim();
-              refreshKnowledgeLibrary();
+              refreshKnowledgeLibrary(true);
             })
             .withFailureHandler(function(err) {
               alert('Error: ' + err.message);
@@ -4127,7 +4139,7 @@
           google.script.run
             .withSuccessHandler(function() {
               currentFolder = null;
-              refreshKnowledgeLibrary();
+              refreshKnowledgeLibrary(true);
             })
             .withFailureHandler(function(err) {
               alert('Error: ' + err.message);
@@ -4203,7 +4215,7 @@
         google.script.run
           .withSuccessHandler(function() {
             hideMoveFileModal();
-            refreshKnowledgeLibrary();
+            refreshKnowledgeLibrary(true);
             showToast('Fitxer mogut correctament', 'success');
           })
           .withFailureHandler(function(err) {
@@ -4269,7 +4281,7 @@
             activeKnowledgeFiles = activeKnowledgeFiles.filter(f => f.id !== fileId);
             showActiveFiles(activeKnowledgeFiles);
             updateChatAttachmentBadge();
-            refreshKnowledgeLibrary();
+            refreshKnowledgeLibrary(true);
           })
           .withFailureHandler(function(err) {
             alert('Error: ' + err.message);
@@ -4346,7 +4358,7 @@
                 }
                 showActiveFiles(activeKnowledgeFiles);
                 updateChatAttachmentBadge();
-                refreshKnowledgeLibrary();
+                refreshKnowledgeLibrary(true);
 
                 // Hide progress after success animation
                 setTimeout(hideUploadProgress, 1500);
