@@ -513,25 +513,6 @@
         <textarea class="form-input" id="styleGuide" rows="3" placeholder="Ex: Sigues formal, utilitza catala correcte..."></textarea>
       </div>
 
-      <!-- Edit History Section (v3.0 - Moved from Tools) -->
-      <div class="settings-card">
-        <div class="settings-card-header">
-          <span class="i i--accent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
-          <div>
-            <div class="title">Historial d'Edicions</div>
-            <div class="subtitle" id="historyStatus">Carregant...</div>
-          </div>
-        </div>
-        <div id="historyList" class="history-list">
-          <!-- Dynamic history content -->
-        </div>
-        <div style="margin-top: var(--space-sm); display: flex; gap: var(--space-sm);">
-          <button class="btn btn-secondary btn-sm" onclick="refreshHistory()" style="flex: 1;">
-            <span class="i i--default i--sm"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span> Actualitzar
-          </button>
-        </div>
-      </div>
-
       <div class="toggle-row">
         <div class="toggle-label">
           <span class="i i--default"><svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
@@ -544,23 +525,6 @@
           <input type="checkbox" id="darkMode" onchange="toggleTheme()">
           <span class="toggle-slider"></span>
         </label>
-      </div>
-
-      <!-- Banned Words Collapsible -->
-      <button class="collapsible-btn" id="bannedWordsToggle" onclick="toggleBannedWordsPanel()">
-        <span class="collapsible-icon i i--error"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span>
-        <span class="collapsible-text">Paraules Prohibides</span>
-        <span class="collapsible-count" id="bannedWordsCount"></span>
-        <span class="collapsible-arrow"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>
-      </button>
-      <div class="collapsible-content" id="bannedWordsPanel">
-        <div class="banned-words-list" id="bannedWordsList">
-          <div class="banned-words-empty">Cap paraula prohibida</div>
-        </div>
-        <div class="banned-words-input">
-          <input type="text" class="form-input" id="newBannedWord" placeholder="Afegir paraula...">
-          <button class="btn btn-sm" onclick="addBannedWord()">+ Afegir</button>
-        </div>
       </div>
 
       <button class="save-btn" id="saveBtn" onclick="saveSettings()">
