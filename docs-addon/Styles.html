@@ -2509,6 +2509,7 @@
         white-space: nowrap;
       }
 
+      .folder-recipe-edit,
       .folder-recipe-delete {
         background: transparent;
         border: none;
@@ -2525,8 +2526,14 @@
         justify-content: center;
       }
 
+      .folder-recipe:hover .folder-recipe-edit,
       .folder-recipe:hover .folder-recipe-delete {
         opacity: 1;
+      }
+
+      .folder-recipe-edit:hover {
+        background: var(--accent-muted);
+        color: var(--accent);
       }
 
       .folder-recipe-delete:hover {
@@ -2642,6 +2649,7 @@
       }
 
       .folders-container.view-2 .folder-recipe-drag-handle,
+      .folders-container.view-2 .folder-recipe-edit,
       .folders-container.view-2 .folder-recipe-delete {
         position: absolute;
         top: 4px;
@@ -2649,6 +2657,10 @@
 
       .folders-container.view-2 .folder-recipe-drag-handle {
         left: 4px;
+      }
+
+      .folders-container.view-2 .folder-recipe-edit {
+        right: 24px;
       }
 
       .folders-container.view-2 .folder-recipe-delete {
@@ -2691,6 +2703,13 @@
 
       .folders-container.view-3 .folder-recipe-drag-handle {
         display: none;
+      }
+
+      .folders-container.view-3 .folder-recipe-edit {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        padding: 2px;
       }
 
       .folders-container.view-3 .folder-recipe-delete {

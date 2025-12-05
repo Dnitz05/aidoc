@@ -54,9 +54,9 @@
           <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           <span class="tab-label">Xat</span>
         </button>
-        <button class="tab" data-tab="recipes" onclick="switchTab('recipes')" title="Receptes">
+        <button class="tab" data-tab="recipes" onclick="switchTab('recipes')" title="Prompts">
           <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          <span class="tab-label">Receptes</span>
+          <span class="tab-label">Prompts</span>
         </button>
         <button class="tab" data-tab="structure" onclick="switchTab('structure')" title="Estructura">
           <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="3" y2="6"/><line x1="7" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="3" y2="12"/><line x1="7" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="3" y2="18"/><line x1="7" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1"/><circle cx="3" cy="12" r="1"/><circle cx="3" cy="18" r="1"/></svg>
@@ -416,6 +416,39 @@
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="hideNewRecipeModal()">Cancel·lar</button>
           <button class="btn btn-primary" onclick="saveNewRecipe()">Crear Recepta</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Recipe Modal -->
+    <div id="editRecipeModal" class="modal hidden">
+      <div class="modal-backdrop" onclick="hideEditRecipeModal()"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <span class="modal-title"><span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></span> Editar Recepta</span>
+          <button class="modal-close" onclick="hideEditRecipeModal()"><span class="i"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editRecipeFolderIndex">
+          <input type="hidden" id="editRecipeIndex">
+          <div class="form-group">
+            <label class="form-label">Icona</label>
+            <div class="icon-selector" id="editRecipeIconSelector">
+              <!-- Icons rendered by JS -->
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nom</label>
+            <input type="text" class="form-input" id="editRecipeName" placeholder="Ex: Fer més formal" maxlength="30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Instrucció per la IA</label>
+            <textarea class="form-input" id="editRecipeInstruction" placeholder="Què vols que faci la IA amb el text?" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="hideEditRecipeModal()">Cancel·lar</button>
+          <button class="btn btn-primary" onclick="saveEditRecipe()">Desar Canvis</button>
         </div>
       </div>
     </div>
@@ -2208,7 +2241,9 @@
       function sendMessage() {
         const input = document.getElementById('userInput');
         const text = input.value.trim();
-        if (!text) return;
+
+        // v8.0: Allow sending file without text, or text without file
+        if (!text && chatAttachments.length === 0) return;
 
         // v7.1: Amagar landing quan s'envia missatge
         hideChatLanding();
@@ -2219,8 +2254,27 @@
         // v5.3: Capturar selecció actual per mostrar badge
         const selectionBadge = lastSelectionText || null;
 
-        // v3.10: Simplificat - només 2 modes (edit/chat), sense classificació
-        addBubble('user', text, false, null, selectionBadge);
+        // v8.0: Build message HTML with file bubbles + text
+        let messageHtml = '';
+
+        // Add file bubbles first
+        chatAttachments.forEach(function(att) {
+          messageHtml += createFileBubbleHtml(att);
+        });
+
+        // Add text message
+        if (text) {
+          const sanitizedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+          messageHtml += '<div class="user-text">' + sanitizedText + '</div>';
+        }
+
+        // v8.0: Use addBubbleHtml for file+text messages
+        if (chatAttachments.length > 0) {
+          addBubbleHtml('user', messageHtml, selectionBadge);
+        } else {
+          addBubble('user', text, false, null, selectionBadge);
+        }
+
         input.value = '';
         input.style.height = 'auto';
 
@@ -2231,12 +2285,27 @@
         const btn = document.getElementById('sendBtn');
         btn.disabled = true;
 
+        // v8.0: Prepare attachments for backend
+        const attachmentsToSend = chatAttachments.map(function(att) {
+          return {
+            name: att.name,
+            size: att.size,
+            type: att.type,
+            content: att.content,
+            text: att.text || null
+          };
+        });
+
+        // v8.0: Clear attachments and hide preview
+        chatAttachments = [];
+        hideChatAttachmentPreview();
+
         showThinking();
 
         google.script.run
           .withSuccessHandler(handleSendSuccess)
           .withFailureHandler(handleSendFailure)
-          .processUserCommand(text, getRecentHistory(), getCurrentMode(), previewModeEnabled);
+          .processUserCommand(text, getRecentHistory(), getCurrentMode(), previewModeEnabled, attachmentsToSend);
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -2361,6 +2430,25 @@
           bubble.innerText = text;
         }
 
+        container.appendChild(bubble);
+        container.scrollTop = container.scrollHeight;
+      }
+
+      // v8.0: Add bubble with raw HTML content (for file attachments)
+      function addBubbleHtml(type, html, selectionBadge) {
+        const container = document.getElementById('chatHistory');
+        const bubble = document.createElement('div');
+        bubble.className = 'msg ' + type;
+
+        // Selection badge for user messages
+        let selectionHtml = '';
+        if (type === 'user' && selectionBadge) {
+          selectionHtml = '<div class="selection-badge">' +
+            '<span class="i i--xs"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>' +
+            '<span class="selection-badge-text">' + selectionBadge.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span></div>';
+        }
+
+        bubble.innerHTML = selectionHtml + html;
         container.appendChild(bubble);
         container.scrollTop = container.scrollHeight;
       }
@@ -3265,6 +3353,7 @@
               '<span class="folder-recipe-drag-handle">' + icon('gripVertical', 'i--sm i--muted') + '</span>' +
               '<span class="folder-recipe-icon">' + icon(recipeIconName, 'i--default') + '</span>' +
               '<span class="folder-recipe-name">' + recipe.name + '</span>' +
+              '<button class="folder-recipe-edit" onclick="event.stopPropagation(); showEditRecipeModal(' + folderIndex + ', ' + realRecipeIndex + ')" title="Editar">' + icon('edit', 'i--sm') + '</button>' +
               '<button class="folder-recipe-delete" onclick="event.stopPropagation(); deleteRecipeFromFolder(' + folderIndex + ', ' + realRecipeIndex + ')" title="Esborrar">' + icon('x', 'i--sm') + '</button>' +
             '</div>';
           });
@@ -3741,6 +3830,74 @@
         hideNewRecipeModal();
       }
 
+      // ═══════════════════════════════════════════════════════════════
+      // EDIT RECIPE MODAL FUNCTIONS
+      // ═══════════════════════════════════════════════════════════════
+
+      let selectedEditRecipeIcon = 'wand';
+
+      function showEditRecipeModal(folderIndex, recipeIndex) {
+        const folder = userFolders[folderIndex];
+        if (!folder) return;
+        const recipe = folder.recipes[recipeIndex];
+        if (!recipe) return;
+
+        document.getElementById('editRecipeFolderIndex').value = folderIndex;
+        document.getElementById('editRecipeIndex').value = recipeIndex;
+        document.getElementById('editRecipeName').value = recipe.name;
+        document.getElementById('editRecipeInstruction').value = recipe.instruction;
+        selectedEditRecipeIcon = mapEmojiToIcon(recipe.icon || recipe.emoji || 'wand');
+        renderIconSelector('editRecipeIconSelector', RECIPE_ICONS, selectedEditRecipeIcon, 'selectEditRecipeIcon');
+
+        const modal = document.getElementById('editRecipeModal');
+        modal.classList.remove('hidden');
+        setTimeout(function() {
+          modal.classList.add('visible');
+          document.getElementById('editRecipeName').focus();
+        }, 10);
+      }
+
+      function hideEditRecipeModal() {
+        const modal = document.getElementById('editRecipeModal');
+        modal.classList.remove('visible');
+        setTimeout(function() {
+          modal.classList.add('hidden');
+        }, 200);
+      }
+
+      function selectEditRecipeIcon(iconName) {
+        selectedEditRecipeIcon = iconName;
+        document.querySelectorAll('#editRecipeIconSelector .icon-picker-btn').forEach(function(btn) {
+          btn.classList.toggle('selected', btn.dataset.icon === iconName);
+        });
+      }
+
+      function saveEditRecipe() {
+        const folderIndex = parseInt(document.getElementById('editRecipeFolderIndex').value);
+        const recipeIndex = parseInt(document.getElementById('editRecipeIndex').value);
+        const name = document.getElementById('editRecipeName').value.trim();
+        const instruction = document.getElementById('editRecipeInstruction').value.trim();
+
+        if (!name) {
+          showToast('Escriu un nom per la recepta', 'warning');
+          return;
+        }
+        if (!instruction) {
+          showToast('Escriu la instrucció per la recepta', 'warning');
+          return;
+        }
+
+        if (userFolders[folderIndex] && userFolders[folderIndex].recipes[recipeIndex]) {
+          userFolders[folderIndex].recipes[recipeIndex].name = name;
+          userFolders[folderIndex].recipes[recipeIndex].instruction = instruction;
+          userFolders[folderIndex].recipes[recipeIndex].icon = selectedEditRecipeIcon;
+          saveRecipes();
+          renderFolders();
+          hideEditRecipeModal();
+          showToast('Recepta actualitzada', 'success');
+        }
+      }
+
       // ═══════════════════════════════════════════════════════════
       // SETTINGS
       // ═══════════════════════════════════════════════════════════
@@ -4139,14 +4296,10 @@
         statusEl.textContent = 'Cap fitxer seleccionat';
       }
 
+      // v8.0: This function is now deprecated - knowledge files no longer show in chat
+      // Chat attachments are temporary and handled separately
       function updateChatAttachmentBadge() {
-        if (activeKnowledgeFiles.length === 0) {
-          hideChatAttachment();
-        } else if (activeKnowledgeFiles.length === 1) {
-          showChatAttachment(activeKnowledgeFiles[0].name, false);
-        } else {
-          showChatAttachment(activeKnowledgeFiles.length + ' fitxers', false);
-        }
+        // No-op: knowledge files don't affect chat input anymore
       }
 
       function handleFileSelect() {
@@ -4242,11 +4395,17 @@
       }
 
       // ═══════════════════════════════════════════════════════════
-      // CHAT FILE ATTACHMENT (v5.1)
+      // CHAT FILE ATTACHMENT (v8.0 - Temporary files in memory)
       // ═══════════════════════════════════════════════════════════
 
       function triggerChatAttachment() {
         document.getElementById('chatFileInput').click();
+      }
+
+      function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
       }
 
       function handleChatFileSelect() {
@@ -4254,73 +4413,89 @@
         if (fileInput.files.length === 0) return;
 
         const file = fileInput.files[0];
-        if (file.size > 10 * 1024 * 1024) {
-          alert('Màxim 10MB');
+
+        // v8.0: Límit 2MB per fitxers de xat (temporals)
+        if (file.size > 2 * 1024 * 1024) {
+          showToast('Màxim 2MB per fitxers de xat', 'warning');
           fileInput.value = '';
           return;
         }
 
-        // Show uploading state
-        showChatAttachment(file.name, true);
+        // Show loading state in preview
+        showChatAttachmentPreview(file.name, file.size, true);
 
         const reader = new FileReader();
         reader.onload = function(e) {
           const base64 = e.target.result.split(',')[1];
-          google.script.run
-            .withSuccessHandler(function(res) {
-              if (res && res.status === 'ok' && res.file) {
-                // v6.0: Add to active files array
-                if (!activeKnowledgeFiles.find(f => f.id === res.file.id)) {
-                  activeKnowledgeFiles.push({ id: res.file.id, name: res.file.name });
-                }
-                updateChatAttachmentBadge();
-                showActiveFiles(activeKnowledgeFiles);
-                refreshKnowledgeLibrary();
-              } else {
-                hideChatAttachment();
-                alert('Error pujant fitxer');
-              }
-            })
-            .withFailureHandler(function(err) {
-              hideChatAttachment();
-              alert('Error: ' + err.message);
-            })
-            .uploadToKnowledgeLibrary(base64, file.type, file.name);
-        };
-        reader.readAsDataURL(file);
 
-        // Reset input so same file can be selected again
+          // v8.0: Store in memory (NOT Supabase)
+          const attachment = {
+            id: 'chat_' + Date.now(),
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            content: base64
+          };
+
+          // For text files, decode content directly
+          if (file.type === 'text/plain' || file.type === 'text/markdown' ||
+              file.type === 'text/csv' || file.name.endsWith('.md') ||
+              file.name.endsWith('.txt') || file.name.endsWith('.csv')) {
+            try {
+              attachment.text = atob(base64);
+            } catch (err) {
+              attachment.text = null;
+            }
+          }
+
+          // Add to chat attachments array
+          chatAttachments = [attachment]; // Only one at a time for simplicity
+
+          // Show preview (loaded)
+          showChatAttachmentPreview(file.name, file.size, false);
+        };
+
+        reader.onerror = function() {
+          showToast('Error llegint el fitxer', 'error');
+          hideChatAttachmentPreview();
+        };
+
+        reader.readAsDataURL(file);
         fileInput.value = '';
       }
 
-      function showChatAttachment(name, uploading) {
-        const badge = document.getElementById('chatAttachmentBadge');
+      function showChatAttachmentPreview(name, size, loading) {
+        const preview = document.getElementById('chatAttachmentPreview');
         const nameEl = document.getElementById('chatAttachmentName');
+        const sizeEl = document.getElementById('chatAttachmentSize');
 
-        nameEl.textContent = uploading ? 'Pujant ' + name + '...' : name;
-        badge.classList.remove('hidden');
-        badge.classList.toggle('uploading', uploading);
+        nameEl.textContent = loading ? 'Carregant...' : name;
+        sizeEl.textContent = loading ? '' : formatFileSize(size);
+        preview.classList.remove('hidden');
+        preview.classList.toggle('loading', loading);
       }
 
-      function hideChatAttachment() {
-        const badge = document.getElementById('chatAttachmentBadge');
-        badge.classList.add('hidden');
+      function hideChatAttachmentPreview() {
+        const preview = document.getElementById('chatAttachmentPreview');
+        preview.classList.add('hidden');
+        chatAttachments = [];
       }
 
       function removeChatAttachment() {
-        hideChatAttachment();
-        hideActiveFiles();
-        activeKnowledgeFiles = [];
-        renderKnowledgeLibrary();
-        google.script.run.unlinkKnowledgeFile();
+        hideChatAttachmentPreview();
       }
 
-      function clearFile() {
-        google.script.run.withSuccessHandler(function() {
-          activeKnowledgeFiles = [];
-          hideActiveFiles();
-          hideChatAttachment();
-        }).clearKnowledgeFile();
+      // v8.0: Create file bubble HTML for chat
+      function createFileBubbleHtml(attachment) {
+        return '<div class="chat-file-bubble">' +
+          '<div class="file-bubble-icon">' +
+            '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+          '</div>' +
+          '<div class="file-bubble-info">' +
+            '<span class="file-bubble-name">' + attachment.name + '</span>' +
+            '<span class="file-bubble-size">' + formatFileSize(attachment.size) + '</span>' +
+          '</div>' +
+        '</div>';
       }
 
       // ═══════════════════════════════════════════════════════════
