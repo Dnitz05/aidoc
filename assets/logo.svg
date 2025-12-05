@@ -1,0 +1,25 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="128" height="128" fill="white"/>
+
+  <!-- 3x3 Grid of squares -->
+  <g transform="translate(16, 16)">
+    <!-- Row 1 -->
+    <rect x="0" y="0" width="28" height="28" rx="2" fill="#6AC1E4"/>
+    <rect x="34" y="0" width="28" height="28" rx="2" fill="#6AC1E4"/>
+    <rect x="68" y="0" width="28" height="28" rx="2" fill="#6AC1E4"/>
+
+    <!-- Row 2 -->
+    <rect x="0" y="34" width="28" height="28" rx="2" fill="#6AC1E4"/>
+    <rect x="34" y="34" width="28" height="28" rx="2" fill="#6AC1E4"/>
+    <rect x="68" y="34" width="28" height="28" rx="2" fill="#6AC1E4"/>
+
+    <!-- Row 3 -->
+    <rect x="0" y="68" width="28" height="28" rx="2" fill="#6AC1E4"/>
+    <rect x="34" y="68" width="28" height="28" rx="2" fill="#6AC1E4"/>
+    <rect x="68" y="68" width="28" height="28" rx="2" fill="#6AC1E4"/>
+
+    <!-- Diagonal line -->
+    <line x1="0" y1="96" x2="96" y2="0" stroke="#3B75A8" stroke-width="8" stroke-linecap="round"/>
+  </g>
+</svg>

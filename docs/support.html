@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suport - Docmile</title>
+  <link rel="icon" type="image/png" href="../assets/logo-32.png">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f8f9fa;
+      color: #333;
+      line-height: 1.7;
+    }
+
+    .header {
+      background: #3B75A8;
+      color: white;
+      padding: 32px 20px;
+      text-align: center;
+    }
+
+    .header h1 { font-size: 2rem; margin-bottom: 8px; }
+    .header p { opacity: 0.9; }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    h2 {
+      color: #3B75A8;
+      margin: 32px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e8eaed;
+    }
+
+    h3 { margin: 24px 0 12px; color: #333; }
+
+    p { margin-bottom: 16px; }
+
+    ul, ol { margin: 16px 0; padding-left: 24px; }
+    li { margin-bottom: 8px; }
+
+    .faq-item {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .faq-question {
+      font-weight: 600;
+      color: #3B75A8;
+      margin-bottom: 8px;
+    }
+
+    .contact-card {
+      background: linear-gradient(135deg, #6AC1E4 0%, #3B75A8 100%);
+      color: white;
+      border-radius: 12px;
+      padding: 32px;
+      text-align: center;
+      margin: 32px 0;
+    }
+
+    .contact-card h3 {
+      color: white;
+      margin-bottom: 16px;
+    }
+
+    .contact-card a {
+      color: white;
+      font-weight: 600;
+    }
+
+    .btn {
+      display: inline-block;
+      background: white;
+      color: #3B75A8;
+      padding: 12px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      margin: 8px;
+      transition: transform 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .footer {
+      text-align: center;
+      padding: 24px;
+      color: #666;
+      border-top: 1px solid #e8eaed;
+      margin-top: 40px;
+    }
+
+    .footer a {
+      color: #3B75A8;
+      text-decoration: none;
+    }
+
+    code {
+      background: #f0f4ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Suport Docmile</h1>
+    <p>Centre d'ajuda i resolució de problemes</p>
+  </div>
+
+  <div class="container">
+    <h2>Preguntes Freqüents (FAQ)</h2>
+
+    <div class="faq-item">
+      <div class="faq-question">Com instal·lo Docmile?</div>
+      <p>Docmile s'instal·la des del Google Workspace Marketplace. Un cop instal·lat, obre qualsevol document de Google Docs i veuràs l'opció "Docmile" al menú "Extensions".</p>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question">On introdueixo la clau de llicència?</div>
+      <p>Obre la sidebar de Docmile (Extensions > Docmile > Obrir) i ves a la pestanya de Configuració (icona d'engranatge). Allà trobaràs el camp per introduir la teva clau de llicència.</p>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question">Quines dades es comparteixen amb servidors externs?</div>
+      <p>Docmile envia només el contingut del document actiu (o la selecció) a la nostra API per processar-lo amb IA. No emmagatzemem documents permanentment. Consulta la nostra <a href="legal/privacy.html">Política de Privacitat</a> per més detalls.</p>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question">Puc usar Docmile offline?</div>
+      <p>No. Docmile requereix connexió a internet per comunicar-se amb el motor d'IA (Gemini). Sense connexió, la sidebar es mostrarà però no podrà processar sol·licituds.</p>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question">Com puc desfer un canvi?</div>
+      <p>Docmile guarda un historial de totes les edicions. Ves a la pestanya "Edicions" (icona de rellotge) i fes clic a "Desfer" al costat de qualsevol canvi per revertir-lo.</p>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-question">L'addon es bloqueja o no respon</div>
+      <p>Prova a tancar i tornar a obrir la sidebar. Si el problema persisteix, recarrega el document (F5). En casos extrems, desinstal·la i torna a instal·lar l'addon.</p>
+    </div>
+
+    <h2>Problemes Comuns</h2>
+
+    <h3>Error "No s'ha pogut connectar amb el servidor"</h3>
+    <p>Això indica un problema de connexió amb la nostra API. Comprova:</p>
+    <ul>
+      <li>Que tens connexió a internet activa</li>
+      <li>Que no hi ha cap firewall bloquejant <code>docmile-api.conteucontes.workers.dev</code></li>
+      <li>Espera uns segons i torna a provar</li>
+    </ul>
+
+    <h3>La sidebar no es carrega</h3>
+    <ul>
+      <li>Desactiva altres extensions que puguin interferir</li>
+      <li>Prova amb un altre navegador (Chrome recomanat)</li>
+      <li>Neteja la caché del navegador</li>
+    </ul>
+
+    <h3>Els canvis no s'apliquen al document</h3>
+    <ul>
+      <li>Assegura't que el document no està en mode "Només lectura"</li>
+      <li>Verifica que tens permisos d'edició</li>
+      <li>Revisa la pestanya d'Edicions per veure si el canvi es va registrar</li>
+    </ul>
+
+    <div class="contact-card">
+      <h3>Necessites més ajuda?</h3>
+      <p>Contacta amb el nostre equip de suport:</p>
+      <a href="mailto:support@docmile.com" class="btn">support@docmile.com</a>
+      <a href="https://github.com/Dnitz05/aidoc/issues" class="btn">Reportar un bug</a>
+    </div>
+
+    <h2>Recursos Addicionals</h2>
+    <ul>
+      <li><a href="legal/privacy.html">Política de Privacitat</a></li>
+      <li><a href="legal/terms.html">Termes de Servei</a></li>
+      <li><a href="https://github.com/Dnitz05/aidoc">Codi font a GitHub</a></li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    <p>&copy; 2024 Docmile. Tots els drets reservats.</p>
+    <p><a href="index.html">Tornar a l'inici</a></p>
+  </div>
+</body>
+</html>
