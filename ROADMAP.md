@@ -8,267 +8,212 @@ Pla de desenvolupament de Docmile - "Lovable for Google Docs"
 
 Construir el **motor d'enginyeria documental** més potent, aplicant els mateixos patrons arquitectònics que fan únics a Cursor, Aider i Lovable.
 
-### Els 3 Pilars (de l'anàlisi Lovable)
+### Els 3 Pilars
 
 ```
-1. CONTEXT ENGINE     →  Entendre el document (estructura, entitats)
+1. CONTEXT ENGINE     →  Entendre el document (estructura, entitats, selecció)
 2. RUNTIME            →  Aplicar canvis (atomic ops, preview, undo)
-3. FEEDBACK LOOP      →  Validar i corregir (retry, user confirm)
+3. FEEDBACK LOOP      →  Validar i corregir (retry, user confirm, references)
 ```
 
 ---
 
-## Estat Actual: v3.1
+## Estat Actual: v6.8
 
 ```
 ████████████████████████████████████████ 100%
 
-✅ Motor d'Enginyeria (System Prompt v3)
+✅ Motor d'Enginyeria Documental (System Prompt v6.8)
 ✅ Chain of Thought obligatori
-✅ Retry Loop per JSON invàlid
-✅ Mode Selector (Auto/Edit/Xat)
-✅ lastEdit Memory + Revert Button
+✅ Shadow Validator amb Retry Loop
+✅ Mode Selector (Edit/Xat)
 ✅ Atomic Operations (UPDATE_BY_ID)
-✅ Receipts (Custom Macros)
-✅ Dark/Light Theme
-✅ Banned Expressions (Memòria Negativa)
-✅ Hybrid Validator (Local + LLM)
+✅ Smart Selection Context (v5.4) - ⟦SEL⟧ markers
+✅ Document References (v6.7) - icones 👁️ clicables
+✅ Reference Highlighting (v6.7) - ressaltat de colors
+✅ Multimodal AI (v6.0) - anàlisi d'imatges
+✅ Table Support (v6.0) - lectura Markdown
+✅ Knowledge Library (v5.1) - fitxers compartits
+✅ Chat History (v5.0) - converses persistents
+✅ Receipts/Macros (v5.3) - accions personalitzades
+✅ Timeline d'edicions (v6.6)
+✅ Event Sourcing (edit_events)
 ✅ Context Engine (DocScanner + Skeleton)
 ✅ Auto-Structure (Visual → H2)
-✅ Event Sourcing (edit_events)
-✅ Shadow Validator (Time Budget + Graceful Degradation)
+✅ Banned Expressions
+✅ Dark/Light Theme
+✅ File Upload amb validació (v6.5)
 ```
+
+---
+
+## Versions Completades
+
+### v6.8 - UI Refinements (2024-12-06)
+
+- Sticky bottom bar amb botons "Añadir" i "Borrar" al panel de Receptes
+- Millores d'interfície i consistència
+
+### v6.7 - Document References (2024-12-05)
+
+- **References Vives**: mencions al xat enllaçen a seccions del document
+- **Reference Highlighting**: ressaltat de seccions amb colors (groc, taronja, blau, lila)
+- Mode REFERENCE_HIGHLIGHT per anàlisi visual
+- Icones 👁️ clicables per navegar al document
+
+### v6.6 - Timeline & Drawer (2024-12-04)
+
+- Timeline visual d'edicions amb preview
+- Drawer de converses amb agrupació per data
+- Cerca de converses anteriors
+
+### v6.5 - File Upload Security (2024-12-03)
+
+- Validació triple: MIME type, extensió, mida
+- Gestió d'errors millorada
+- Suport PDFs i imatges
+
+### v6.0 - Multimodal & Tables (2024-12-02)
+
+- Suport Gemini 2.0 Flash (multimodal)
+- Anàlisi d'imatges integrada
+- Lectura de taules en format Markdown
+
+### v5.4 - Smart Selection (2024-12-01)
+
+- Context expandit ±3 paràgrafs al voltant de selecció
+- Marcador ⟦SEL⟧ per identificar text seleccionat
+- IA interpreta intel·ligentment pregunta vs edició
+
+### v5.3 - Receipts Panel (2024-11-30)
+
+- Panel dedicat per receptes/macros
+- Gestió de custom actions
+
+### v5.1 - Knowledge Library (2024-11-28)
+
+- Biblioteca de fitxers compartida entre documents
+- Gestió via Gemini File API
+
+### v5.0 - Conversations (2024-11-25)
+
+- Historial de converses persistent
+- Auto-save amb debounce
+- Pinning de converses
+
+### v3.1 - Shadow Validator (2024-11-20)
+
+- Time Budget (25s safety cutoff)
+- Graceful Degradation amb `_meta`
+- Retry Feedback específic per error
+
+### v3.0 - Event Sourcing (2024-11-18)
+
+- Taula `edit_events` a Supabase
+- Historial complet de canvis
+- Undo de qualsevol edició
+
+### v2.9 - Context Engine (2024-11-15)
+
+- DocScanner amb extracció d'estructura
+- Document Skeleton
+- Entity Extraction
 
 ---
 
 ## Pròximes Versions
 
-### v2.9 - Context Engine (Document Map) ✅ COMPLETAT
-
-**Objectiu:** Entendre l'ESTRUCTURA del document, no només el text.
-
-**Inspiració:** Aider Repository Map (AST → Graph → PageRank)
-
-```
-Prioritat: 🔴 ALTA
-Complexitat: Mitjana
-Impacte: Alt (docs llargs, context efficiency)
-Estat: ✅ COMPLETAT (2024-11-30)
-```
-
-#### Features
-
-| Feature | Descripció | Estat |
-|---------|------------|-------|
-| Document Structure Extraction | Extreure H1, H2, H3, paràgrafs | ✅ Fet |
-| Section Hierarchy | Arbre de seccions amb fills | ✅ Fet |
-| Entity Extraction | Dates, imports (€/$), percentatges | ✅ Fet |
-| Visual Heading Detection | Negreta, majúscules, numeració | ✅ Fet |
-| Auto-Structure | Convertir BOLD_H → H2 | ✅ Fet |
-
-#### Format proposat
-
-```javascript
-// En lloc de text pla:
-"{{0}} Capítol 1\n{{1}} Lorem ipsum..."
-
-// Enviar estructura:
-{
-  "document_map": {
-    "title": "Informe Anual 2024",
-    "sections": [
-      { "id": 0, "level": 1, "text": "Introducció", "word_count": 450 },
-      { "id": 3, "level": 2, "text": "1.1 Context", "word_count": 200 }
-    ],
-    "entities": ["Barcelona", "Q3 2024", "Maria García"],
-    "total_words": 12500
-  },
-  "active_section": {
-    "id": 3,
-    "full_content": "El context actual del mercat..."
-  }
-}
-```
-
-#### Beneficis
-
-- Docs de 50 pàgines → ~500 tokens de context
-- IA entén estructura jeràrquica
-- Evita "Context Rot" en docs llargs
-
----
-
-### v3.0 - Event Sourcing (Edit History) ✅ COMPLETAT
-
-**Objectiu:** Historial complet de canvis, no només l'últim.
-
-**Inspiració:** OpenHands Event-Sourced State
-
-```
-Prioritat: 🟡 MITJANA
-Complexitat: Mitjana
-Impacte: Alt (undo chain, analytics, debug)
-Estat: ✅ COMPLETAT (2024-11-30)
-```
-
-#### Features
-
-| Feature | Descripció | Estat |
-|---------|------------|-------|
-| Edit Events Table | `edit_events` a Supabase | ✅ Fet |
-| Full History | Guardar tots els canvis, no només lastEdit | ✅ Fet |
-| Undo Any Change | Desfer qualsevol canvi de l'historial | ✅ Fet |
-| Replay/Debug | Reproduir seqüència de canvis | ⏳ Futur |
-| Analytics | Estadístiques d'ús per usuari/doc | ⏳ Futur |
-
-#### Schema proposat
-
-```sql
-CREATE TABLE edit_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  doc_id TEXT NOT NULL,
-  license_key_hash TEXT NOT NULL,
-
-  -- Event data
-  event_type TEXT NOT NULL, -- 'UPDATE_BY_ID', 'REWRITE', 'REVERT'
-  target_id INTEGER,
-  before_text TEXT,
-  after_text TEXT,
-
-  -- AI context
-  user_instruction TEXT,
-  thought TEXT,
-  mode TEXT,
-
-  -- Metadata
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  reverted_at TIMESTAMPTZ
-);
-```
-
-#### UI
-
-```
-┌─────────────────────────────────────────┐
-│  Historial de Canvis                    │
-├─────────────────────────────────────────┤
-│  🕐 10:32 - "Traduir al castellà"       │
-│     llegendes → leyendas                │
-│     [Desfer]                            │
-│                                         │
-│  🕐 10:30 - "Millorar redacció"         │
-│     El text era... → El text resultava..│
-│     [Desfer]                            │
-│                                         │
-│  🕐 10:28 - "Corregir ortografia"       │
-│     [Ja desfet]                         │
-└─────────────────────────────────────────┘
-```
-
----
-
-### v3.1 - Shadow Validator ✅ COMPLETAT
-
-**Objectiu:** Sistema immunitari que valida i auto-corregeix respostes.
-
-**Inspiració:** "Mai preguntis a una IA el que puguis saber amb un `if`"
-
-```
-Prioritat: 🔴 ALTA
-Complexitat: Mitjana
-Impacte: Alt (qualitat, robustesa, timeouts)
-Estat: ✅ COMPLETAT (2024-11-30)
-```
-
-#### Features
-
-| Feature | Descripció | Estat |
-|---------|------------|-------|
-| Unified Validation | `validateResponse()` centralitzada | ✅ Fet |
-| Time Budget | 25s safety cutoff (GAS timeout = 30s) | ✅ Fet |
-| Graceful Degradation | `_meta` amb warnings/errors | ✅ Fet |
-| Retry Feedback | `buildRetryFeedback()` específic per error | ✅ Fet |
-| Deterministic First | Regex abans de gastar tokens | ✅ Fet |
-
----
-
-### v3.2 - Preview Mode (Shadow State) ⏳ PENDENT
+### v7.0 - Preview Mode (Shadow State)
 
 **Objectiu:** Mostrar canvis abans d'aplicar.
 
 **Inspiració:** Cursor Shadow Workspace
 
 ```
-Prioritat: 🟡 MITJANA
+Prioritat: 🔴 ALTA
 Complexitat: Mitjana-Alta
 Impacte: Alt (user confidence, control)
 ```
 
-#### Features
+| Feature | Descripció |
+|---------|------------|
+| Shadow State | Guardar canvis proposats sense aplicar |
+| Visual Diff | Mostrar - (vermell) / + (verd) |
+| Approve/Reject | Botons per acceptar o rebutjar |
+| Modify Before Apply | Editar proposta abans d'aplicar |
+| Batch Preview | Múltiples canvis en una preview |
 
-| Feature | Descripció | Estat |
-|---------|------------|-------|
-| Shadow State | Guardar canvis proposats sense aplicar | ⏳ Pendent |
-| Visual Diff | Mostrar - (vermell) / + (verd) | ⏳ Pendent |
-| Approve/Reject | Botons per acceptar o rebutjar | ⏳ Pendent |
-| Modify Before Apply | Editar proposta abans d'aplicar | ⏳ Pendent |
-| Batch Preview | Múltiples canvis en una preview | ⏳ Pendent |
+### v7.1 - Google Workspace Marketplace
 
-#### UI
+**Objectiu:** Publicació oficial al Marketplace.
 
 ```
-┌─────────────────────────────────────────┐
-│  📝 Canvis Proposats                    │
-├─────────────────────────────────────────┤
-│                                         │
-│  Paràgraf 3:                           │
-│  ─────────────────────────────────────  │
-│  - les llegendes del món antic          │
-│  + les faules ancestrals del món antic  │
-│                                         │
-│  Paràgraf 7:                           │
-│  ─────────────────────────────────────  │
-│  - El resultat va ser positiu.          │
-│  + El resultat va superar expectatives. │
-│                                         │
-│  ┌─────────┐ ┌─────────┐ ┌───────────┐ │
-│  │ Aplicar │ │Rebutjar │ │ Modificar │ │
-│  └─────────┘ └─────────┘ └───────────┘ │
-└─────────────────────────────────────────┘
+Prioritat: 🔴 ALTA
+Complexitat: Mitjana
+Impacte: Alt (distribució, visibilitat)
 ```
+
+| Feature | Descripció |
+|---------|------------|
+| OAuth Consent Screen | Configuració GCP |
+| Screenshots | 5 captures 1280x800 |
+| Store Listing | Descripció, icones, categories |
+| Review Process | Aprovació Google |
+
+### v7.2 - Advanced Collaboration
+
+**Objectiu:** Suport multi-usuari.
+
+```
+Prioritat: 🟡 MITJANA
+Complexitat: Alta
+Impacte: Mitjà-Alt
+```
+
+| Feature | Descripció |
+|---------|------------|
+| Conflict Detection | Detectar edicions simultànies |
+| Edit Locking | Bloqueig temporal de seccions |
+| Team Library | Biblioteca compartida per equip |
 
 ---
 
-### v3.3+ - Futures Direccions
+## Futures Direccions (v8.x+)
 
-#### Synonym Memory (Enhanced)
+### Synonym Memory
 ```
 Prioritat: 🟡 MITJANA
 Descripció: Recordar paraules rebutjades per no tornar-les a proposar
 ```
 
-#### Multi-Document Support
+### Multi-Document Support
 ```
 Prioritat: 🟢 BAIXA
 Descripció: Treballar amb múltiples docs (referències creuades)
 ```
 
-#### MCP Integration
+### MCP Integration
 ```
 Prioritat: 🟢 BAIXA
 Descripció: Model Context Protocol per extensibilitat
 ```
 
-#### Voice Input
+### Voice Input
 ```
 Prioritat: 🟢 BAIXA
-Descripció: Instruccions per veu
+Descripció: Instruccions per veu (Web Speech API)
 ```
 
-#### Collaboration Mode
+### Templates Library
 ```
-Prioritat: 🟢 BAIXA
-Descripció: Múltiples usuaris editant amb IA simultàniament
+Prioritat: 🟡 MITJANA
+Descripció: Biblioteca de plantilles predefinides per tipus de document
+```
+
+### AI Suggestions
+```
+Prioritat: 🟡 MITJANA
+Descripció: Suggeriments proactius de millora sense instrucció explícita
 ```
 
 ---
@@ -277,31 +222,40 @@ Descripció: Múltiples usuaris editant amb IA simultàniament
 
 ```
 2024-Q4 (Nov-Dec)
-├── v2.7  ✅ Document Engineering Engine
-├── v2.8  ✅ Banned Expressions + Hybrid Validator
 ├── v2.9  ✅ Context Engine (DocScanner + Skeleton)
 ├── v3.0  ✅ Event Sourcing (edit_events)
-└── v3.1  ✅ Shadow Validator (Time Budget + Graceful Degradation)
+├── v3.1  ✅ Shadow Validator
+├── v5.0  ✅ Conversations
+├── v5.1  ✅ Knowledge Library
+├── v5.3  ✅ Receipts Panel
+├── v5.4  ✅ Smart Selection Context
+├── v6.0  ✅ Multimodal & Tables
+├── v6.5  ✅ File Upload Security
+├── v6.6  ✅ Timeline & Drawer
+├── v6.7  ✅ Document References
+└── v6.8  ✅ UI Refinements
 
 2025-Q1 (Jan-Mar)
-├── v3.2  ⏳ Preview Mode (Visual Diff)
-└── v4.0  ⏳ GCP Productization (OAuth, Marketplace)
+├── v7.0  ⏳ Preview Mode (Visual Diff)
+└── v7.1  ⏳ Google Workspace Marketplace
 
 2025-Q2+
-└── v4.x  ⏳ Advanced features (MCP, Voice, Collab)
+├── v7.2  ⏳ Advanced Collaboration
+└── v8.x  ⏳ Future features
 ```
 
 ---
 
 ## Mètriques d'Èxit
 
-| Mètrica | Target v3.0 |
+| Mètrica | Target v7.0 |
 |---------|-------------|
 | Temps resposta | < 3s |
 | Taxa d'èxit JSON | > 98% |
 | Undo success rate | > 99% |
 | User satisfaction | > 4.5/5 |
 | Docs > 10 pàgines | Funciona sense degradació |
+| Selection accuracy | > 95% (amb Smart Selection) |
 
 ---
 
@@ -316,4 +270,4 @@ Si tens idees o prioritats diferents:
 
 ---
 
-*Última actualització: 2024-11-30 (v3.1)*
+*Última actualització: 2024-12-06 (v6.8)*

@@ -4429,6 +4429,9 @@
             }
           })
           .withFailureHandler(function(err) {
+            // v8.2 FIX: Reset cache on failure so retry is possible
+            knowledgeCacheTimestamp = 0;
+            knowledgeLibraryLoaded = false;
             listEl.innerHTML = '<div class="knowledge-empty"><span>Error carregant biblioteca</span></div>';
           })
           .getKnowledgeLibrary();

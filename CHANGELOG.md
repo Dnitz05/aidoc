@@ -6,6 +6,133 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [6.8] - 2024-12-06
+
+### Added
+- **Unified Highlight System** - Sistema unificat de ressaltat blau
+  - Ressaltat consistent per referències de document
+  - Auto-neteja després de 3 segons
+  - Integració amb Document References
+
+### Changed
+- Millores de rendiment al sistema de highlighting
+- Optimització de la gestió de colors de fons
+
+---
+
+## [6.7] - 2024-12-05
+
+### Added
+- **Document References (Referències Vives)** - Enllaços vius entre xat i document
+  - Icona 👁️ clicable al costat de referències al xat
+  - Clic ressalta la secció corresponent al document en blau
+  - Navegació ràpida pel document des del xat
+  - Auto-neteja del ressaltat
+
+- **Reference Highlighting Mode** - Mode REFERENCE_HIGHLIGHT
+  - Anàlisi visual del document sense editar
+  - Colors: groc (atenció), taronja (problema), blau (recomanació), lila (clarificació)
+  - Màxim 5 highlights per resposta
+  - Format JSON estructurat amb `para_id`, `color`, `reason`, `snippet`
+
+### Technical
+- Nou mode `REFERENCE_HIGHLIGHT` al worker
+- `highlightParagraph()` i `clearHighlight()` al frontend
+- Integració amb el sistema de parsing de respostes
+
+---
+
+## [6.6] - 2024-12-04
+
+### Added
+- **Intent Detection in Chat Mode** - Detecció d'intents d'edició en mode xat
+  - Detecta quan l'usuari vol editar però està en mode xat
+  - Mostra suggeriment: "Per aplicar aquest canvi, canvia a mode Edit"
+  - Paràmetre `user_mode` al worker per context
+
+### Changed
+- System prompt actualitzat amb instruccions per mode xat
+- Millor feedback quan hi ha mismatch entre mode i intenció
+
+---
+
+## [6.5] - 2024-12-04
+
+### Added
+- **File Upload Security** - Validació completa de fitxers
+  - Validació de MIME type
+  - Verificació d'extensió
+  - Límit de mida (10MB)
+  - Llista blanca d'extensions permeses
+
+### Security
+- Prevenció d'uploads maliciosos
+- Sanitització de noms de fitxer
+
+---
+
+## [6.0] - 2024-12-03
+
+### Added
+- **Table Support** - Suport per taules de Google Docs
+  - Captura de taules en format Markdown
+  - Identificador `{{T:X}}` per taules
+  - Mode només lectura (taules no editables directament)
+  - Instruccions al prompt per gestionar peticions de taules
+
+- **Multimodal AI Support** - Suport per imatges amb Gemini
+  - Anàlisi d'imatges adjuntes
+  - Context visual per respostes més precises
+
+### Changed
+- `captureFullDocument()` ara captura taules
+- `processElement()` amb suport per `TABLE` type
+- System prompt amb instruccions de taules
+
+---
+
+## [5.4] - 2024-12-06
+
+### Added
+- **Smart Selection Context** - Context intel·ligent per seleccions
+  - Expansió automàtica ±3 paràgrafs al voltant de la selecció
+  - Marcador `⟦SEL⟧` per identificar text seleccionat
+  - IA interpreta intel·ligentment si la pregunta és sobre la selecció o el document
+
+- **Intelligent Selection Handling** - Gestió intel·ligent al prompt
+  - Pregunta d'edició → Opera sobre ⟦SEL⟧
+  - Pregunta sobre document → Usa tot el context
+  - Pregunta sobre selecció → Respon basant-se en ⟦SEL⟧
+
+### Changed
+- `captureFullDocument()` sempre captura context expandit amb selecció
+- `processElement()` accepta paràmetre `isSelected`
+- System prompt amb secció "GESTIÓ DE SELECCIÓ INTEL·LIGENT"
+
+### Fixed
+- Al·lucinacions quan usuari tenia selecció però preguntava sobre altra part del document
+
+---
+
+## [5.3] - 2024-12-03
+
+### Added
+- **Selection Polling Improvements** - Millores al polling de selecció
+  - Polling cada 400ms (abans 1s)
+  - Debounce durant escriptura (800ms)
+  - Throttle de polls manuals (150ms mínim)
+
+- **Selection Indicator Enhancements** - Millores a l'indicador
+  - Preview de 40 caràcters
+  - Comptador de paraules
+  - Actualització només quan canvia
+
+### Changed
+- Mode label dinàmic: "Edit document" vs "Edit selection"
+- Polling pausat mentre l'usuari escriu
+
+---
+
 ## [5.2] - 2024-12-02
 
 ### Added

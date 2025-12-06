@@ -986,8 +986,8 @@ function getCachedCapture(currentHash, isSelection) {
     // Validar hash
     if (data.hash !== currentHash) return null;
 
-    // Validar TTL
-    if (Date.now() - data.timestamp > CAPTURE_CACHE_TTL) return null;
+    // Validar TTL (amb validació de tipus)
+    if (typeof data.timestamp !== 'number' || Date.now() - data.timestamp > CAPTURE_CACHE_TTL) return null;
 
     // Validar mateix document
     const doc = DocumentApp.getActiveDocument();
@@ -1320,12 +1320,16 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
   // Intentar cache primer (només si no hi ha selecció)
   const cachedResult = getCachedCapture(currentHash, isSelection);
   if (cachedResult) {
-    // Cache HIT - encara necessitem mapIdToElement (no cachejable)
-    captureResult = captureFullDocument(doc, body, isSelection, selectedElements);
-    // Sobreescriure contingut amb versió cachejada
-    captureResult.contentPayload = cachedResult.contentPayload;
-    captureResult.stats = cachedResult.stats;
-    captureResult.isEmpty = cachedResult.isEmpty;
+    // v8.2 FIX: Cache HIT - només construir mapIdToElement (operació lleugera)
+    // NO cridem captureFullDocument per estalviar temps
+    const lightweightMap = buildElementMap(body);
+    captureResult = {
+      contentPayload: cachedResult.contentPayload,
+      stats: cachedResult.stats,
+      isEmpty: cachedResult.isEmpty,
+      mapIdToElement: lightweightMap
+    };
+    Logger.log('[Cache] HIT - Skipped full document capture');
   } else {
     // Cache MISS - captura completa
     captureResult = captureFullDocument(doc, body, isSelection, selectedElements);
@@ -2392,6 +2396,96 @@ function clearPendingInDocPreview() {
 function hasPendingInDocPreview() {
   const previews = loadPendingInDocPreview();
   return previews && previews.length > 0;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HEADING DETECTION & SPACING v10.1
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Detecta si el text comença amb markdown de heading
+ * Usa regla conservadora: només detecta si segueix majúscula o número
+ *
+ * @param {string} text - El text a analitzar
+ * @returns {Object|null} - { heading, cleanText, prefixLen } o null si no és heading
+ */
+function detectHeadingFromMarkdown(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  // Patrons: # + espai + (Majúscula, Número, o Caràcter especial com "¿¡")
+  // Ordre important: de més específic (####) a menys (#)
+  const patterns = [
+    { regex: /^#### ([A-ZÀÁÈÉÍÏÒÓÚÜ0-9¿¡"'])/, heading: DocumentApp.ParagraphHeading.HEADING4, prefixLen: 5 },
+    { regex: /^### ([A-ZÀÁÈÉÍÏÒÓÚÜ0-9¿¡"'])/, heading: DocumentApp.ParagraphHeading.HEADING3, prefixLen: 4 },
+    { regex: /^## ([A-ZÀÁÈÉÍÏÒÓÚÜ0-9¿¡"'])/, heading: DocumentApp.ParagraphHeading.HEADING2, prefixLen: 3 },
+    { regex: /^# ([A-ZÀÁÈÉÍÏÒÓÚÜ0-9¿¡"'])/, heading: DocumentApp.ParagraphHeading.HEADING1, prefixLen: 2 }
+  ];
+
+  for (const p of patterns) {
+    if (p.regex.test(text)) {
+      return {
+        heading: p.heading,
+        cleanText: text.substring(p.prefixLen),
+        prefixLen: p.prefixLen
+      };
+    }
+  }
+
+  return null; // No és heading
+}
+
+/**
+ * Aplica spacing professional segons el tipus de heading
+ *
+ * @param {Element} element - L'element paràgraf
+ * @param {ParagraphHeading} heading - El tipus de heading
+ */
+function applyHeadingSpacing(element, heading) {
+  if (!element || !heading) return;
+
+  try {
+    // Spacing en punts (pt) - valors professionals
+    const spacingConfig = {
+      HEADING1: { before: 24, after: 12 },
+      HEADING2: { before: 18, after: 10 },
+      HEADING3: { before: 14, after: 8 },
+      HEADING4: { before: 12, after: 6 },
+      NORMAL: { before: 0, after: 0 }
+    };
+
+    // Trobar el nom del heading
+    let headingName = 'NORMAL';
+    for (const [name, value] of Object.entries(DocumentApp.ParagraphHeading)) {
+      if (value === heading) {
+        headingName = name;
+        break;
+      }
+    }
+
+    const config = spacingConfig[headingName];
+    if (config && element.setSpacingBefore && element.setSpacingAfter) {
+      element.setSpacingBefore(config.before);
+      element.setSpacingAfter(config.after);
+    }
+  } catch (e) {
+    // Error aplicant spacing - no crític
+    console.log('[Spacing] Error:', e.message);
+  }
+}
+
+/**
+ * Obté el heading actual d'un element (per guardar a lastEdit)
+ *
+ * @param {Element} element - L'element a analitzar
+ * @returns {ParagraphHeading|null} - El heading o null
+ */
+function getElementHeading(element) {
+  try {
+    if (element && element.getHeading) {
+      return element.getHeading();
+    }
+  } catch (e) {}
+  return null;
 }
 
 // --- RENDERING HELPERS ---

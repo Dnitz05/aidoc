@@ -243,7 +243,26 @@ async function useCredits(env, licenseHash, docMetadata) {
       p_metadata: docMetadata || {}
     })
   });
-  return supabaseResp.json();
+
+  // v8.2: Proper error handling
+  if (!supabaseResp.ok) {
+    console.error('useCredits failed:', supabaseResp.status);
+    return { credits_remaining: 0, error: `HTTP ${supabaseResp.status}` };
+  }
+
+  const data = await supabaseResp.json();
+
+  // Validate response structure
+  if (data.credits_remaining === undefined && data.remaining === undefined) {
+    console.error('useCredits invalid response:', JSON.stringify(data).substring(0, 200));
+    return { credits_remaining: 0, error: 'invalid_response' };
+  }
+
+  // Normalize field name (handle both possible field names)
+  return {
+    credits_remaining: data.credits_remaining ?? data.remaining ?? 0,
+    ...data
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1570,8 +1589,12 @@ async function handleChat(body, env, corsHeaders) {
 
   // v8.2: PARALLELIZED - Run useCredits and detectAndRecordGap simultaneously
   const [creditsResult, gapResult] = await Promise.all([
-    // Credit usage (always runs)
-    useCredits(env, licenseHash, doc_metadata),
+    // Credit usage (always runs) - with error handling for network failures
+    useCredits(env, licenseHash, doc_metadata)
+      .catch(creditError => {
+        console.error('Credit check failed:', creditError.message);
+        return { credits_remaining: 0, error: creditError.message };
+      }),
 
     // Gap detection (conditional, returns null if skipped)
     shouldDetectGap
