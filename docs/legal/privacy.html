@@ -88,7 +88,7 @@
   <div class="header">
     <h1>Privacy Policy</h1>
     <p>Docmile AI - Document Engineering Assistant</p>
-    <p><em>Last updated: November 30, 2024</em></p>
+    <p><em>Last updated: December 6, 2025</em></p>
   </div>
 
   <div class="container">
@@ -123,7 +123,25 @@
       <li>Custom "receipts" (saved editing macros) you create</li>
     </ul>
 
-    <h3>2.3 Technical Data</h3>
+    <h3>2.3 Conversation History</h3>
+    <p>To provide a seamless editing experience, we store:</p>
+    <ul>
+      <li>Your chat messages and AI responses within each document</li>
+      <li>Conversation titles (auto-generated or custom)</li>
+      <li>Pinned conversation preferences</li>
+    </ul>
+    <p>This data is associated with your license key and document ID, allowing you to resume conversations when you return to a document.</p>
+
+    <h3>2.4 Knowledge Library (Uploaded Files)</h3>
+    <p>If you use the Knowledge Library feature, we store:</p>
+    <ul>
+      <li>Files you upload (PDF, TXT, CSV, Markdown) in our database</li>
+      <li>References to these files in Google's Gemini Files API for AI processing</li>
+      <li>Associations between your files and documents</li>
+    </ul>
+    <p><strong>Important:</strong> Uploaded files remain stored until you explicitly delete them. Files uploaded to Google Gemini API expire automatically after 48 hours and are re-uploaded as needed.</p>
+
+    <h3>2.5 Technical Data</h3>
     <p>We automatically collect:</p>
     <ul>
       <li>Document ID (to provide per-document features like edit history)</li>
@@ -157,6 +175,16 @@
         <td>Provide edit history & undo</td>
         <td>Edit events, text diffs</td>
         <td>30 days</td>
+      </tr>
+      <tr>
+        <td>Enable conversation continuity</td>
+        <td>Chat messages, AI responses</td>
+        <td>30 days</td>
+      </tr>
+      <tr>
+        <td>Provide knowledge context to AI</td>
+        <td>Uploaded files (PDF, TXT, etc.)</td>
+        <td>Until user deletes</td>
       </tr>
       <tr>
         <td>Improve service reliability</td>
@@ -243,6 +271,14 @@
         <td>30 days from creation</td>
       </tr>
       <tr>
+        <td>Conversation history</td>
+        <td>30 days from last message</td>
+      </tr>
+      <tr>
+        <td>Uploaded files (Knowledge Library)</td>
+        <td>Until explicitly deleted by user</td>
+      </tr>
+      <tr>
         <td>Usage logs</td>
         <td>90 days</td>
       </tr>
@@ -281,7 +317,7 @@
   </div>
 
   <div class="footer">
-    <p>© 2024 Docmile AI. All rights reserved.</p>
+    <p>© 2024-2025 Docmile AI. All rights reserved.</p>
   </div>
 </body>
 </html>

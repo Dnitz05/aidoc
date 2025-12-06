@@ -635,6 +635,17 @@ function revertLastEdit() {
     // Revertir al text original
     targetElement.asText().setText(lastEdit.originalText);
 
+    // v10.1: Restaurar heading original si existeix
+    if (lastEdit.originalHeading !== undefined && lastEdit.originalHeading !== null) {
+      try {
+        if (targetElement.setHeading) {
+          targetElement.setHeading(lastEdit.originalHeading);
+        }
+      } catch (e) {
+        console.log('[Revert] Could not restore heading:', e.message);
+      }
+    }
+
     // v2.6.1: Actualitzar currentText = originalText (no esborrar)
     lastEdit.currentText = lastEdit.originalText;
     saveLastEdit(lastEdit);
@@ -1703,11 +1714,14 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           }
 
           const currentDocText = targetElement.asText().getText();
+          // v10.1: Capturar heading original ABANS de modificar
+          const originalHeading = getElementHeading(targetElement);
 
           // v2.6 Snapshot: Capturar ABANS de modificar
           undoSnapshot = {
             targetId: id,
             originalText: currentDocText,
+            originalHeading: originalHeading,  // v10.1
             bodyIndex: getBodyIndex(targetElement)  // v6.6: Per undo més fiable
           };
 
@@ -1737,9 +1751,15 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
                                     ? existingLastEdit.originalText
                                     : currentDocText;
 
+          // v10.1: Preservar heading original si és el mateix target
+          const preservedHeading = isSameTarget && existingLastEdit.originalHeading
+                                   ? existingLastEdit.originalHeading
+                                   : originalHeading;
+
           capturedLastEdit = {
             targetId: id,
             originalText: preservedOriginal,
+            originalHeading: preservedHeading,  // v10.1
             currentText: cleanNewText,
             bodyIndex: getBodyIndex(targetElement)  // v6.6: Per undo més fiable
           };
@@ -1916,11 +1936,14 @@ function applyPendingChanges(changes, expectedSnapshot) {
 
       if (targetElement) {
         const currentDocText = targetElement.asText().getText();
+        // v10.1: Capturar heading original ABANS de modificar
+        const originalHeading = getElementHeading(targetElement);
 
         // Guardar snapshot per undo
         undoSnapshots.push({
           targetId: change.targetId,
           originalText: currentDocText,
+          originalHeading: originalHeading,  // v10.1
           bodyIndex: getBodyIndex(targetElement)  // v6.6: Per undo més fiable
         });
 
@@ -1935,10 +1958,15 @@ function applyPendingChanges(changes, expectedSnapshot) {
           const preservedOriginal = isSameTarget
                                     ? existingLastEdit.originalText
                                     : currentDocText;
+          // v10.1: Preservar heading original
+          const preservedHeading = isSameTarget && existingLastEdit.originalHeading
+                                   ? existingLastEdit.originalHeading
+                                   : originalHeading;
 
           saveLastEdit({
             targetId: change.targetId,
             originalText: preservedOriginal,
+            originalHeading: preservedHeading,  // v10.1
             currentText: change.proposedText,
             bodyIndex: getBodyIndex(targetElement)  // v6.6: Per undo més fiable
           });
@@ -2058,6 +2086,7 @@ function applyInDocumentPreview(changes, existingMap) {
         targetId: String(targetId),
         originalText: originalText,
         newText: cleanNewText,
+        newTextRaw: change.proposedText || '',  // v10.1: Text amb markdown per detectar heading al commit
         originalLength: originalLength,
         separatorLength: separator.length,
         bodyIndex: bodyIndex  // v5.3: Índex real dins el body
@@ -2130,6 +2159,8 @@ function commitInDocumentPreview() {
       if (!targetElement) continue;
 
       const textObj = targetElement.editAsText();
+      // v10.1: Capturar heading original ABANS de modificar
+      const originalHeading = getElementHeading(targetElement);
 
       // Eliminar: text original + separador (deixant només el text nou)
       const deleteEnd = preview.originalLength + preview.separatorLength - 1;
@@ -2146,6 +2177,19 @@ function commitInDocumentPreview() {
         textObj.setStrikethrough(0, remainingLength - 1, false);
       }
 
+      // v10.1: Detectar i aplicar heading del markdown original
+      const rawText = preview.newTextRaw || preview.newText;
+      const headingInfo = detectHeadingFromMarkdown(rawText);
+      if (headingInfo && targetElement.setHeading) {
+        targetElement.setHeading(headingInfo.heading);
+        applyHeadingSpacing(targetElement, headingInfo.heading);
+      }
+
+      // v10.1: Aplicar markdown inline (bold, italic) si hi ha text raw
+      if (rawText && remainingLength > 0) {
+        applyInlineMarkdown(targetElement, rawText);
+      }
+
       applied++;
 
       // Guardar lastEdit per al primer canvi
@@ -2155,10 +2199,15 @@ function commitInDocumentPreview() {
         const preservedOriginal = isSameTarget
                                   ? existingLastEdit.originalText
                                   : preview.originalText;
+        // v10.1: Preservar heading original
+        const preservedHeading = isSameTarget && existingLastEdit.originalHeading
+                                 ? existingLastEdit.originalHeading
+                                 : originalHeading;
 
         saveLastEdit({
           targetId: preview.targetId,
           originalText: preservedOriginal,
+          originalHeading: preservedHeading,  // v10.1
           currentText: preview.newText,
           bodyIndex: preview.bodyIndex !== undefined ? preview.bodyIndex : getBodyIndex(targetElement)  // v6.6
         });
@@ -2492,14 +2541,25 @@ function getElementHeading(element) {
 function updateParagraphPreservingAttributes(element, newMarkdownText) {
   const textObj = element.editAsText();
   const oldText = textObj.getText();
-  const cleanText = cleanMarkdown(newMarkdownText);
+
+  // 0. DETECTAR HEADING del markdown ABANS de processar
+  // Si l'AI retorna "## Títol", detectem H2 i netegem el prefix
+  const headingInfo = detectHeadingFromMarkdown(newMarkdownText);
+  let textToProcess = newMarkdownText;
+  let detectedHeading = null;
+
+  if (headingInfo) {
+    textToProcess = headingInfo.cleanText;
+    detectedHeading = headingInfo.heading;
+  }
+
+  // Netejar bold/italic del text (sense el prefix de heading)
+  const cleanText = cleanMarkdown(textToProcess);
 
   // 1. Guardar atributs del PARÀGRAF (heading, alignment, spacing, indentation)
   let paragraphHeading = null;
   let paragraphAlignment = null;
   let lineSpacing = null;
-  let spacingBefore = null;
-  let spacingAfter = null;
   let indentStart = null;
   let indentEnd = null;
   let indentFirstLine = null;
@@ -2508,8 +2568,7 @@ function updateParagraphPreservingAttributes(element, newMarkdownText) {
     if (element.getHeading) paragraphHeading = element.getHeading();
     if (element.getAlignment) paragraphAlignment = element.getAlignment();
     if (element.getLineSpacing) lineSpacing = element.getLineSpacing();
-    if (element.getSpacingBefore) spacingBefore = element.getSpacingBefore();
-    if (element.getSpacingAfter) spacingAfter = element.getSpacingAfter();
+    // Nota: NO guardem spacingBefore/After si detectem heading nou (volem spacing automàtic)
     if (element.getIndentStart) indentStart = element.getIndentStart();
     if (element.getIndentEnd) indentEnd = element.getIndentEnd();
     if (element.getIndentFirstLine) indentFirstLine = element.getIndentFirstLine();
@@ -2521,14 +2580,12 @@ function updateParagraphPreservingAttributes(element, newMarkdownText) {
   let fontFamily = null;
   let fontSize = null;
   let foregroundColor = null;
-  let backgroundColor = null;
 
   if (oldText.length > 0) {
     try {
       fontFamily = textObj.getFontFamily(0);
       fontSize = textObj.getFontSize(0);
       foregroundColor = textObj.getForegroundColor(0);
-      backgroundColor = textObj.getBackgroundColor(0);
     } catch (e) {
       // Atributs no disponibles
     }
@@ -2551,28 +2608,33 @@ function updateParagraphPreservingAttributes(element, newMarkdownText) {
       if (fontFamily) textObj.setFontFamily(0, newLength - 1, fontFamily);
       if (fontSize) textObj.setFontSize(0, newLength - 1, fontSize);
       if (foregroundColor) textObj.setForegroundColor(0, newLength - 1, foregroundColor);
-      // Nota: No restaurem backgroundColor per defecte (pot ser del preview)
     } catch (e) {
       // Error aplicant atributs de text
     }
   }
 
-  // 5. Restaurar atributs del PARÀGRAF
+  // 5. Aplicar HEADING (detectat del markdown O preservar l'original)
   try {
-    if (paragraphHeading !== null && element.setHeading) {
+    if (detectedHeading !== null && element.setHeading) {
+      // Hem detectat un heading nou del markdown → Aplicar-lo
+      element.setHeading(detectedHeading);
+      // Aplicar spacing professional per aquest heading
+      applyHeadingSpacing(element, detectedHeading);
+    } else if (paragraphHeading !== null && element.setHeading) {
+      // No hi ha heading detectat → Preservar l'original
       element.setHeading(paragraphHeading);
     }
+  } catch (e) {
+    // Error aplicant heading
+  }
+
+  // 6. Restaurar altres atributs del PARÀGRAF (no heading ni spacing si s'ha detectat heading)
+  try {
     if (paragraphAlignment !== null && element.setAlignment) {
       element.setAlignment(paragraphAlignment);
     }
     if (lineSpacing !== null && element.setLineSpacing) {
       element.setLineSpacing(lineSpacing);
-    }
-    if (spacingBefore !== null && element.setSpacingBefore) {
-      element.setSpacingBefore(spacingBefore);
-    }
-    if (spacingAfter !== null && element.setSpacingAfter) {
-      element.setSpacingAfter(spacingAfter);
     }
     if (indentStart !== null && element.setIndentStart) {
       element.setIndentStart(indentStart);
@@ -2587,8 +2649,8 @@ function updateParagraphPreservingAttributes(element, newMarkdownText) {
     // Error restaurant atributs de paràgraf
   }
 
-  // 6. Aplicar markdown inline (bold, italic)
-  applyInlineMarkdown(element, newMarkdownText);
+  // 7. Aplicar markdown inline (bold, italic) - usar text sense prefix de heading
+  applyInlineMarkdown(element, textToProcess);
 }
 
 function applyInlineMarkdown(element, originalMarkdown) {
