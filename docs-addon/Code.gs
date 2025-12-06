@@ -822,13 +822,16 @@ function captureCurrentSelection() {
     const doc = DocumentApp.getActiveDocument();
     const selection = doc.getSelection();
 
+    // v8.2: Sempre retornar docWordCount per mostrar "tot el document"
+    const docWordCount = getDocumentWordCount();
+
     if (!selection) {
-      return { captured: false, hasSelection: false, wordCount: 0 };
+      return { captured: false, hasSelection: false, wordCount: 0, docWordCount: docWordCount };
     }
 
     const ranges = selection.getRangeElements() || [];
     if (ranges.length === 0) {
-      return { captured: false, hasSelection: false, wordCount: 0 };
+      return { captured: false, hasSelection: false, wordCount: 0, docWordCount: docWordCount };
     }
 
     // v5.3: També calcular word count per l'indicador
@@ -3196,14 +3199,13 @@ function addRowToTable(tableIndex, rowData) {
           const table = child.asTable();
           const numCols = table.getRow(0).getNumCells();
 
-          // Ensure rowData has correct number of columns
-          const paddedRow = [];
-          for (var c = 0; c < numCols; c++) {
-            paddedRow.push(rowData[c] || '');
-          }
+          // Append empty row first
+          const newRow = table.appendTableRow();
 
-          // Append row
-          table.appendTableRow(paddedRow);
+          // Then populate cells
+          for (var c = 0; c < numCols; c++) {
+            newRow.appendTableCell(rowData[c] || '');
+          }
 
           return { success: true, newRowIndex: table.getNumRows() - 1 };
         }

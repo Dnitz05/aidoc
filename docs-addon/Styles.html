@@ -348,21 +348,21 @@
         position: relative;
       }
 
-      /* Eye button at top-right corner of AI bubbles - always visible */
+      /* Eye button outside AI bubbles - right side */
       .bubble-eye-btn {
         position: absolute;
-        top: 6px;
-        right: 6px;
+        top: 4px;
+        right: -28px;
         width: 22px;
         height: 22px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--bg-secondary);
-        border: 1px solid var(--border);
+        background: transparent;
+        border: none;
         border-radius: var(--radius-sm);
         cursor: pointer;
-        opacity: 0.5;
+        opacity: 0.3;
         transition: opacity 0.15s ease, background 0.15s ease;
       }
 
@@ -372,8 +372,6 @@
 
       .bubble-eye-btn:hover {
         opacity: 1 !important;
-        background: var(--accent-muted);
-        border-color: var(--accent);
       }
 
       .bubble-eye-btn svg {
@@ -497,16 +495,16 @@
       .save-prompt-btn {
         position: absolute;
         top: 4px;
-        left: 4px;
+        left: -26px;
         width: 20px;
         height: 20px;
         padding: 0;
         border: none;
         border-radius: 4px;
-        background: rgba(255, 255, 255, 0.1);
-        color: rgba(255, 255, 255, 0.5);
+        background: transparent;
+        color: var(--text-muted);
         cursor: pointer;
-        opacity: 0.5;
+        opacity: 0.3;
         transition: all 0.15s ease;
         display: flex;
         align-items: center;
@@ -518,8 +516,8 @@
       }
 
       .save-prompt-btn:hover {
-        background: rgba(255, 255, 255, 0.25);
-        color: white;
+        opacity: 1 !important;
+        color: var(--accent);
       }
 
       .save-prompt-btn.saved {
@@ -853,6 +851,7 @@
       /* Salutació */
       .landing-greeting {
         text-align: center;
+        margin-top: 20px;
         margin-bottom: 20px;
       }
 
@@ -895,10 +894,10 @@
         margin: 0 0 10px 0;
       }
 
-      /* Grid de targetes - 3 columnes minimalista */
+      /* Grid de targetes - 2 columnes minimalista */
       .suggestion-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         gap: 6px;
       }
 
@@ -924,7 +923,6 @@
       }
 
       .suggestion-card:hover .suggestion-icon {
-        color: var(--accent);
         transform: scale(1.1);
       }
 
@@ -935,7 +933,6 @@
       .suggestion-icon {
         width: 20px;
         height: 20px;
-        color: var(--text-muted);
         transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
       }
 
@@ -959,22 +956,25 @@
       /* Landing Tip */
       .landing-tip {
         display: flex;
+        flex-direction: row;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        margin-top: 20px;
+        gap: 4px;
+        margin-top: 12px;
+        padding: 0 4px;
       }
 
       .landing-tip .tip-icon {
-        width: 24px;
-        height: 24px;
+        width: 14px;
+        height: 14px;
         color: #f59e0b;
         flex-shrink: 0;
       }
 
       .landing-tip .tip-text {
-        font-size: 11px;
+        font-size: 9px;
         color: var(--text-muted);
+        white-space: nowrap;
       }
 
       /* Revert Button */
@@ -1474,7 +1474,6 @@
       .input-area {
         padding: var(--space-sm) var(--space-md) var(--space-md);
         background: var(--bg-secondary);
-        border-top: 1px solid var(--border);
         transition: background-color 0.2s ease, border-color 0.2s ease;
       }
 
@@ -2523,6 +2522,7 @@
         margin-bottom: var(--space-lg);
       }
 
+
       /* Sticky Bottom Bar */
       .recipes-bottom-bar {
         display: flex;
@@ -2859,13 +2859,13 @@
 
       .folders-container.view-1 .folder-recipe-preview {
         grid-area: preview;
-        display: block;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
         font-size: 11px;
         color: var(--text-muted);
         line-height: 1.4;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
         padding-right: 2px;
       }
 
@@ -5844,36 +5844,114 @@
         display: none;
       }
 
-      /* v5.3: Selection indicator - text preview (fora de l'àrea ombrejada) */
+      /* v5.3: Selection indicator - barra compacta */
       .selection-indicator {
-        display: flex;
+        display: grid;
+        grid-template-columns: 1fr auto;
         align-items: center;
-        gap: 6px;
-        padding: 8px 12px;
-        margin: 0 12px 8px 12px;
+        gap: 4px;
+        padding: 6px 8px 6px 12px;
+        margin: 0;
         background: var(--bg-secondary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-sm);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
         font-size: 11px;
         color: var(--text-primary);
-        animation: fadeIn 0.15s ease-out;
+        flex-shrink: 0;
       }
 
       .selection-indicator.hidden {
         display: none;
       }
 
-      .selection-indicator .i {
-        color: var(--accent);
-        flex-shrink: 0;
+      .selection-scope {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0;
+        flex: 1;
+        min-width: 0;
       }
 
-      .selection-indicator #selectionPreview {
-        flex: 1;
+      .selection-scope .i {
+        width: 10px;
+        height: 10px;
+        flex-shrink: 0;
+        margin-right: 4px;
+      }
+
+      .selection-scope .i svg {
+        width: 10px;
+        height: 10px;
+      }
+
+      .selection-scope .scope-label {
+        font-family: var(--font-display);
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--accent);
+        flex-shrink: 0;
+        margin-right: 4px;
+      }
+
+      .selection-scope .scope-text {
+        font-style: italic;
+        font-size: 10px;
+        color: var(--text-primary);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-style: italic;
+      }
+
+      .selection-scope .selection-word-count {
+        font-size: 9px;
+        color: var(--text-muted);
+        flex-shrink: 0;
+        margin-left: 2px;
+      }
+
+      /* Polling indicator - breathing dot */
+      .polling-indicator {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+        margin-left: 4px;
+        flex-shrink: 0;
+        opacity: 0.4;
+        animation: breathe 1.5s ease-in-out infinite;
+      }
+
+      .polling-indicator.fast {
+        animation: breathe 0.6s ease-in-out infinite;
+      }
+
+      @keyframes breathe {
+        0%, 100% { opacity: 0.3; transform: scale(0.9); }
+        50% { opacity: 0.8; transform: scale(1.1); }
+      }
+
+      /* Mode selector dins selection-indicator */
+      .selection-indicator .mode-selector {
+        flex-shrink: 0;
+        justify-self: end;
+        margin-right: 0;
+      }
+
+      .selection-indicator .mode-btn {
+        padding: 2px 6px;
+        font-size: 10px;
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .selection-indicator .mode-btn:hover {
+        background: var(--accent-muted);
+      }
+
+      .selection-indicator .mode-dropdown {
+        right: 0;
+        left: auto;
       }
 
       .selection-word-count {
@@ -6393,22 +6471,25 @@
         gap: var(--space-sm);
       }
 
-      .chat-history-btn {
+      .chat-header-right {
         display: flex;
         align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        background: none;
+        gap: var(--space-sm);
+      }
+
+      .chat-history-btn {
+        font-size: 11px;
+        padding: var(--space-xs) var(--space-sm);
+        background: transparent;
         border: 1px solid var(--border);
         border-radius: var(--radius-sm);
-        cursor: pointer;
         color: var(--text-secondary);
+        cursor: pointer;
         transition: all 0.15s ease;
       }
 
       .chat-history-btn:hover {
-        background: var(--bg-tertiary);
+        background: var(--accent-muted);
         border-color: var(--accent);
         color: var(--accent);
       }
