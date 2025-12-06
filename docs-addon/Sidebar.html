@@ -5870,12 +5870,17 @@
 
       /**
        * Scroll to the last edited paragraph in the document
+       * v6.8: FIX - targetId és elementId ({{0}}), no bodyIndex
        */
       function scrollToLastEdit() {
         google.script.run
           .withSuccessHandler(function(lastEdit) {
             if (lastEdit && lastEdit.targetId !== undefined && lastEdit.targetId !== null) {
-              google.script.run.scrollToParagraph(parseInt(lastEdit.targetId, 10));
+              // v6.8: Usar mode 'elementId' perquè targetId és ID del sistema {{0}}, {{1}}
+              google.script.run.highlightElement({
+                mode: 'elementId',
+                value: parseInt(lastEdit.targetId, 10)
+              });
             } else {
               showToast('No hi ha edició recent', 'info');
             }

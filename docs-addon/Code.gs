@@ -2985,223 +2985,267 @@ function deleteReceiptFromWorker(receiptId) {
   }
 }
 
-// --- SCROLL TO PARAGRAPH (v3.9) ---
+// ═══════════════════════════════════════════════════════════════════════════
+// UNIFIED HIGHLIGHT SYSTEM v6.8
+// ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Fa scroll al document fins al paràgraf indicat
- * @param {number} paragraphIndex - Índex del paràgraf (0-based)
+ * Sistema unificat per ressaltar elements al document
+ * Substitueix: scrollToParagraph, scrollToReference, findAndHighlight
+ *
+ * @param {Object} options
+ * @param {string} options.mode - 'bodyIndex' | 'elementId' | 'text'
+ * @param {any} options.value - L'identificador segons el mode
+ * @param {string} options.color - Color del highlight (default: '#a8d4ff')
+ * @param {boolean} options.scroll - Si fer scroll (default: true)
+ * @returns {Object} - {success: boolean, error?: string}
  */
-function scrollToParagraph(paragraphIndex) {
+function highlightElement(options) {
   try {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
-    const numChildren = body.getNumChildren();
-
-    if (paragraphIndex < 0 || paragraphIndex >= numChildren) {
-      return { success: false, error: 'Índex fora de rang' };
-    }
-
-    // Netejar ressaltat anterior
-    clearStructureHighlight();
-
-    const element = body.getChild(paragraphIndex);
-
-    // Ressaltar amb verd clar (igual que la UI)
-    if (element.getType() === DocumentApp.ElementType.PARAGRAPH ||
-        element.getType() === DocumentApp.ElementType.LIST_ITEM) {
-      const text = element.editAsText();
-      const len = text.getText().length;
-      if (len > 0) {
-        text.setBackgroundColor(0, len - 1, '#d1fae5');
-        // Guardar l'índex per netejar després
-        PropertiesService.getDocumentProperties().setProperty('highlightedParagraph', String(paragraphIndex));
-      }
-    }
-
-    // Seleccionar l'element per fer scroll fins a ell
-    const rangeBuilder = doc.newRange();
-    rangeBuilder.addElement(element);
-    doc.setSelection(rangeBuilder.build());
-
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-}
-
-/**
- * Neteja el ressaltat de l'estructura anterior
- */
-function clearStructureHighlight() {
-  try {
     const props = PropertiesService.getDocumentProperties();
-    const prevIdx = props.getProperty('highlightedParagraph');
 
-    if (prevIdx !== null) {
-      const doc = DocumentApp.getActiveDocument();
-      const body = doc.getBody();
-      const idx = parseInt(prevIdx, 10);
+    const mode = options.mode;
+    const value = options.value;
+    const color = options.color || '#a8d4ff';
+    const scroll = options.scroll !== false;
 
-      if (idx >= 0 && idx < body.getNumChildren()) {
-        const element = body.getChild(idx);
-        if (element.getType() === DocumentApp.ElementType.PARAGRAPH ||
-            element.getType() === DocumentApp.ElementType.LIST_ITEM) {
-          const text = element.editAsText();
-          const len = text.getText().length;
-          if (len > 0) {
-            text.setBackgroundColor(0, len - 1, null);
+    // 1. Netejar highlight anterior
+    clearHighlight();
+
+    // 2. Trobar element segons mode
+    let element = null;
+    let startOffset = -1;
+    let endOffset = -1;
+    let childIndex = -1;
+
+    switch (mode) {
+      case 'bodyIndex':
+        // Índex directe del body (usat per UI estructura)
+        if (value >= 0 && value < body.getNumChildren()) {
+          element = body.getChild(value);
+          childIndex = value;
+        }
+        break;
+
+      case 'elementId':
+        // ID del sistema {{0}}, {{1}} (usat per AI i lastEdit)
+        const map = buildElementMap(body);
+        element = map[value];
+        if (element) {
+          const parent = element.getParent();
+          if (parent && parent.getType() === DocumentApp.ElementType.BODY_SECTION) {
+            childIndex = parent.getChildIndex(element);
           }
         }
-      }
-      props.deleteProperty('highlightedParagraph');
-    }
-  } catch (e) {
-    // Ignorar errors de neteja
-  }
-}
+        break;
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DOCUMENT REFERENCES v6.7 - Referències Vives
-// ═══════════════════════════════════════════════════════════════════════════
+      case 'text':
+        // Cerca per text (usat per referències [[text]])
+        let searchResult = body.findText(value);
 
-/**
- * Cerca text al document i el selecciona (fa scroll automàtic)
- * v6.7: Document Intelligence - Referències vives
- *
- * @param {string} searchText - Text a buscar al document
- * @returns {Object} - {success: boolean, error?: string, partial?: boolean}
- */
-function findAndHighlight(searchText) {
-  try {
-    if (!searchText || searchText.trim().length < 2) {
-      return { success: false, error: 'Text de cerca massa curt' };
-    }
+        // Fallback: primeres paraules si no troba
+        if (!searchResult && value.split(/\s+/).length > 3) {
+          const partialSearch = value.split(/\s+/).slice(0, 4).join(' ');
+          searchResult = body.findText(partialSearch);
+        }
 
-    const doc = DocumentApp.getActiveDocument();
-    const body = doc.getBody();
+        if (searchResult) {
+          element = searchResult.getElement();
+          startOffset = searchResult.getStartOffset();
+          endOffset = searchResult.getEndOffsetInclusive();
+          try {
+            const parent = element.getParent();
+            if (parent && parent.getType() === DocumentApp.ElementType.BODY_SECTION) {
+              childIndex = parent.getChildIndex(element);
+            } else {
+              // Element dins d'un altre contenidor, buscar el parent al body
+              let current = element;
+              while (current.getParent() &&
+                     current.getParent().getType() !== DocumentApp.ElementType.BODY_SECTION) {
+                current = current.getParent();
+              }
+              if (current.getParent()) {
+                childIndex = current.getParent().getChildIndex(current);
+              }
+            }
+          } catch (e) {}
+        }
+        break;
 
-    // Netejar highlight anterior
-    clearStructureHighlight();
-
-    // 1. Intentar cerca exacta
-    let searchResult = body.findText(searchText);
-
-    // 2. Si no troba, intentar cerca normalitzada (sense accents, minúscules)
-    if (!searchResult) {
-      // Provar amb les primeres paraules (per si l'AI ha abreujat)
-      const words = searchText.split(/\s+/);
-      if (words.length > 3) {
-        const partialSearch = words.slice(0, 4).join(' ');
-        searchResult = body.findText(partialSearch);
-      }
+      default:
+        return { success: false, error: 'Mode no vàlid: ' + mode };
     }
 
-    // 3. Si encara no troba, provar cerca case-insensitive amb regex
-    if (!searchResult) {
-      try {
-        // Escapar caràcters especials de regex
-        const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        searchResult = body.findText(escaped);
-      } catch (regexError) {
-        // Regex pot fallar amb alguns caràcters, ignorar
-      }
-    }
-
-    if (!searchResult) {
+    if (!element) {
       return {
         success: false,
-        error: 'Text no trobat al document',
-        searchedFor: searchText.substring(0, 50)
+        error: mode === 'text' ? 'Text no trobat al document' : 'Element no trobat',
+        searchedFor: mode === 'text' ? String(value).substring(0, 50) : undefined
       };
     }
 
-    // Obtenir element i posicions
-    const element = searchResult.getElement();
-    const startOffset = searchResult.getStartOffset();
-    const endOffset = searchResult.getEndOffsetInclusive();
+    // 3. Aplicar highlight
+    let textEl;
+    try {
+      textEl = element.asText();
+    } catch (e) {
+      return { success: false, error: 'Element no té text' };
+    }
 
-    // Netejar highlight anterior (usa el mateix sistema que scrollToParagraph)
-    clearStructureHighlight();
-    clearDocRefHighlight();
+    const text = textEl.getText();
+    const len = text.length;
 
-    // Aplicar highlight blau clar (similar a selecció)
-    const textElement = element.asText();
-    const highlightColor = '#a8d4ff';
-
-    if (startOffset >= 0 && endOffset >= 0) {
-      textElement.setBackgroundColor(startOffset, endOffset, highlightColor);
-
-      // Guardar per netejar després
-      const parent = element.getParent();
-      if (parent.getType() === DocumentApp.ElementType.BODY_SECTION) {
-        const childIndex = parent.getChildIndex(element);
-        PropertiesService.getDocumentProperties().setProperty('docRefHighlight', JSON.stringify({
-          childIndex: childIndex,
-          start: startOffset,
-          end: endOffset
-        }));
+    if (len > 0) {
+      if (startOffset >= 0 && endOffset >= 0) {
+        // Highlight parcial (només el text trobat)
+        textEl.setBackgroundColor(startOffset, endOffset, color);
+      } else {
+        // Highlight complet de l'element
+        textEl.setBackgroundColor(0, len - 1, color);
+        startOffset = 0;
+        endOffset = len - 1;
       }
     }
 
-    // Seleccionar per fer scroll
-    const rangeBuilder = doc.newRange();
-    if (startOffset >= 0 && endOffset >= 0) {
-      rangeBuilder.addElement(element, startOffset, endOffset);
-    } else {
-      rangeBuilder.addElement(element);
-    }
-    doc.setSelection(rangeBuilder.build());
+    // 4. Guardar per netejar després
+    props.setProperty('activeHighlight', JSON.stringify({
+      childIndex: childIndex,
+      start: startOffset,
+      end: endOffset
+    }));
 
-    return {
-      success: true,
-      foundText: textElement.getText().substring(
-        Math.max(0, startOffset - 10),
-        Math.min(textElement.getText().length, endOffset + 10)
-      )
-    };
+    // 5. Scroll si cal
+    if (scroll) {
+      const rangeBuilder = doc.newRange();
+      if (startOffset >= 0 && endOffset >= 0 && startOffset !== 0) {
+        rangeBuilder.addElement(element, startOffset, endOffset);
+      } else {
+        rangeBuilder.addElement(element);
+      }
+      doc.setSelection(rangeBuilder.build());
+    }
+
+    return { success: true };
 
   } catch (e) {
-    console.error('[findAndHighlight] Error:', e);
+    console.error('[highlightElement] Error:', e);
     return { success: false, error: e.message };
   }
 }
 
 /**
- * Neteja el highlight de referència anterior
+ * Neteja el highlight actiu (qualsevol tipus)
  */
-function clearDocRefHighlight() {
+function clearHighlight() {
   try {
     const props = PropertiesService.getDocumentProperties();
-    const saved = props.getProperty('docRefHighlight');
 
+    // Netejar highlight unificat
+    const saved = props.getProperty('activeHighlight');
     if (saved) {
-      const data = JSON.parse(saved);
-      const doc = DocumentApp.getActiveDocument();
-      const body = doc.getBody();
+      try {
+        const data = JSON.parse(saved);
+        const doc = DocumentApp.getActiveDocument();
+        const body = doc.getBody();
 
-      if (data.childIndex >= 0 && data.childIndex < body.getNumChildren()) {
-        const element = body.getChild(data.childIndex);
-        const text = element.asText();
-        text.setBackgroundColor(data.start, data.end, null);
-      }
+        if (data.childIndex >= 0 && data.childIndex < body.getNumChildren()) {
+          const element = body.getChild(data.childIndex);
+          try {
+            const text = element.asText();
+            if (data.start >= 0 && data.end >= 0) {
+              text.setBackgroundColor(data.start, data.end, null);
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
+      props.deleteProperty('activeHighlight');
+    }
 
+    // Netejar també les properties antigues (compatibilitat)
+    const oldHighlight = props.getProperty('highlightedParagraph');
+    if (oldHighlight) {
+      try {
+        const doc = DocumentApp.getActiveDocument();
+        const body = doc.getBody();
+        const idx = parseInt(oldHighlight, 10);
+        if (idx >= 0 && idx < body.getNumChildren()) {
+          const element = body.getChild(idx);
+          const text = element.asText();
+          const len = text.getText().length;
+          if (len > 0) text.setBackgroundColor(0, len - 1, null);
+        }
+      } catch (e) {}
+      props.deleteProperty('highlightedParagraph');
+    }
+
+    const docRefHighlight = props.getProperty('docRefHighlight');
+    if (docRefHighlight) {
+      try {
+        const data = JSON.parse(docRefHighlight);
+        const doc = DocumentApp.getActiveDocument();
+        const body = doc.getBody();
+        if (data.childIndex >= 0 && data.childIndex < body.getNumChildren()) {
+          const element = body.getChild(data.childIndex);
+          element.asText().setBackgroundColor(data.start, data.end, null);
+        }
+      } catch (e) {}
       props.deleteProperty('docRefHighlight');
     }
+
   } catch (e) {
     // Ignorar errors de neteja
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LEGACY WRAPPERS (per compatibilitat - criden highlightElement)
+// ═══════════════════════════════════════════════════════════════════════════
+
 /**
- * Cerca text i copia al porta-retalls si no el troba (fallback UX)
- * @param {string} searchText - Text a buscar
- * @returns {Object} - Resultat amb instruccions per l'usuari
+ * @deprecated Usar highlightElement({mode:'bodyIndex', value:idx})
+ * Mantingut per compatibilitat amb crides existents
+ */
+function scrollToParagraph(paragraphIndex) {
+  return highlightElement({ mode: 'bodyIndex', value: paragraphIndex });
+}
+
+/**
+ * @deprecated Usar clearHighlight()
+ */
+function clearStructureHighlight() {
+  clearHighlight();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DOCUMENT REFERENCES v6.7 - Referències Vives (Legacy Wrappers)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * @deprecated Usar highlightElement({mode:'text', value:searchText})
+ */
+function findAndHighlight(searchText) {
+  if (!searchText || searchText.trim().length < 2) {
+    return { success: false, error: 'Text de cerca massa curt' };
+  }
+  return highlightElement({ mode: 'text', value: searchText });
+}
+
+/**
+ * @deprecated Usar clearHighlight()
+ */
+function clearDocRefHighlight() {
+  clearHighlight();
+}
+
+/**
+ * Cerca text amb fallback a clipboard si no troba
  */
 function findInDocumentWithFallback(searchText) {
-  const result = findAndHighlight(searchText);
+  const result = highlightElement({ mode: 'text', value: searchText });
 
   if (!result.success) {
-    // Retornar el text per copiar al clipboard des del frontend
     return {
       success: false,
       fallback: 'clipboard',
@@ -3335,70 +3379,13 @@ function clearReferenceHighlights() {
 }
 
 /**
- * Scroll a un paràgraf i highlight temporal amb color específic
- * v7.0: Millorat per centrar millor i usar blau clar per defecte
- * @param {number} paragraphIndex - Índex del paràgraf
- * @param {string} color - Color del highlight
- * @returns {Object} - {success}
+ * @deprecated Usar highlightElement({mode:'elementId', value:id, color:color})
+ * Scroll a un paràgraf per ID del sistema {{0}}, {{1}}
  */
 function scrollToReference(paragraphIndex, color) {
-  try {
-    const doc = DocumentApp.getActiveDocument();
-    const body = doc.getBody();
-    const numChildren = body.getNumChildren();
-
-    if (numChildren === 0) {
-      return { success: false, error: 'Document sense contingut' };
-    }
-
-    // Reconstruir mapa d'elements (igual que processUserCommand)
-    let mapIdToElement = {};
-    let currentIndex = 0;
-
-    for (let i = 0; i < numChildren; i++) {
-      const child = body.getChild(i);
-      const childType = child.getType();
-
-      if (childType === DocumentApp.ElementType.PARAGRAPH ||
-          childType === DocumentApp.ElementType.LIST_ITEM) {
-        try {
-          const text = child.asText().getText();
-          if (text && text.trim().length > 0) {
-            mapIdToElement[currentIndex] = child;
-            currentIndex++;
-          }
-        } catch (e) {
-          // Ignorar elements que no es poden llegir
-        }
-      }
-    }
-
-    const element = mapIdToElement[paragraphIndex];
-    if (!element) {
-      return { success: false, error: 'Paràgraf ' + paragraphIndex + ' no trobat (total: ' + currentIndex + ')' };
-    }
-
-    // Aplicar highlight amb color específic (blau clar per defecte)
-    const textObj = element.editAsText();
-    const textContent = textObj.getText();
-    const len = textContent.length;
-
-    if (len > 0) {
-      // v7.0: Blau clar per defecte (#B3E5FC) en lloc de groc
-      const bgColor = REFERENCE_COLORS[color] || '#B3E5FC';
-      textObj.setBackgroundColor(0, len - 1, bgColor);
-    }
-
-    // v7.0: Seleccionar element per forçar scroll + centrat
-    const rangeBuilder = doc.newRange();
-    rangeBuilder.addElement(element);
-    doc.setSelection(rangeBuilder.build());
-
-    return { success: true };
-
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
+  // Convertir color de nom a hex si cal
+  const hexColor = REFERENCE_COLORS[color] || color || '#a8d4ff';
+  return highlightElement({ mode: 'elementId', value: paragraphIndex, color: hexColor });
 }
 
 // --- CONTEXT SUMMARY (v2.5) ---
