@@ -639,6 +639,9 @@ function revertLastEdit() {
     lastEdit.currentText = lastEdit.originalText;
     saveLastEdit(lastEdit);
 
+    // v8.2: Invalidar cache
+    invalidateCaptureCache();
+
     return { success: true };
   } catch (e) {
     return { success: false, error: e.message };
@@ -957,6 +960,93 @@ function getDocumentStateHash() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// v8.2: DOCUMENT CAPTURE CACHE - Evita escanejos repetits
+// ═══════════════════════════════════════════════════════════════
+const CAPTURE_CACHE_KEY = 'DOCMILE_CAPTURE_CACHE';
+const CAPTURE_CACHE_TTL = 60000; // 60 segons
+
+/**
+ * Obtenir capture cachejat si hash coincideix
+ * @param {string} currentHash - Hash actual del document
+ * @param {boolean} isSelection - Si hi ha selecció activa
+ * @returns {Object|null} - Resultat cachejat o null
+ */
+function getCachedCapture(currentHash, isSelection) {
+  // Mai cachear seleccions (canvien sense canvi de hash)
+  if (isSelection) return null;
+
+  try {
+    const cache = CacheService.getUserCache();
+    const cached = cache.get(CAPTURE_CACHE_KEY);
+    if (!cached) return null;
+
+    const data = JSON.parse(cached);
+
+    // Validar hash
+    if (data.hash !== currentHash) return null;
+
+    // Validar TTL
+    if (Date.now() - data.timestamp > CAPTURE_CACHE_TTL) return null;
+
+    // Validar mateix document
+    const doc = DocumentApp.getActiveDocument();
+    if (data.docId !== doc.getId()) return null;
+
+    Logger.log('[Cache] HIT - Document capture reutilitzat');
+    return data.result;
+  } catch (e) {
+    Logger.log('[Cache] Read error: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Guardar capture al cache
+ * @param {string} hash - Hash del document
+ * @param {Object} result - Resultat de captureFullDocument
+ */
+function setCachedCapture(hash, result) {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const cache = CacheService.getUserCache();
+    const data = {
+      hash: hash,
+      docId: doc.getId(),
+      timestamp: Date.now(),
+      result: {
+        contentPayload: result.contentPayload,
+        stats: result.stats,
+        isEmpty: result.isEmpty
+        // mapIdToElement NO es cacheja (referències GAS objects)
+      }
+    };
+
+    const jsonData = JSON.stringify(data);
+    // CacheService té límit 100KB per item
+    if (jsonData.length < 100000) {
+      cache.put(CAPTURE_CACHE_KEY, jsonData, 60);
+      Logger.log('[Cache] SAVED - ' + Math.round(jsonData.length / 1024) + 'KB');
+    } else {
+      Logger.log('[Cache] Document massa gran: ' + Math.round(jsonData.length / 1024) + 'KB');
+    }
+  } catch (e) {
+    Logger.log('[Cache] Write error: ' + e.message);
+  }
+}
+
+/**
+ * Invalidar cache del document
+ */
+function invalidateCaptureCache() {
+  try {
+    CacheService.getUserCache().remove(CAPTURE_CACHE_KEY);
+    Logger.log('[Cache] Invalidated');
+  } catch (e) {
+    // Ignorar errors d'invalidació
+  }
+}
+
 /**
  * Compta paraules del document
  * v6.1: Regex optimitzat
@@ -1109,6 +1199,8 @@ function revertEditEvent(eventId) {
 
     if (targetElement) {
       targetElement.asText().setText(json.restore_text);
+      // v8.2: Invalidar cache
+      invalidateCaptureCache();
       return { status: 'ok', restore_text: json.restore_text, target_id: json.target_id };
     } else {
       return { status: 'error', error: "No s'ha trobat el paràgraf amb ID " + targetId };
@@ -1157,13 +1249,33 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
   // v2.8: Carregar paraules prohibides
   const bannedWords = getBannedWords();
 
-  // v2.9: Obtenir skeleton del document (estructura + entitats)
+  // v8.2: LAZY LOAD SKELETON - Només quan cal per operacions estructurals
   let docSkeleton = null;
-  try {
-    docSkeleton = getDocSkeleton();
-  } catch (e) {
-    // Si falla el skeleton, continuar sense (graceful degradation)
-    docSkeleton = null;
+
+  // Patrons que indiquen necessitat d'estructura
+  const skeletonTriggers = [
+    /\b(titol|títol|heading|encapçalament|secció|sección|section|capítol|capitol)\b/i,
+    /\b(estructura|structure|índex|index|taula de continguts|toc)\b/i,
+    /\b(primer|segon|tercer|últim|anterior|següent)\s+(paràgraf|párrafo|secció)/i,
+    /\b(resum|summary|table of contents|sumari)\b/i,
+    /\b(reorganitza|reorganize|reordena|reorder|mou.*secció)\b/i,
+    /\b(afegeix.*al final|afegeix.*abans|insereix.*secció)\b/i,
+    /\b(quantes seccions|quants capítols|llista.*seccions)\b/i
+  ];
+
+  const needsSkeleton = instruction && skeletonTriggers.some(r => r.test(instruction));
+
+  if (needsSkeleton) {
+    try {
+      docSkeleton = getDocSkeleton();
+      Logger.log('[Skeleton] LOADED - keyword detected');
+    } catch (e) {
+      // Si falla el skeleton, continuar sense (graceful degradation)
+      docSkeleton = null;
+      Logger.log('[Skeleton] Load failed: ' + e.message);
+    }
+  } else {
+    Logger.log('[Skeleton] SKIPPED - no structural keywords');
   }
 
   const settings = JSON.parse(getSettings());
@@ -1201,7 +1313,28 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
 
   // v3.7: UNIVERSAL DOC READER - Captura TOTAL del document
   // Inclou: Header, Body (paràgrafs, llistes, taules, TOC), Footer, Footnotes
-  const captureResult = captureFullDocument(doc, body, isSelection, selectedElements);
+  // v8.2: HASH-BASED CACHING - Evitar escanejos repetits
+  const currentHash = getDocumentStateHash();
+  let captureResult;
+
+  // Intentar cache primer (només si no hi ha selecció)
+  const cachedResult = getCachedCapture(currentHash, isSelection);
+  if (cachedResult) {
+    // Cache HIT - encara necessitem mapIdToElement (no cachejable)
+    captureResult = captureFullDocument(doc, body, isSelection, selectedElements);
+    // Sobreescriure contingut amb versió cachejada
+    captureResult.contentPayload = cachedResult.contentPayload;
+    captureResult.stats = cachedResult.stats;
+    captureResult.isEmpty = cachedResult.isEmpty;
+  } else {
+    // Cache MISS - captura completa
+    captureResult = captureFullDocument(doc, body, isSelection, selectedElements);
+    // Guardar per properes peticions (només si no hi ha selecció)
+    if (!isSelection && currentHash) {
+      setCachedCapture(currentHash, captureResult);
+    }
+  }
+
   contentPayload = captureResult.contentPayload;
   mapIdToElement = captureResult.mapIdToElement;
   const contentIndex = Object.keys(mapIdToElement).length;
@@ -1288,8 +1421,27 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
     client_hash: getDocumentStateHash(),
     word_count: getDocumentWordCount(),
     // v8.0: Chat attachments (temporary files)
-    chat_attachments: chatAttachments || []
+    chat_attachments: chatAttachments || [],
+    // v6.0: Document images for multimodal AI (conditional extraction)
+    images: null  // Will be populated below if needed
   };
+
+  // v6.0: Extract images if instruction mentions them
+  if (shouldExtractImages(instruction) && captureStats.has_images) {
+    try {
+      const imageResult = extractDocumentImages(body);
+      if (imageResult.images.length > 0) {
+        payload.images = imageResult.images;
+        logDiagnostic('IMAGES_EXTRACTED', {
+          count: imageResult.stats.extracted,
+          total_kb: imageResult.stats.total_size_kb,
+          time_ms: imageResult.stats.extraction_time_ms
+        });
+      }
+    } catch (e) {
+      logDiagnostic('IMAGE_EXTRACTION_ERROR', { error: e.message });
+    }
+  }
 
   const options = {
     'method': 'post',
@@ -1372,6 +1524,47 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
         _diag: {
           doc_chars: contentPayload.length,
           doc_empty: isDocumentEmpty
+        }
+      };
+    }
+
+    // v6.0: TABLE_UPDATE mode - Modify existing table cells/rows
+    if (aiData.mode === 'TABLE_UPDATE' && aiData.operations) {
+      const tableResult = applyTableOperations(aiData.table_id, aiData.operations);
+
+      // Log resposta TABLE_UPDATE
+      const responseInfo = {
+        mode: 'TABLE_UPDATE',
+        table_id: aiData.table_id,
+        operations_requested: aiData.operations.length,
+        operations_applied: tableResult.operations_applied,
+        operations_failed: tableResult.operations_failed,
+        credits_remaining: json.credits_remaining
+      };
+      metrics.setResponseInfo(responseInfo);
+      logDiagnostic('RESPONSE', {
+        mode: 'TABLE_UPDATE',
+        table_id: aiData.table_id,
+        operations: aiData.operations.length,
+        applied: tableResult.operations_applied,
+        failed: tableResult.operations_failed
+      });
+      metrics.finalize();
+
+      return {
+        ok: tableResult.success,
+        status: 'table_updated',
+        ai_response: aiData.change_summary || aiData.thought || 'Taula actualitzada.',
+        table_id: aiData.table_id,
+        operations_applied: tableResult.operations_applied,
+        operations_failed: tableResult.operations_failed,
+        details: tableResult.details,
+        credits: json.credits_remaining,
+        mode: 'table_update',
+        _diag: {
+          doc_chars: contentPayload.length,
+          original_dims: tableResult.original_dimensions,
+          final_dims: tableResult.final_dimensions
         }
       };
     }
@@ -1748,6 +1941,9 @@ function applyPendingChanges(changes, expectedSnapshot) {
         }
       }
     }
+
+    // v8.2: Invalidar cache després d'aplicar canvis
+    invalidateCaptureCache();
 
     return {
       ok: true,
@@ -2331,9 +2527,739 @@ function renderFullDocument(body, blocks) {
       case 'HEADING_3': element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.HEADING3); break;
       case 'BULLET_LIST': element = body.appendListItem(block.text).setGlyphType(DocumentApp.GlyphType.BULLET); break;
       case 'NUMBERED_LIST': element = body.appendListItem(block.text).setGlyphType(DocumentApp.GlyphType.NUMBER); break;
+      case 'TABLE':
+        // v6.0: Handle TABLE blocks
+        if (block.headers && Array.isArray(block.headers)) {
+          insertTableFromBlock(body, body.getNumChildren(), block);
+        }
+        break;
       default: element = body.appendParagraph(block.text).setHeading(DocumentApp.ParagraphHeading.NORMAL);
     }
   });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABLE GENERATION v6.0 - Insert tables from REWRITE blocks
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Inserts a table into Google Docs from a TABLE block
+ * @param {Body} body - Document body
+ * @param {number} insertIndex - Where to insert
+ * @param {Object} tableData - { headers: [], rows: [[]] }
+ * @returns {Object} { success, stats, error }
+ */
+function insertTableFromBlock(body, insertIndex, tableData) {
+  try {
+    if (!tableData.headers || !Array.isArray(tableData.headers) || tableData.headers.length === 0) {
+      return { success: false, error: 'Missing headers' };
+    }
+
+    const numCols = tableData.headers.length;
+    const rows = tableData.rows || [];
+
+    // Build cells matrix
+    const cells = [];
+
+    // Add header row
+    cells.push(tableData.headers.map(h => String(h)));
+
+    // Add data rows
+    for (const row of rows) {
+      if (Array.isArray(row)) {
+        // Ensure correct column count
+        const paddedRow = [];
+        for (let i = 0; i < numCols; i++) {
+          paddedRow.push(String(row[i] || ''));
+        }
+        cells.push(paddedRow);
+      }
+    }
+
+    // Insert the table
+    const table = body.insertTable(insertIndex, cells);
+
+    // Format headers (bold)
+    const headerRow = table.getRow(0);
+    for (let c = 0; c < numCols; c++) {
+      try {
+        headerRow.getCell(c).editAsText().setBold(true);
+      } catch (e) {}
+    }
+
+    return {
+      success: true,
+      stats: { rows: cells.length, cols: numCols }
+    };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMAGE EXTRACTION v6.0 - Extract images for multimodal AI
+// ═══════════════════════════════════════════════════════════════
+
+const IMAGE_CONFIG = {
+  MAX_SIZE_KB: 500,
+  MAX_IMAGES: 3,
+  MAX_TOTAL_KB: 1500,
+  SUPPORTED_TYPES: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'],
+  EXTRACTION_TIMEOUT_MS: 5000
+};
+
+/**
+ * Detects if the instruction requires image analysis
+ * @param {string} instruction - User instruction
+ * @returns {boolean}
+ */
+function shouldExtractImages(instruction) {
+  if (!instruction) return false;
+  const lower = instruction.toLowerCase();
+
+  // Direct patterns (image-related words)
+  const directPatterns = [
+    /imatge/i, /image/i, /foto/i, /fotografia/i,
+    /gràfic/i, /gráfico/i, /graph/i, /chart/i,
+    /diagrama/i, /figura/i, /picture/i,
+    /screenshot/i, /captura/i, /il·lustració/i
+  ];
+
+  // Action patterns (visual analysis requests)
+  const actionPatterns = [
+    /què (hi ha|mostra|veus|es veu)/i,
+    /what (is|does|shows)/i,
+    /descriu/i, /describe/i,
+    /explica.*visual/i,
+    /analitza.*imatge/i, /analyze.*image/i,
+    /mira/i, /look at/i,
+    /text.*imatge/i, /ocr/i
+  ];
+
+  for (const pattern of directPatterns) {
+    if (pattern.test(lower)) return true;
+  }
+  for (const pattern of actionPatterns) {
+    if (pattern.test(lower)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Extracts a single image as base64
+ * @param {InlineImage} inlineImage
+ * @param {number} index
+ * @returns {Object}
+ */
+function extractImageAsBase64(inlineImage, index) {
+  try {
+    const blob = inlineImage.getBlob();
+    const mimeType = blob.getContentType();
+
+    if (!IMAGE_CONFIG.SUPPORTED_TYPES.includes(mimeType)) {
+      return { success: false, index: index, error: 'Unsupported type: ' + mimeType, skipped: true };
+    }
+
+    const bytes = blob.getBytes();
+    const sizeKB = Math.round(bytes.length / 1024);
+
+    if (sizeKB > IMAGE_CONFIG.MAX_SIZE_KB) {
+      return { success: false, index: index, error: 'Too large: ' + sizeKB + 'KB', sizeKB: sizeKB, skipped: true };
+    }
+
+    const base64 = Utilities.base64Encode(bytes);
+    return { success: true, index: index, data: base64, mimeType: mimeType, sizeKB: sizeKB };
+  } catch (e) {
+    return { success: false, index: index, error: e.message, skipped: true };
+  }
+}
+
+/**
+ * Extracts all images from the document (with limits)
+ * @param {Body} body
+ * @returns {Object} { images: [], stats: {}, warnings: [] }
+ */
+function extractDocumentImages(body) {
+  const startTime = Date.now();
+  const result = {
+    images: [],
+    stats: { total_found: 0, extracted: 0, skipped: 0, total_size_kb: 0 },
+    warnings: []
+  };
+
+  const numChildren = body.getNumChildren();
+  let imageIndex = 0;
+
+  for (let i = 0; i < numChildren; i++) {
+    // Timeout check
+    if (Date.now() - startTime > IMAGE_CONFIG.EXTRACTION_TIMEOUT_MS) {
+      result.warnings.push('Extraction truncated by timeout');
+      break;
+    }
+
+    // Image limit check
+    if (result.images.length >= IMAGE_CONFIG.MAX_IMAGES) {
+      result.warnings.push('Max ' + IMAGE_CONFIG.MAX_IMAGES + ' images limit reached');
+      break;
+    }
+
+    const child = body.getChild(i);
+
+    // Search for images inside paragraphs
+    if (child.getType() === DocumentApp.ElementType.PARAGRAPH) {
+      const para = child.asParagraph();
+      const numParaChildren = para.getNumChildren();
+
+      for (let j = 0; j < numParaChildren; j++) {
+        const paraChild = para.getChild(j);
+
+        if (paraChild.getType() === DocumentApp.ElementType.INLINE_IMAGE) {
+          result.stats.total_found++;
+
+          if (result.stats.total_size_kb >= IMAGE_CONFIG.MAX_TOTAL_KB) {
+            result.warnings.push('Total size limit reached');
+            break;
+          }
+
+          const extracted = extractImageAsBase64(paraChild.asInlineImage(), imageIndex);
+
+          if (extracted.success) {
+            result.images.push({
+              index: imageIndex,
+              data: extracted.data,
+              mimeType: extracted.mimeType,
+              sizeKB: extracted.sizeKB
+            });
+            result.stats.extracted++;
+            result.stats.total_size_kb += extracted.sizeKB;
+          } else {
+            result.stats.skipped++;
+            if (extracted.error) {
+              result.warnings.push('Image ' + imageIndex + ': ' + extracted.error);
+            }
+          }
+          imageIndex++;
+        }
+      }
+    }
+
+    // Direct images in body
+    if (child.getType() === DocumentApp.ElementType.INLINE_IMAGE) {
+      result.stats.total_found++;
+
+      const extracted = extractImageAsBase64(child.asInlineImage(), imageIndex);
+
+      if (extracted.success && result.images.length < IMAGE_CONFIG.MAX_IMAGES) {
+        result.images.push({
+          index: imageIndex,
+          data: extracted.data,
+          mimeType: extracted.mimeType,
+          sizeKB: extracted.sizeKB
+        });
+        result.stats.extracted++;
+        result.stats.total_size_kb += extracted.sizeKB;
+      } else {
+        result.stats.skipped++;
+      }
+      imageIndex++;
+    }
+  }
+
+  result.stats.extraction_time_ms = Date.now() - startTime;
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABLE UPDATE v6.0 - Apply operations to existing tables
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Finds a table by its index
+ * @param {Body} body
+ * @param {number} tableId
+ * @returns {Table|null}
+ */
+function findTableById(body, tableId) {
+  let currentTableIndex = 0;
+  const numChildren = body.getNumChildren();
+
+  for (let i = 0; i < numChildren; i++) {
+    const child = body.getChild(i);
+    if (child.getType() === DocumentApp.ElementType.TABLE) {
+      if (currentTableIndex === tableId) {
+        return child.asTable();
+      }
+      currentTableIndex++;
+    }
+  }
+  return null;
+}
+
+/**
+ * Sorts operations to avoid index shifting issues
+ * Deletes are moved to the end and sorted descending
+ */
+function sortTableOperations(operations) {
+  const deletes = [];
+  const others = [];
+
+  for (const op of operations) {
+    if (op.action === 'delete_row') {
+      deletes.push(op);
+    } else {
+      others.push(op);
+    }
+  }
+
+  // Sort deletes descending by row
+  deletes.sort(function(a, b) { return b.row - a.row; });
+
+  return others.concat(deletes);
+}
+
+/**
+ * Applies a single operation to a table
+ */
+function applySingleTableOperation(table, op, numRows, numCols) {
+  switch (op.action) {
+    case 'update_cell':
+      if (op.row < 0 || op.row >= numRows) {
+        return { success: false, error: 'Row ' + op.row + ' out of range (0-' + (numRows-1) + ')' };
+      }
+      if (op.col < 0 || op.col >= numCols) {
+        return { success: false, error: 'Col ' + op.col + ' out of range (0-' + (numCols-1) + ')' };
+      }
+      table.getCell(op.row, op.col).setText(String(op.value));
+      return { success: true };
+
+    case 'add_row':
+      if (op.values.length !== numCols) {
+        return { success: false, error: 'Values has ' + op.values.length + ' items, table has ' + numCols + ' cols' };
+      }
+      var newRow = table.insertTableRow(op.after_row + 1);
+      for (var v = 0; v < op.values.length; v++) {
+        newRow.appendTableCell(String(op.values[v]));
+      }
+      return { success: true };
+
+    case 'delete_row':
+      if (op.row < 0 || op.row >= numRows) {
+        return { success: false, error: 'Row ' + op.row + ' out of range' };
+      }
+      table.getRow(op.row).removeFromParent();
+      return { success: true };
+
+    case 'update_row':
+      if (op.row < 0 || op.row >= numRows) {
+        return { success: false, error: 'Row ' + op.row + ' out of range' };
+      }
+      if (op.values.length !== numCols) {
+        return { success: false, error: 'Values count mismatch' };
+      }
+      var targetRow = table.getRow(op.row);
+      for (var c = 0; c < numCols; c++) {
+        targetRow.getCell(c).setText(String(op.values[c]));
+      }
+      return { success: true };
+
+    default:
+      return { success: false, error: 'Unknown action: ' + op.action };
+  }
+}
+
+/**
+ * Applies all operations to a table
+ * @param {number} tableId
+ * @param {Array} operations
+ * @returns {Object} Result with stats
+ */
+function applyTableOperations(tableId, operations) {
+  const body = DocumentApp.getActiveDocument().getBody();
+  const table = findTableById(body, tableId);
+
+  if (!table) {
+    return { success: false, error: 'Table ' + tableId + ' not found' };
+  }
+
+  var numRows = table.getNumRows();
+  var numCols = numRows > 0 ? table.getRow(0).getNumCells() : 0;
+
+  const results = {
+    success: true,
+    operations_applied: 0,
+    operations_failed: 0,
+    details: [],
+    original_dimensions: { rows: numRows, cols: numCols }
+  };
+
+  // Sort operations to avoid index issues
+  const sortedOps = sortTableOperations(operations);
+
+  for (var i = 0; i < sortedOps.length; i++) {
+    var op = sortedOps[i];
+    try {
+      // Recalculate dimensions after each operation
+      numRows = table.getNumRows();
+      numCols = numRows > 0 ? table.getRow(0).getNumCells() : 0;
+
+      var opResult = applySingleTableOperation(table, op, numRows, numCols);
+
+      if (opResult.success) {
+        results.operations_applied++;
+        results.details.push({ action: op.action, status: 'OK' });
+      } else {
+        results.operations_failed++;
+        results.details.push({ action: op.action, status: 'FAILED', error: opResult.error });
+      }
+    } catch (e) {
+      results.operations_failed++;
+      results.details.push({ action: op.action, status: 'ERROR', error: e.message });
+    }
+  }
+
+  results.final_dimensions = {
+    rows: table.getNumRows(),
+    cols: table.getRow(0).getNumCells()
+  };
+
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABLES PANEL v6.0 - Backend functions for table management UI
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Scans all tables in the document and returns their metadata
+ * @returns {Object} { tables: [{rows, cols, preview, headers}], total }
+ */
+function scanTablesInDocument() {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const numChildren = body.getNumChildren();
+    const tables = [];
+
+    for (var i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      if (child.getType() === DocumentApp.ElementType.TABLE) {
+        const table = child.asTable();
+        const numRows = table.getNumRows();
+        const numCols = numRows > 0 ? table.getRow(0).getNumCells() : 0;
+
+        // Get headers (first row)
+        let headers = [];
+        let preview = '';
+        if (numRows > 0) {
+          const firstRow = table.getRow(0);
+          for (var c = 0; c < numCols && c < 5; c++) {
+            try {
+              headers.push(firstRow.getCell(c).getText().trim().substring(0, 30));
+            } catch (e) {
+              headers.push('');
+            }
+          }
+          preview = headers.join(' | ');
+        }
+
+        tables.push({
+          index: tables.length,
+          bodyIndex: i,
+          rows: numRows,
+          cols: numCols,
+          headers: headers,
+          preview: preview
+        });
+      }
+    }
+
+    return {
+      success: true,
+      tables: tables,
+      total: tables.length
+    };
+  } catch (e) {
+    return { success: false, error: e.message, tables: [] };
+  }
+}
+
+/**
+ * Scrolls to and selects a table by its index
+ * @param {number} tableIndex - The index of the table (0-based)
+ * @returns {Object} Result
+ */
+function scrollToTableByIndex(tableIndex) {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const numChildren = body.getNumChildren();
+    let tableCount = 0;
+
+    for (var i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      if (child.getType() === DocumentApp.ElementType.TABLE) {
+        if (tableCount === tableIndex) {
+          // Found the table - set cursor to it
+          const table = child.asTable();
+          // Set position to first cell
+          if (table.getNumRows() > 0) {
+            const firstCell = table.getRow(0).getCell(0);
+            const position = doc.newPosition(firstCell, 0);
+            doc.setCursor(position);
+          }
+          return { success: true };
+        }
+        tableCount++;
+      }
+    }
+
+    return { success: false, error: 'Taula no trobada' };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Adds a row to a table by its index
+ * @param {number} tableIndex - The index of the table (0-based)
+ * @param {Array<string>} rowData - Array of cell values
+ * @returns {Object} Result
+ */
+function addRowToTable(tableIndex, rowData) {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const numChildren = body.getNumChildren();
+    let tableCount = 0;
+
+    for (var i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      if (child.getType() === DocumentApp.ElementType.TABLE) {
+        if (tableCount === tableIndex) {
+          const table = child.asTable();
+          const numCols = table.getRow(0).getNumCells();
+
+          // Ensure rowData has correct number of columns
+          const paddedRow = [];
+          for (var c = 0; c < numCols; c++) {
+            paddedRow.push(rowData[c] || '');
+          }
+
+          // Append row
+          table.appendTableRow(paddedRow);
+
+          return { success: true, newRowIndex: table.getNumRows() - 1 };
+        }
+        tableCount++;
+      }
+    }
+
+    return { success: false, error: 'Taula no trobada' };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Inserts an empty table at cursor position
+ * @param {number} numRows - Number of rows
+ * @param {number} numCols - Number of columns
+ * @returns {Object} Result
+ */
+function insertEmptyTable(numRows, numCols) {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const cursor = doc.getCursor();
+    let insertIndex = -1;
+
+    if (cursor) {
+      // Find the element at cursor
+      const element = cursor.getElement();
+      let parent = element;
+      while (parent && parent.getParent() && parent.getParent().getType() !== DocumentApp.ElementType.BODY_SECTION) {
+        parent = parent.getParent();
+      }
+      if (parent) {
+        insertIndex = doc.getBody().getChildIndex(parent) + 1;
+      }
+    }
+
+    // Create empty cells array
+    const cells = [];
+    for (var r = 0; r < numRows; r++) {
+      const row = [];
+      for (var c = 0; c < numCols; c++) {
+        row.push(r === 0 ? 'Col ' + (c + 1) : '');
+      }
+      cells.push(row);
+    }
+
+    // Insert table
+    const body = doc.getBody();
+    let table;
+    if (insertIndex > 0 && insertIndex < body.getNumChildren()) {
+      table = body.insertTable(insertIndex, cells);
+    } else {
+      table = body.appendTable(cells);
+    }
+
+    // Bold first row (headers)
+    const headerRow = table.getRow(0);
+    for (var c = 0; c < numCols; c++) {
+      try {
+        headerRow.getCell(c).editAsText().setBold(true);
+      } catch (e) {}
+    }
+
+    return { success: true, rows: numRows, cols: numCols };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Generates a table from AI description
+ * @param {string} description - What the table should contain
+ * @param {number} numRows - Desired number of rows
+ * @param {boolean} includeHeaders - Whether to include headers
+ * @returns {Object} Result
+ */
+function generateTableFromDescription(description, numRows, includeHeaders) {
+  try {
+    // Build a specific prompt for table generation
+    const tablePrompt = 'Genera una taula amb exactament ' + numRows + ' files de dades' +
+      (includeHeaders ? ' més una fila de capçaleres' : '') +
+      '. Contingut: ' + description +
+      '\n\nRespon NOMÉS amb format JSON vàlid amb aquesta estructura exacta:' +
+      '\n{"headers": ["Col1", "Col2", ...], "rows": [["val1", "val2", ...], ...]}' +
+      '\n\nNo afegeixis cap text addicional, només el JSON.';
+
+    // Get API key
+    const props = PropertiesService.getUserProperties();
+    let apiKey = props.getProperty('DOCMILE_API_KEY');
+    if (!apiKey) {
+      apiKey = props.getProperty('gemini_api_key');
+    }
+
+    if (!apiKey) {
+      return { success: false, error: 'No s\'ha configurat la clau API' };
+    }
+
+    // Call Gemini directly for structured output
+    const response = UrlFetchApp.fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey,
+      {
+        method: 'POST',
+        contentType: 'application/json',
+        payload: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [{ text: tablePrompt }]
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 2048
+          }
+        }),
+        muteHttpExceptions: true
+      }
+    );
+
+    const responseData = JSON.parse(response.getContentText());
+
+    if (!responseData.candidates || !responseData.candidates[0]) {
+      return { success: false, error: 'No s\'ha rebut resposta de la IA' };
+    }
+
+    let aiText = responseData.candidates[0].content.parts[0].text;
+
+    // Clean up the response - extract JSON
+    aiText = aiText.trim();
+    if (aiText.startsWith('```json')) {
+      aiText = aiText.substring(7);
+    }
+    if (aiText.startsWith('```')) {
+      aiText = aiText.substring(3);
+    }
+    if (aiText.endsWith('```')) {
+      aiText = aiText.substring(0, aiText.length - 3);
+    }
+    aiText = aiText.trim();
+
+    // Parse the table data
+    const tableData = JSON.parse(aiText);
+
+    if (!tableData.headers || !Array.isArray(tableData.headers)) {
+      return { success: false, error: 'Format de taula invàlid: falten capçaleres' };
+    }
+
+    // Build cells array
+    const numCols = tableData.headers.length;
+    const cells = [];
+
+    // Add headers row
+    if (includeHeaders) {
+      cells.push(tableData.headers.map(h => String(h)));
+    }
+
+    // Add data rows
+    const rows = tableData.rows || [];
+    for (var r = 0; r < rows.length && r < numRows; r++) {
+      const row = rows[r];
+      if (Array.isArray(row)) {
+        const paddedRow = [];
+        for (var c = 0; c < numCols; c++) {
+          paddedRow.push(String(row[c] || ''));
+        }
+        cells.push(paddedRow);
+      }
+    }
+
+    // Insert the table at cursor or end
+    const doc = DocumentApp.getActiveDocument();
+    const cursor = doc.getCursor();
+    let insertIndex = -1;
+
+    if (cursor) {
+      const element = cursor.getElement();
+      let parent = element;
+      while (parent && parent.getParent() && parent.getParent().getType() !== DocumentApp.ElementType.BODY_SECTION) {
+        parent = parent.getParent();
+      }
+      if (parent) {
+        insertIndex = doc.getBody().getChildIndex(parent) + 1;
+      }
+    }
+
+    const body = doc.getBody();
+    let table;
+    if (insertIndex > 0 && insertIndex < body.getNumChildren()) {
+      table = body.insertTable(insertIndex, cells);
+    } else {
+      table = body.appendTable(cells);
+    }
+
+    // Bold headers if included
+    if (includeHeaders && table.getNumRows() > 0) {
+      const headerRow = table.getRow(0);
+      for (var c = 0; c < numCols; c++) {
+        try {
+          headerRow.getCell(c).editAsText().setBold(true);
+        } catch (e) {}
+      }
+    }
+
+    return {
+      success: true,
+      stats: {
+        rows: cells.length,
+        cols: numCols
+      }
+    };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 }
 
 // --- INSTRUMENTATION & DIAGNOSTICS (v3.7) ---
@@ -3686,6 +4612,8 @@ function revertEditById(eventId) {
 
       if (targetElement) {
         targetElement.asText().setText(json.restore_text);
+        // v8.2: Invalidar cache
+        invalidateCaptureCache();
         return { success: true, restored: true };
       } else {
         return { success: false, error: "No s'ha trobat el paràgraf" };

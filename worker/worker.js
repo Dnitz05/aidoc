@@ -671,7 +671,7 @@ function buildSystemPrompt(hasSelection, hasFile, styleGuide, strictMode, negati
     if (docStats.has_header) parts.push(`Capçalera: SÍ`);
     if (docStats.has_footer) parts.push(`Peu de pàgina: SÍ`);
     if (docStats.footnotes > 0) parts.push(`Notes al peu: ${docStats.footnotes}`);
-    if (docStats.has_images) parts.push(`Imatges: SÍ (no visibles)`);
+    if (docStats.has_images) parts.push(`Imatges: SÍ (analitzables si s'envien)`);
     if (docStats.has_drawings) parts.push(`Dibuixos: SÍ (no visibles)`);
     parts.push(`Total caràcters: ${docStats.total_chars || 0}`);
     parts.push(`Document buit: ${docStats.is_empty ? 'SÍ ⚠️' : 'NO'}`);
@@ -844,7 +844,44 @@ FORMAT JSON (OBLIGATORI - SENSE TEXT EXTRA)
   "change_summary": "Descripció del contingut generat"
 }
 
-Tipus de blocks: HEADING_1, HEADING_2, HEADING_3, PARAGRAPH, BULLET_LIST, NUMBERED_LIST
+Tipus de blocks: HEADING_1, HEADING_2, HEADING_3, PARAGRAPH, BULLET_LIST, NUMBERED_LIST, TABLE
+
+**TABLE (v6.0):**
+Quan necessitis crear una TAULA nova:
+{
+  "type": "TABLE",
+  "headers": ["Capçalera1", "Capçalera2", "Capçalera3"],
+  "rows": [
+    ["Fila1Col1", "Fila1Col2", "Fila1Col3"],
+    ["Fila2Col1", "Fila2Col2", "Fila2Col3"]
+  ]
+}
+Regles TABLE:
+- headers: Array de strings (capçaleres obligatòries)
+- rows: Array d'arrays (cada fila té el MATEIX nombre d'elements que headers)
+- Usa strings sempre, fins i tot per números ("10", no 10)
+- Màxim: 10 columnes, 50 files
+
+**TABLE_UPDATE (v6.0):**
+Quan l'usuari demani MODIFICAR una taula existent:
+{
+  "thought": "[Anàlisi de l'edició de taula]",
+  "mode": "TABLE_UPDATE",
+  "table_id": 0,
+  "operations": [
+    {"action": "update_cell", "row": 1, "col": 2, "value": "Nou valor"},
+    {"action": "add_row", "after_row": 3, "values": ["A", "B", "C"]},
+    {"action": "delete_row", "row": 5},
+    {"action": "update_row", "row": 2, "values": ["X", "Y", "Z"]}
+  ],
+  "change_summary": "Descripció dels canvis"
+}
+Operacions disponibles:
+- update_cell: Canvia una cel·la (row, col, value)
+- add_row: Afegeix fila després de after_row (values = array)
+- delete_row: Esborra fila (row)
+- update_row: Reescriu fila sencera (row, values)
+Índexs comencen a 0. Fila 0 = capçaleres.
 `;
 
   // Style guide
@@ -1187,7 +1224,12 @@ function parseAndValidate(rawText) {
     'REFERENCE': 'REFERENCE_HIGHLIGHT',
     'HIGHLIGHT': 'REFERENCE_HIGHLIGHT',
     'ANALYZE': 'REFERENCE_HIGHLIGHT',
-    'MARK': 'REFERENCE_HIGHLIGHT'
+    'MARK': 'REFERENCE_HIGHLIGHT',
+    // v6.0: Table Update mode
+    'TABLE_UPDATE': 'TABLE_UPDATE',
+    'TABLE_EDIT': 'TABLE_UPDATE',
+    'EDIT_TABLE': 'TABLE_UPDATE',
+    'MODIFY_TABLE': 'TABLE_UPDATE'
   };
 
   parsed.mode = modeMap[rawMode] || 'CHAT_ONLY';  // DEFAULT: CHAT_ONLY (safe)
@@ -1207,6 +1249,63 @@ function parseAndValidate(rawText) {
       // No valid blocks → convert to CHAT
       parsed.mode = 'CHAT_ONLY';
       parsed.chat_response = parsed.change_summary || parsed.userMessage || "No s'ha pogut generar contingut nou.";
+    } else {
+      // v6.0: Validate TABLE blocks
+      for (let i = 0; i < parsed.blocks.length; i++) {
+        const block = parsed.blocks[i];
+        if (block.type === 'TABLE') {
+          // Validate TABLE structure
+          if (!block.headers || !Array.isArray(block.headers) || block.headers.length === 0) {
+            block._error = 'TABLE: Falta headers';
+            continue;
+          }
+          if (!block.rows || !Array.isArray(block.rows)) {
+            block.rows = []; // Allow empty tables
+          }
+          // Ensure all rows have correct column count
+          const numCols = block.headers.length;
+          block.rows = block.rows.filter(row => Array.isArray(row)).map(row => {
+            // Pad or truncate to match headers
+            while (row.length < numCols) row.push('');
+            return row.slice(0, numCols).map(cell => String(cell));
+          });
+          // Convert headers to strings
+          block.headers = block.headers.map(h => String(h));
+        }
+      }
+    }
+  }
+
+  // ─── VALIDATE TABLE_UPDATE (v6.0) ───
+  if (parsed.mode === 'TABLE_UPDATE') {
+    if (typeof parsed.table_id !== 'number' || parsed.table_id < 0) {
+      parsed.mode = 'CHAT_ONLY';
+      parsed.chat_response = parsed.change_summary || "No s'ha pogut identificar la taula a modificar.";
+    } else if (!parsed.operations || !Array.isArray(parsed.operations) || parsed.operations.length === 0) {
+      parsed.mode = 'CHAT_ONLY';
+      parsed.chat_response = parsed.change_summary || "No s'han especificat operacions per la taula.";
+    } else {
+      // Validate each operation
+      const validActions = ['update_cell', 'add_row', 'delete_row', 'update_row'];
+      parsed.operations = parsed.operations.filter(op => {
+        if (!op.action || !validActions.includes(op.action)) return false;
+        switch (op.action) {
+          case 'update_cell':
+            return typeof op.row === 'number' && typeof op.col === 'number' && op.value !== undefined;
+          case 'add_row':
+            return typeof op.after_row === 'number' && Array.isArray(op.values);
+          case 'delete_row':
+            return typeof op.row === 'number';
+          case 'update_row':
+            return typeof op.row === 'number' && Array.isArray(op.values);
+          default:
+            return false;
+        }
+      });
+      if (parsed.operations.length === 0) {
+        parsed.mode = 'CHAT_ONLY';
+        parsed.chat_response = parsed.change_summary || "Les operacions de taula no són vàlides.";
+      }
     }
   }
 
@@ -1261,7 +1360,8 @@ function parseAndValidate(rawText) {
       'CHAT_ONLY': 'Intenció: consulta. Estratègia: respondre sense editar.',
       'UPDATE_BY_ID': 'Intenció: edició. Estratègia: modificar paràgrafs específics.',
       'REWRITE': 'Intenció: creació. Estratègia: generar contingut nou.',
-      'REFERENCE_HIGHLIGHT': 'Intenció: anàlisi. Estratègia: marcar seccions rellevants sense editar.'
+      'REFERENCE_HIGHLIGHT': 'Intenció: anàlisi. Estratègia: marcar seccions rellevants sense editar.',
+      'TABLE_UPDATE': 'Intenció: edició de taula. Estratègia: modificar cel·les o files específiques.'
     };
     parsed.thought = modeThoughts[parsed.mode] || 'Processant petició.';
   }
@@ -1420,7 +1520,8 @@ async function handleChat(body, env, corsHeaders) {
     doc_stats,     // v3.7: Universal Doc Reader stats
     client_hash,   // v4.0: Timeline - document hash before action
     word_count,    // v4.0: Timeline - word count for delta tracking
-    chat_attachments  // v8.0: Temporary file attachments from chat
+    chat_attachments,  // v8.0: Temporary file attachments from chat
+    images         // v6.0: Document images as base64 for multimodal analysis
   } = body;
 
   if (!license_key) throw new Error("missing_license");
@@ -1464,19 +1565,23 @@ async function handleChat(body, env, corsHeaders) {
 
   // 1. License validation and credit usage
   const licenseHash = await hashKey(license_key);
-  const creditsResult = await useCredits(env, licenseHash, doc_metadata);
-
-  // v4.0: Timeline Gap Detection - detect manual edits before AI processing
   const docId = doc_metadata?.doc_id || 'unknown';
-  let gapResult = null;
-  if (client_hash && docId !== 'unknown') {
-    try {
-      gapResult = await detectAndRecordGap(env, licenseHash, docId, client_hash, word_count || 0);
-    } catch (gapError) {
-      console.error('Gap detection failed:', gapError.message);
-      // Non-blocking: continue even if gap detection fails
-    }
-  }
+  const shouldDetectGap = client_hash && docId !== 'unknown';
+
+  // v8.2: PARALLELIZED - Run useCredits and detectAndRecordGap simultaneously
+  const [creditsResult, gapResult] = await Promise.all([
+    // Credit usage (always runs)
+    useCredits(env, licenseHash, doc_metadata),
+
+    // Gap detection (conditional, returns null if skipped)
+    shouldDetectGap
+      ? detectAndRecordGap(env, licenseHash, docId, client_hash, word_count || 0)
+          .catch(gapError => {
+            console.error('Gap detection failed:', gapError.message);
+            return null; // Non-blocking: continue even if gap detection fails
+          })
+      : Promise.resolve(null)
+  ]);
 
   // 2. Build system prompt (context-driven)
   // v3.7: Afegim doc_stats per UNIVERSAL DOC READER
@@ -1589,6 +1694,25 @@ INSTRUCCIÓ DE L'USUARI:
         mimeType: knowledge_file_mime || "application/pdf"
       }
     });
+  }
+
+  // v6.0: Add document images as inlineData for multimodal analysis
+  if (images && Array.isArray(images) && images.length > 0) {
+    let imageCount = 0;
+    for (const img of images) {
+      if (img.data && img.mimeType && imageCount < 3) {
+        userParts.push({
+          inlineData: {
+            mimeType: img.mimeType,
+            data: img.data  // base64 without "data:..." header
+          }
+        });
+        imageCount++;
+      }
+    }
+    if (imageCount > 0) {
+      console.log(`[Multimodal v6.0] Added ${imageCount} images to Gemini request`);
+    }
   }
 
   userParts.push({ text: currentMessage });
