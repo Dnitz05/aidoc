@@ -3120,7 +3120,30 @@ function findAndHighlight(searchText) {
     const startOffset = searchResult.getStartOffset();
     const endOffset = searchResult.getEndOffsetInclusive();
 
-    // Seleccionar el text (fa scroll automàtic + highlight natiu de Google Docs)
+    // Netejar highlight anterior (usa el mateix sistema que scrollToParagraph)
+    clearStructureHighlight();
+    clearDocRefHighlight();
+
+    // Aplicar highlight blau clar (similar a selecció)
+    const textElement = element.asText();
+    const highlightColor = '#a8d4ff';
+
+    if (startOffset >= 0 && endOffset >= 0) {
+      textElement.setBackgroundColor(startOffset, endOffset, highlightColor);
+
+      // Guardar per netejar després
+      const parent = element.getParent();
+      if (parent.getType() === DocumentApp.ElementType.BODY_SECTION) {
+        const childIndex = parent.getChildIndex(element);
+        PropertiesService.getDocumentProperties().setProperty('docRefHighlight', JSON.stringify({
+          childIndex: childIndex,
+          start: startOffset,
+          end: endOffset
+        }));
+      }
+    }
+
+    // Seleccionar per fer scroll
     const rangeBuilder = doc.newRange();
     if (startOffset >= 0 && endOffset >= 0) {
       rangeBuilder.addElement(element, startOffset, endOffset);
@@ -3131,15 +3154,41 @@ function findAndHighlight(searchText) {
 
     return {
       success: true,
-      foundText: element.asText().getText().substring(
+      foundText: textElement.getText().substring(
         Math.max(0, startOffset - 10),
-        Math.min(element.asText().getText().length, endOffset + 10)
+        Math.min(textElement.getText().length, endOffset + 10)
       )
     };
 
   } catch (e) {
     console.error('[findAndHighlight] Error:', e);
     return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Neteja el highlight de referència anterior
+ */
+function clearDocRefHighlight() {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    const saved = props.getProperty('docRefHighlight');
+
+    if (saved) {
+      const data = JSON.parse(saved);
+      const doc = DocumentApp.getActiveDocument();
+      const body = doc.getBody();
+
+      if (data.childIndex >= 0 && data.childIndex < body.getNumChildren()) {
+        const element = body.getChild(data.childIndex);
+        const text = element.asText();
+        text.setBackgroundColor(data.start, data.end, null);
+      }
+
+      props.deleteProperty('docRefHighlight');
+    }
+  } catch (e) {
+    // Ignorar errors de neteja
   }
 }
 

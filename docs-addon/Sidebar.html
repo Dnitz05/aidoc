@@ -5868,6 +5868,24 @@
         google.script.run.scrollToParagraph(idx);
       }
 
+      /**
+       * Scroll to the last edited paragraph in the document
+       */
+      function scrollToLastEdit() {
+        google.script.run
+          .withSuccessHandler(function(lastEdit) {
+            if (lastEdit && lastEdit.targetId !== undefined && lastEdit.targetId !== null) {
+              google.script.run.scrollToParagraph(parseInt(lastEdit.targetId, 10));
+            } else {
+              showToast('No hi ha edició recent', 'info');
+            }
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error navegant', 'error');
+          })
+          .loadLastEdit();
+      }
+
       // Legacy function alias for compatibility - redirects to new function
       function refreshSkeleton() {
         refreshStructure();
