@@ -2589,15 +2589,60 @@ function captureFullDocument(doc, body, isSelection, selectedElements) {
   // ═══ 2. CAPTURAR BODY (Contingut Principal) ═══
   let bodyContent = "";
 
-  // Si hi ha selecció, processar només els elements seleccionats
-  const elementsToProcess = isSelection && selectedElements ?
-    selectedElements : getAllChildElements(body);
+  // v5.4: CONTEXT EXPANDIT - Sempre obtenir tots els fills del body
+  const allBodyElements = getAllChildElements(body);
+  const totalElements = allBodyElements.length;
+
+  // Determinar quins elements processar i quins estan seleccionats
+  let elementsToProcess = [];
+  let selectedIndices = new Set();
+
+  if (isSelection && selectedElements && selectedElements.length > 0) {
+    // Trobar els índexs dels elements seleccionats dins del body
+    const selectionBodyIndices = [];
+    for (let i = 0; i < totalElements; i++) {
+      const bodyEl = allBodyElements[i];
+      for (const selEl of selectedElements) {
+        // Comparar elements (poden ser el mateix o parent/child)
+        if (bodyEl === selEl ||
+            (selEl.getParent && selEl.getParent() === bodyEl) ||
+            (bodyEl.getText && selEl.getText && bodyEl.getText() === selEl.getText())) {
+          selectionBodyIndices.push(i);
+          selectedIndices.add(i);
+          break;
+        }
+      }
+    }
+
+    if (selectionBodyIndices.length > 0) {
+      // Expandir rang ±3 elements al voltant de la selecció
+      const CONTEXT_WINDOW = 3;
+      const minIdx = Math.max(0, Math.min(...selectionBodyIndices) - CONTEXT_WINDOW);
+      const maxIdx = Math.min(totalElements - 1, Math.max(...selectionBodyIndices) + CONTEXT_WINDOW);
+
+      // Processar el rang expandit
+      for (let i = minIdx; i <= maxIdx; i++) {
+        elementsToProcess.push({ element: allBodyElements[i], bodyIndex: i });
+      }
+    } else {
+      // Fallback: si no trobem els elements, processar tot
+      for (let i = 0; i < totalElements; i++) {
+        elementsToProcess.push({ element: allBodyElements[i], bodyIndex: i });
+      }
+    }
+  } else {
+    // Sense selecció: processar tot el document
+    for (let i = 0; i < totalElements; i++) {
+      elementsToProcess.push({ element: allBodyElements[i], bodyIndex: i });
+    }
+  }
 
   stats.total_elements = elementsToProcess.length;
 
   for (let i = 0; i < elementsToProcess.length; i++) {
-    const element = elementsToProcess[i];
-    const result = processElement(element, globalIndex, mapIdToElement, stats);
+    const { element, bodyIndex } = elementsToProcess[i];
+    const isSelected = selectedIndices.has(bodyIndex);
+    const result = processElement(element, globalIndex, mapIdToElement, stats, isSelected);
     if (result.content) {
       bodyContent += result.content;
       globalIndex = result.nextIndex;
@@ -2673,11 +2718,15 @@ function captureFullDocument(doc, body, isSelection, selectedElements) {
 
 /**
  * Processa un element individual i retorna el seu contingut formatat
+ * v5.4: Afegit paràmetre isSelected per marcar elements seleccionats
  */
-function processElement(element, currentIndex, mapIdToElement, stats) {
+function processElement(element, currentIndex, mapIdToElement, stats, isSelected) {
   const elementType = element.getType();
   let content = "";
   let nextIndex = currentIndex;
+
+  // v5.4: Marcador per elements seleccionats
+  const selMarker = isSelected ? '⟦SEL⟧ ' : '';
 
   switch (elementType) {
     case DocumentApp.ElementType.PARAGRAPH:
@@ -2691,7 +2740,7 @@ function processElement(element, currentIndex, mapIdToElement, stats) {
         else if (heading === DocumentApp.ParagraphHeading.HEADING3) prefix = "### ";
         else if (heading === DocumentApp.ParagraphHeading.HEADING4) prefix = "#### ";
 
-        content = `{{${currentIndex}}} ${prefix}${pText}\n`;
+        content = `{{${currentIndex}}} ${selMarker}${prefix}${pText}\n`;
         mapIdToElement[currentIndex] = element;
         nextIndex = currentIndex + 1;
         stats.captured_paragraphs++;
@@ -2708,7 +2757,7 @@ function processElement(element, currentIndex, mapIdToElement, stats) {
         const bullet = (glyphType === DocumentApp.GlyphType.NUMBER) ?
           `${element.getListId()}.` : "•";
 
-        content = `{{${currentIndex}}} ${indent}${bullet} ${liText}\n`;
+        content = `{{${currentIndex}}} ${selMarker}${indent}${bullet} ${liText}\n`;
         mapIdToElement[currentIndex] = element;
         nextIndex = currentIndex + 1;
         stats.captured_lists++;

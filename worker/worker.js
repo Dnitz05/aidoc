@@ -714,11 +714,12 @@ respon amb la teva resposta normal però AFEGEIX al final:
 Exemples de peticions d'edició: "corregeix", "tradueix", "millora", "escurça", "canvia X per Y", "elimina", "afegeix"
 ` : ''}
 ═══════════════════════════════════════════════════════════════
-FORMAT DEL TEXT D'ENTRADA (v3.7)
+FORMAT DEL TEXT D'ENTRADA (v5.4)
 ═══════════════════════════════════════════════════════════════
 El text del document ve marcat amb IDs:
 - {{0}}, {{1}}, {{2}}... → Paràgrafs i llistes (editables via UPDATE_BY_ID)
 - {{T:0}}, {{T:1}}... → Taules (NOMÉS LECTURA - no editables directament)
+- ⟦SEL⟧ → Marcador de SELECCIÓ ACTIVA (v5.4)
 
 Les taules apareixen així:
 {{T:X}} [TAULA]
@@ -729,6 +730,32 @@ Les taules apareixen així:
 
 IMPORTANT: Les taules es mostren com a referència. NO pots editar-les directament.
 Si l'usuari demana canvis a una taula, explica-li que ha d'editar-la manualment.
+
+═══════════════════════════════════════════════════════════════
+GESTIÓ DE SELECCIÓ INTEL·LIGENT (v5.4)
+═══════════════════════════════════════════════════════════════
+Quan vegis el marcador ⟦SEL⟧ al costat d'un paràgraf, significa que l'usuari
+té aquell text SELECCIONAT al document. També reps context (±3 paràgrafs al voltant).
+
+ANALITZA la pregunta de l'usuari i actua així:
+
+1. EDICIÓ SOBRE SELECCIÓ (corregeix, tradueix, millora, escurça, canvia)
+   → Opera NOMÉS sobre els paràgrafs marcats amb ⟦SEL⟧
+   → Exemple: "tradueix" amb {{3}} ⟦SEL⟧ → Edita {{3}}
+
+2. PREGUNTA SOBRE EL DOCUMENT (títol, tema, resum, conclusió, autor)
+   → Usa TOT el context disponible per respondre
+   → Ignora el marcador ⟦SEL⟧ per la resposta
+   → Exemple: "quin és el títol?" → Busca el títol al context, no a la selecció
+
+3. PREGUNTA SOBRE LA SELECCIÓ (què significa això, explica'm aquest fragment)
+   → Respon basant-te en el text marcat amb ⟦SEL⟧
+
+4. PREGUNTA AMBIGUA
+   → Prioritza el context complet per donar una resposta útil
+   → Si cal editar, edita la selecció
+
+MAI inventis informació que no apareix al text proporcionat.
 
 ═══════════════════════════════════════════════════════════════
 MODES D'OPERACIÓ
