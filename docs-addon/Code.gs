@@ -2204,6 +2204,47 @@ function updateParagraphPreservingAttributes(element, newMarkdownText) {
   const oldText = textObj.getText();
   const cleanText = cleanMarkdown(newMarkdownText);
 
+  // 1. Guardar atributs del PARÀGRAF (heading, alignment, spacing, indentation)
+  let paragraphHeading = null;
+  let paragraphAlignment = null;
+  let lineSpacing = null;
+  let spacingBefore = null;
+  let spacingAfter = null;
+  let indentStart = null;
+  let indentEnd = null;
+  let indentFirstLine = null;
+
+  try {
+    if (element.getHeading) paragraphHeading = element.getHeading();
+    if (element.getAlignment) paragraphAlignment = element.getAlignment();
+    if (element.getLineSpacing) lineSpacing = element.getLineSpacing();
+    if (element.getSpacingBefore) spacingBefore = element.getSpacingBefore();
+    if (element.getSpacingAfter) spacingAfter = element.getSpacingAfter();
+    if (element.getIndentStart) indentStart = element.getIndentStart();
+    if (element.getIndentEnd) indentEnd = element.getIndentEnd();
+    if (element.getIndentFirstLine) indentFirstLine = element.getIndentFirstLine();
+  } catch (e) {
+    // Element sense aquests mètodes (graceful degradation)
+  }
+
+  // 2. Guardar atributs del TEXT (font, size, color) del primer caràcter
+  let fontFamily = null;
+  let fontSize = null;
+  let foregroundColor = null;
+  let backgroundColor = null;
+
+  if (oldText.length > 0) {
+    try {
+      fontFamily = textObj.getFontFamily(0);
+      fontSize = textObj.getFontSize(0);
+      foregroundColor = textObj.getForegroundColor(0);
+      backgroundColor = textObj.getBackgroundColor(0);
+    } catch (e) {
+      // Atributs no disponibles
+    }
+  }
+
+  // 3. Aplicar el text nou
   if (oldText.length > 0) {
     textObj.insertText(0, cleanText);
     const startOfOld = cleanText.length;
@@ -2212,6 +2253,51 @@ function updateParagraphPreservingAttributes(element, newMarkdownText) {
   } else {
     textObj.setText(cleanText);
   }
+
+  // 4. Restaurar atributs del TEXT a tot el nou contingut
+  const newLength = cleanText.length;
+  if (newLength > 0) {
+    try {
+      if (fontFamily) textObj.setFontFamily(0, newLength - 1, fontFamily);
+      if (fontSize) textObj.setFontSize(0, newLength - 1, fontSize);
+      if (foregroundColor) textObj.setForegroundColor(0, newLength - 1, foregroundColor);
+      // Nota: No restaurem backgroundColor per defecte (pot ser del preview)
+    } catch (e) {
+      // Error aplicant atributs de text
+    }
+  }
+
+  // 5. Restaurar atributs del PARÀGRAF
+  try {
+    if (paragraphHeading !== null && element.setHeading) {
+      element.setHeading(paragraphHeading);
+    }
+    if (paragraphAlignment !== null && element.setAlignment) {
+      element.setAlignment(paragraphAlignment);
+    }
+    if (lineSpacing !== null && element.setLineSpacing) {
+      element.setLineSpacing(lineSpacing);
+    }
+    if (spacingBefore !== null && element.setSpacingBefore) {
+      element.setSpacingBefore(spacingBefore);
+    }
+    if (spacingAfter !== null && element.setSpacingAfter) {
+      element.setSpacingAfter(spacingAfter);
+    }
+    if (indentStart !== null && element.setIndentStart) {
+      element.setIndentStart(indentStart);
+    }
+    if (indentEnd !== null && element.setIndentEnd) {
+      element.setIndentEnd(indentEnd);
+    }
+    if (indentFirstLine !== null && element.setIndentFirstLine) {
+      element.setIndentFirstLine(indentFirstLine);
+    }
+  } catch (e) {
+    // Error restaurant atributs de paràgraf
+  }
+
+  // 6. Aplicar markdown inline (bold, italic)
   applyInlineMarkdown(element, newMarkdownText);
 }
 

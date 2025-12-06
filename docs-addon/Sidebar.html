@@ -2413,100 +2413,39 @@
           html = '<p class="md-para">' + html + '</p>';
         }
 
-        // 15. v6.7: Document References - [[text]] → botons clicables
-        html = parseDocumentReferences(html);
+        // 15. v6.8: Document References - [[text]] → text destacat (botó a cantonada)
+        const refResult = parseDocumentReferences(html);
 
-        return html;
+        return { html: refResult.html, firstRef: refResult.firstRef };
+      }
+
+      // Wrapper per compatibilitat - retorna només HTML
+      function renderMarkdownHtml(text) {
+        const result = renderMarkdown(text);
+        return typeof result === 'object' ? result.html : result;
       }
 
       /**
-       * v6.7: Parseja referències [[text]] i les converteix en text + icona clicable
+       * v6.8: Parseja referències [[text]] - només extreu el text, sense botó inline
+       * El botó de la cantonada s'encarrega de navegar
        * @param {string} html - HTML amb possibles referències
-       * @returns {string} - HTML amb text visible i botó per navegar
+       * @returns {Object} - { html: string, firstRef: string|null }
        */
       function parseDocumentReferences(html) {
         // Regex: [[text]] - captura el contingut entre dobles claudàtors
         const refPattern = /\[\[([^\]]+)\]\]/g;
+        let firstRef = null;
 
-        return html.replace(refPattern, function(match, searchText) {
-          // Escapar cometes per l'onclick
-          const escaped = searchText
-            .replace(/\\/g, '\\\\')
-            .replace(/'/g, "\\'")
-            .replace(/"/g, '&quot;');
-
-          // Mostrar el TEXT COMPLET + icona d'ull per navegar
-          return '<span class="doc-ref">' +
-                 '<span class="doc-ref-text">' + searchText + '</span>' +
-                 '<button class="doc-ref-btn" onclick="findInDocument(\'' + escaped + '\')" ' +
-                 'title="Mostrar al document">' +
-                 '<svg class="doc-ref-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-                 '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>' +
-                 '<circle cx="12" cy="12" r="3"/>' +
-                 '</svg></button></span>';
+        const result = html.replace(refPattern, function(match, searchText) {
+          // Guardar la primera referència per al botó de cantonada
+          if (!firstRef) {
+            firstRef = searchText;
+          }
+          // Mostrar només el text, sense botó inline
+          return '<span class="doc-ref-text">' + searchText + '</span>';
         });
-      }
 
-      /**
-       * v6.7: Cerca text al document i fa scroll/highlight
-       * @param {string} searchText - Text a buscar
-       */
-      function findInDocument(searchText) {
-        // Buscar el botó per donar feedback visual
-        const btn = event && event.target ? event.target.closest('.doc-ref-btn') : null;
-        if (btn) btn.classList.add('loading');
-
-        google.script.run
-          .withSuccessHandler(function(result) {
-            if (btn) btn.classList.remove('loading');
-
-            if (result.success) {
-              // Feedback visual: el botó fa "pulse" verd
-              if (btn) {
-                btn.classList.add('success');
-                setTimeout(function() { btn.classList.remove('success'); }, 1500);
-              }
-            } else {
-              // Fallback: copiar al clipboard
-              if (result.fallback === 'clipboard' || result.textToCopy) {
-                copyToClipboardFallback(result.textToCopy || searchText);
-                showToast('Text copiat. Usa Ctrl+F per buscar.', 'info');
-              } else {
-                showToast(result.error || 'No trobat', 'error');
-              }
-            }
-          })
-          .withFailureHandler(function(error) {
-            if (btn) btn.classList.remove('loading');
-            // Fallback: copiar al clipboard
-            copyToClipboardFallback(searchText);
-            showToast('Error. Text copiat - usa Ctrl+F', 'error');
-          })
-          .findInDocumentWithFallback(searchText);
-      }
-
-      /**
-       * v6.7: Copia text al clipboard com a fallback
-       */
-      function copyToClipboardFallback(text) {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).catch(function() {
-            // Fallback per navegadors antics
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-          });
-        } else {
-          const textarea = document.createElement('textarea');
-          textarea.value = text;
-          document.body.appendChild(textarea);
-          textarea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textarea);
-        }
+        return { html: result, firstRef: firstRef };
       }
 
       function addBubble(type, text, isEdit, lastEditWord, selectionBadge) {
@@ -2529,42 +2468,93 @@
             '<span class="selection-badge-text">' + sanitizeText(selectionBadge) + '</span></div>';
         }
 
-        // Eye button for AI bubbles (top-right corner)
-        const eyeBtn = '<button class="bubble-eye-btn" onclick="scrollToLastEdit()" title="Veure al document">' +
-          '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
-          '</button>';
-
         if (type === 'ai' && isEdit) {
-          // v10.0: Badge només mostra indicador + Prohibir (el Desfer està a l'Undo Bar)
-          let badgeHtml = '<div class="edit-badge">' + icon('check', 'i--sm i--success') + ' Fet!';
+          // v6.8: Renderitzar markdown i obtenir referència
+          const mdResult = renderMarkdown(text);
+          const mdHtml = typeof mdResult === 'object' ? mdResult.html : mdResult;
+          const firstRef = typeof mdResult === 'object' ? mdResult.firstRef : null;
 
-          // v2.8: Add "ban word" button if we have a recently changed word
+          // v6.8: Eye button amb referència o lastEdit
+          const eyeBtn = createEyeButton(firstRef);
+
+          let badgeHtml = '<div class="edit-badge">' + icon('check', 'i--sm i--success') + ' Fet!';
           if (lastEditWord) {
             badgeHtml += '<button class="ban-word-btn" onclick="addToBannedFromChat(\'' +
               lastEditWord.replace(/'/g, "\\'") + '\')" title="No usar mai aquesta paraula">' +
               icon('ban', 'i--error i--sm') + ' Prohibir</button>';
           }
-
           badgeHtml += '</div>';
-          // v6.5: Use markdown for AI responses with edit badge
-          bubble.innerHTML = eyeBtn + badgeHtml + '<div class="md-content">' + renderMarkdown(text) + '</div>';
+
+          bubble.innerHTML = eyeBtn + badgeHtml + '<div class="md-content">' + mdHtml + '</div>';
+          if (firstRef) bubble.dataset.docRef = firstRef;
+
         } else if (type === 'ai') {
-          // v6.5: AI responses with markdown rendering
-          bubble.innerHTML = eyeBtn + '<div class="md-content">' + renderMarkdown(text) + '</div>';
+          // v6.8: AI responses with markdown rendering
+          const mdResult = renderMarkdown(text);
+          const mdHtml = typeof mdResult === 'object' ? mdResult.html : mdResult;
+          const firstRef = typeof mdResult === 'object' ? mdResult.firstRef : null;
+
+          const eyeBtn = createEyeButton(firstRef);
+          bubble.innerHTML = eyeBtn + '<div class="md-content">' + mdHtml + '</div>';
+          if (firstRef) bubble.dataset.docRef = firstRef;
+
         } else if (type === 'error' || type === 'system') {
-          // v3.3: Errors i system poden tenir HTML per icones (controlat internament)
           bubble.innerHTML = text;
         } else if (type === 'user') {
-          // v6.7: User messages amb botó per desar com a recepta
           const saveBtn = '<button class="save-prompt-btn" onclick="saveAsRecipe(this)" title="Desar com a recepta">' +
             icon('bookmark', 'i--xs') + '</button>';
           bubble.innerHTML = (selectionBadge ? selectionHtml : '') +
             '<div class="user-text">' + sanitizeText(text) + '</div>' + saveBtn;
-          bubble.dataset.prompt = text; // Guardar text original per desar
+          bubble.dataset.prompt = text;
         }
 
         container.appendChild(bubble);
         container.scrollTop = container.scrollHeight;
+      }
+
+      /**
+       * v6.8: Crea el botó d'ull per la cantonada
+       * @param {string|null} docRef - Referència al document o null per lastEdit
+       */
+      function createEyeButton(docRef) {
+        if (docRef) {
+          const escaped = docRef.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          return '<button class="bubble-eye-btn" onclick="navigateToReference(this, \'' + escaped + '\')" title="Mostrar al document">' +
+            '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
+            '</button>';
+        } else {
+          return '<button class="bubble-eye-btn" onclick="scrollToLastEdit()" title="Veure al document">' +
+            '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
+            '</button>';
+        }
+      }
+
+      /**
+       * v6.8: Navega a una referència del document amb feedback visual
+       * Auto-clear del highlight després de 2.5 segons
+       */
+      function navigateToReference(btn, searchText) {
+        btn.classList.add('loading');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            btn.classList.remove('loading');
+            if (result.success) {
+              btn.classList.add('success');
+              setTimeout(function() { btn.classList.remove('success'); }, 1500);
+              // Auto-clear highlight after 2.5s
+              setTimeout(function() {
+                google.script.run.clearHighlight();
+              }, 2500);
+            } else {
+              showToast(result.error || 'No trobat', 'error');
+            }
+          })
+          .withFailureHandler(function(error) {
+            btn.classList.remove('loading');
+            showToast('Error: ' + error.message, 'error');
+          })
+          .highlightElement({ mode: 'text', value: searchText });
       }
 
       // v8.0: Add bubble with raw HTML content (for file attachments)
@@ -3122,10 +3112,18 @@
           const isCurrent = index === currentEventIndex;
 
           // Build class names
+          // v4.3: Determine if this event can be reverted
+          const hasBeforeText = event.before_text && event.before_text.length > 0;
+          const isRevertible = event.source === 'ai' && !event.reverted_at && event.type !== 'REVERT' && !isBaseline && hasBeforeText && !isInvalidated;
+
+          // Build class names
           let cardClasses = 'timeline-card';
           cardClasses += isManual ? ' timeline-manual' : isBaseline ? ' timeline-baseline' : ' timeline-ai';
           if (isInvalidated) cardClasses += ' timeline-invalidated';
           if (isCurrent) cardClasses += ' timeline-current';
+          // v4.3: Add reference class for non-revertible events (more subtle)
+          if (isManual && !isBaseline) cardClasses += ' timeline-reference';
+          if (isBaseline) cardClasses += ' timeline-baseline-ref';
           card.className = cardClasses;
           card.style.animationDelay = (index * 30) + 'ms';
 
@@ -3162,11 +3160,6 @@
             wordsInfo = '<span class="timeline-words" style="color: var(--text-muted)">' + event.word_count + ' paraules al document</span>';
           }
 
-          // Can revert? Only AI edits with before_text that aren't already reverted
-          const hasBeforeText = event.before_text && event.before_text.length > 0;
-          const canRevert = event.source === 'ai' && !event.reverted_at && event.type !== 'REVERT' && !isBaseline && hasBeforeText;
-          const isAiButCantRevert = event.source === 'ai' && !event.reverted_at && event.type !== 'REVERT' && !isBaseline && !hasBeforeText;
-
           // Build body content based on type
           let bodyContent = '';
           if (isManual || isBaseline) {
@@ -3178,21 +3171,20 @@
               wordsInfo;
           }
 
-          // v4.2: Botó revert visible al header (o indicador si no es pot)
-          // v4.3: Don't show revert button for invalidated events
+          // v4.3: Revert button only for revertible events
           let revertButtonHtml = '';
-          if (!isInvalidated && canRevert) {
-            revertButtonHtml = '<button class="timeline-revert-btn-mini" onclick="event.stopPropagation(); revertTimelineEvent(\'' + event.id + '\', \'' + escapeHtml((event.before_text || '').substring(0, 40)).replace(/'/g, "\\'") + '\')" title="Revertir aquesta edició"><span class="i i--xs">' + ICONS.rotateCcw + '</span></button>';
-          } else if (!isInvalidated && isAiButCantRevert) {
-            revertButtonHtml = '<span class="timeline-no-revert" title="No es pot revertir: falta text original">⚠</span>';
+          if (isRevertible) {
+            revertButtonHtml = '<button class="timeline-revert-btn-mini" onclick="event.stopPropagation(); revertTimelineEvent(\'' + event.id + '\', \'' + escapeHtml((event.before_text || '').substring(0, 40)).replace(/'/g, "\\'") + '\')" title="Revertir a aquest punt"><span class="i i--xs">' + ICONS.rotateCcw + '</span></button>';
           }
 
-          // v4.3: Status badges
+          // v4.3: Status badges - show what type of event this is
           let statusBadge = '';
           if (isCurrent) {
             statusBadge = '<span class="timeline-current-badge">● Actual</span>';
           } else if (isInvalidated) {
             statusBadge = '<span class="timeline-invalidated-badge">Obsolet</span>';
+          } else if (isManual || isBaseline) {
+            statusBadge = '<span class="timeline-reference-badge">Referència</span>';
           }
 
           card.innerHTML =
@@ -5871,16 +5863,26 @@
       /**
        * Scroll to the last edited paragraph in the document
        * v6.8: FIX - targetId és elementId ({{0}}), no bodyIndex
+       * Auto-clear del highlight després de 2.5 segons
        */
       function scrollToLastEdit() {
         google.script.run
           .withSuccessHandler(function(lastEdit) {
             if (lastEdit && lastEdit.targetId !== undefined && lastEdit.targetId !== null) {
               // v6.8: Usar mode 'elementId' perquè targetId és ID del sistema {{0}}, {{1}}
-              google.script.run.highlightElement({
-                mode: 'elementId',
-                value: parseInt(lastEdit.targetId, 10)
-              });
+              google.script.run
+                .withSuccessHandler(function(result) {
+                  if (result.success) {
+                    // Auto-clear highlight after 2.5s
+                    setTimeout(function() {
+                      google.script.run.clearHighlight();
+                    }, 2500);
+                  }
+                })
+                .highlightElement({
+                  mode: 'elementId',
+                  value: parseInt(lastEdit.targetId, 10)
+                });
             } else {
               showToast('No hi ha edició recent', 'info');
             }
