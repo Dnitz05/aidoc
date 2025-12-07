@@ -2,7 +2,7 @@
 
 **"Lovable for Google Docs"** - Motor d'Enginyeria Documental amb IA
 
-[![Version](https://img.shields.io/badge/version-6.8-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-6.9-blue.svg)]()
 [![Platform](https://img.shields.io/badge/platform-Google%20Docs-green.svg)]()
 [![AI](https://img.shields.io/badge/AI-Gemini%202.0-orange.svg)]()
 
@@ -25,13 +25,14 @@ Docmile         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 
 ## Features
 
-### Core (v6.8)
+### Core (v6.9)
 
 | Feature | Descripció |
 |---------|------------|
 | **Smart Selection** (v5.4) | Context expandit ±3 paràgrafs amb marcador ⟦SEL⟧ |
 | **Document References** (v6.7) | Referències vives que enllacen mencions al xat amb seccions del document |
 | **Reference Highlighting** (v6.7) | Ressaltat de seccions amb colors (groc, taronja, blau, lila) |
+| **Prompts Professionals** (v6.9) | Receptes amb instruccions detallades i específiques |
 | **Table Support** (v6.0) | Lectura i visualització de taules en format Markdown |
 | **Multimodal AI** (v6.0) | Suport per anàlisi d'imatges amb Gemini |
 | **Knowledge Library** | Biblioteca de fitxers compartida entre documents |
@@ -45,7 +46,7 @@ Docmile         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 | **Chain of Thought** | La IA raona abans d'actuar (`thought` obligatori) |
 | **Atomic Operations** | `UPDATE_BY_ID` - edita paràgrafs específics |
 | **Time Budget** | Safety cutoff de 25s per evitar timeouts |
-| **Receipts** | Macros personalitzades (Custom Actions) |
+| **Receipts** | Macros personalitzades amb 5 carpetes predefinides |
 | **File Upload** (v6.5) | Validació de MIME type, extensió i mida |
 
 ### Modes d'Operació

@@ -1,11 +1,17 @@
 /**
- * SIDECAR CORE API v3.1 - Shadow Validator (Surgical Refactor)
+ * SIDECAR CORE API v8.3 - Multi-Agent Pipeline
  *
- * v3.1 features:
- * - NEW: Time Budget (25s safety cutoff)
- * - NEW: Unified validateResponse() function
- * - NEW: Graceful degradation with _meta warnings
- * - IMPROVED: processWithRetry() pattern
+ * v8.3 features (NEW):
+ * - Multi-Agent Pipeline amb classificació IA (Gemini)
+ * - Cache semàntic de dos nivells (L1 sessió + L2 embeddings)
+ * - Circuit Breaker per protecció d'errors
+ * - Fast paths per salutacions i casos trivials
+ * - Executors especialitzats per mode (CHAT, HIGHLIGHT, UPDATE, REWRITE)
+ *
+ * v3.1 features (preserved):
+ * - Time Budget (25s safety cutoff)
+ * - Unified validateResponse() function
+ * - Graceful degradation with _meta warnings
  *
  * v3.0 features (preserved):
  * - Event Sourcing (edit_events table)
@@ -15,19 +21,12 @@
  * v2.9 features (preserved):
  * - Document Skeleton (doc_skeleton) - estructura + entitats
  * - Context-aware prompting with document structure
- *
- * v2.8 features (preserved):
- * - Banned Expressions (negative_constraints)
- * - Hybrid Validator (local regex + LLM retry)
- *
- * v2.7 features (preserved):
- * - "Motor d'Enginyeria" system prompt (Lovable-style)
- * - Mandatory "thought" field (Chain of Thought)
- *
- * v2.6.x features (preserved):
- * - Mode selector (auto | edit | chat)
- * - lastEdit memory, revert button, pinned_prefs
  */
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORTS
+// ═══════════════════════════════════════════════════════════════
+import { tryNewPipeline } from './multiagent/index.js';
 
 // ═══════════════════════════════════════════════════════════════
 // SHADOW VALIDATOR CONSTANTS (v3.1)
@@ -1958,6 +1957,75 @@ async function handleChat(body, env, corsHeaders) {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // v8.3: MULTI-AGENT PIPELINE (Nova arquitectura de classificació IA)
+  // ═══════════════════════════════════════════════════════════════
+  try {
+    const newPipelineResult = await tryNewPipeline(body, env);
+
+    if (newPipelineResult) {
+      // Pipeline ha processat la petició - validar crèdits
+      const licenseHash = await hashKey(license_key);
+      const creditsResult = await useCredits(env, licenseHash, doc_metadata);
+
+      // Event sourcing per edicions (mantenim compatibilitat amb timeline)
+      let savedEventId = null;
+      const docId = doc_metadata?.doc_id || 'unknown';
+
+      if (newPipelineResult.mode === 'UPDATE_BY_ID' && newPipelineResult.updates) {
+        const updateEntries = Object.entries(newPipelineResult.updates);
+        if (updateEntries.length > 0) {
+          const [targetId, afterText] = updateEntries[0];
+          const eventData = {
+            license_hash: licenseHash,
+            doc_id: docId,
+            event_type: 'ai_edit',
+            target_id: parseInt(targetId, 10),
+            before_text: text.match(new RegExp(`\\{\\{${targetId}\\}\\}\\s*([\\s\\S]*?)(?=\\{\\{|$)`))?.[1]?.trim() || '',
+            after_text: afterText,
+            instruction: user_instruction,
+            ai_reasoning: newPipelineResult.thought || ''
+          };
+          const savedEvent = await saveEditEvent(env, eventData);
+          if (savedEvent) savedEventId = savedEvent.id;
+        }
+      } else if (newPipelineResult.mode === 'REWRITE' && newPipelineResult.blocks) {
+        const eventData = {
+          license_hash: licenseHash,
+          doc_id: docId,
+          event_type: 'ai_rewrite',
+          target_id: -1,
+          before_text: JSON.stringify({ blocks_affected: newPipelineResult.blocks.length }),
+          after_text: JSON.stringify(newPipelineResult.blocks),
+          instruction: user_instruction,
+          ai_reasoning: newPipelineResult.thought || ''
+        };
+        const savedEvent = await saveEditEvent(env, eventData);
+        if (savedEvent) savedEventId = savedEvent.id;
+      }
+
+      console.log(`[Multi-Agent v8.3] ✅ Pipeline completed: ${newPipelineResult.mode}`);
+
+      return new Response(JSON.stringify({
+        status: "ok",
+        data: newPipelineResult,
+        credits_remaining: creditsResult.credits_remaining || 0,
+        event_id: savedEventId,
+        _multiagent: newPipelineResult._multiagent,
+        _debug: {
+          version: "8.3.0-multiagent",
+          pipeline: "new",
+          has_selection: has_selection,
+          elapsed_ms: Date.now() - startTime
+        }
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+  } catch (pipelineError) {
+    console.error('[Multi-Agent v8.3] Pipeline error, falling back to legacy:', pipelineError.message);
+    // Continuar amb pipeline legacy
+  }
+  // ═══════════════════════════════════════════════════════════════
 
   // v4.0: Detect NL ban patterns (Sprint 3)
   const autoBanWords = detectNLBanPatterns(user_instruction);

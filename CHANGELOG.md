@@ -6,6 +6,45 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [6.9] - 2024-12-07
+
+### Added
+- **Botó tornar enrere a Receptes** - Navegació millorada
+  - Fletxa a l'esquerra del camp "Cerca receptes"
+  - Torna al xat (landing o conversa activa)
+  - Estil consistent amb els altres botons del toolbar
+
+- **Nova recepta "Clarificar"** a la carpeta Redacció
+  - Reorganitza idees en ordre lògic
+  - Explicita connexions implícites entre conceptes
+  - Reformula frases ambigües
+
+### Changed
+- **Millora de tots els prompts de receptes** - Qualitat professional
+  - Landing: Corregeix, Explica, Resumeix, Millora - prompts més específics
+  - Redacció: 6 receptes amb instruccions detallades
+  - Traducció: Adapta expressions idiomàtiques
+  - Longitud: Proporcions concretes (un terç)
+  - Estil: Accions específiques per cada estil
+
+### Fixed
+- **Icones de receptes ara es renderitzen correctament**
+  - `runRecipe` i `runReceipt` usen `addBubbleHtml` en lloc de `addBubble`
+  - Evita que `sanitizeText` escapi el HTML de les icones
+
+- **Landing s'amaga quan s'executa una recepta**
+  - Afegit `hideChatLanding()` a `runRecipe` i `runReceipt`
+  - Comportament consistent amb enviar missatges normals
+
+### Docs
+- **Política de privacitat actualitzada** (privacy.html)
+  - Nova secció 2.3: Conversation History
+  - Nova secció 2.4: Knowledge Library (Uploaded Files)
+  - Taules de retenció actualitzades
+  - Data: December 6, 2025
+
+---
+
 ## [6.8] - 2024-12-06
 
 ### Added

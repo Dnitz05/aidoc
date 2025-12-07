@@ -1,0 +1,1093 @@
+{
+  "version": "1.0",
+  "description": "Dataset de test pel classificador multi-agent v8.3",
+  "created": "2025-12-07",
+  "total_cases": 200,
+  "categories": {
+    "REFERENCE_HIGHLIGHT": 60,
+    "CHAT_ONLY": 50,
+    "UPDATE_BY_ID": 40,
+    "REWRITE": 30,
+    "CLARIFICATION_NEEDED": 20
+  },
+  "test_cases": [
+    {
+      "id": "RH001",
+      "instruction": "Veus faltes al document?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "errors",
+      "expected_scope": "word",
+      "expected_is_question": true,
+      "notes": "Cas clàssic - pregunta sobre errors",
+      "language": "ca"
+    },
+    {
+      "id": "RH002",
+      "instruction": "Hi ha errors ortogràfics?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "errors",
+      "expected_scope": "word",
+      "expected_is_question": true,
+      "notes": "Pregunta directa sobre errors",
+      "language": "ca"
+    },
+    {
+      "id": "RH003",
+      "instruction": "Pots revisar si es citen els serveis de cultura?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["serveis de cultura"],
+      "expected_scope": "phrase",
+      "expected_is_question": true,
+      "notes": "Cas que fallava amb regex - revisar mencions",
+      "language": "ca"
+    },
+    {
+      "id": "RH004",
+      "instruction": "On parla de pressupost?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["pressupost"],
+      "expected_scope": "phrase",
+      "expected_is_question": true,
+      "notes": "Localització directa de terme",
+      "language": "ca"
+    },
+    {
+      "id": "RH005",
+      "instruction": "Detecta inconsistències al document",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "issues",
+      "expected_scope": "sentence",
+      "expected_is_question": false,
+      "notes": "Ordre de detecció",
+      "language": "ca"
+    },
+    {
+      "id": "RH006",
+      "instruction": "Marca on es menciona l'article 5",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["article 5"],
+      "expected_scope": "phrase",
+      "expected_is_question": false,
+      "notes": "Ordre explícita de marcar",
+      "language": "ca"
+    },
+    {
+      "id": "RH007",
+      "instruction": "Assenyala les repeticions",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "issues",
+      "expected_scope": "phrase",
+      "expected_is_question": false,
+      "notes": "Detecció de problemes estilístics",
+      "language": "ca"
+    },
+    {
+      "id": "RH008",
+      "instruction": "Trobes problemes de coherència?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "issues",
+      "expected_scope": "paragraph",
+      "expected_is_question": true,
+      "notes": "Anàlisi qualitativa",
+      "language": "ca"
+    },
+    {
+      "id": "RH009",
+      "instruction": "Quines parts parlen de la metodologia?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["metodologia"],
+      "expected_scope": "section",
+      "expected_is_question": true,
+      "notes": "Localització de seccions",
+      "language": "ca"
+    },
+    {
+      "id": "RH010",
+      "instruction": "Revisa la gramàtica",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "errors",
+      "expected_scope": "word",
+      "expected_is_question": false,
+      "notes": "Revisió gramatical",
+      "language": "ca"
+    },
+    {
+      "id": "RH011",
+      "instruction": "¿Hay errores en el documento?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "errors",
+      "expected_scope": "word",
+      "expected_is_question": true,
+      "notes": "Castellà - errors",
+      "language": "es"
+    },
+    {
+      "id": "RH012",
+      "instruction": "¿Dónde se menciona el presupuesto?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["presupuesto"],
+      "expected_scope": "phrase",
+      "expected_is_question": true,
+      "notes": "Castellà - localització",
+      "language": "es"
+    },
+    {
+      "id": "RH013",
+      "instruction": "Find spelling mistakes",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "errors",
+      "expected_scope": "word",
+      "expected_is_question": false,
+      "notes": "Anglès - errors",
+      "language": "en"
+    },
+    {
+      "id": "RH014",
+      "instruction": "Where does it talk about budget?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["budget"],
+      "expected_scope": "phrase",
+      "expected_is_question": true,
+      "notes": "Anglès - localització",
+      "language": "en"
+    },
+    {
+      "id": "RH015",
+      "instruction": "Mostra'm on hi ha ambigüitats",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "issues",
+      "expected_scope": "sentence",
+      "expected_is_question": false,
+      "notes": "Problemes d'ambigüitat",
+      "language": "ca"
+    },
+    {
+      "id": "RH016",
+      "instruction": "Hi ha frases massa llargues?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "issues",
+      "expected_scope": "sentence",
+      "expected_is_question": true,
+      "notes": "Problemes d'estil",
+      "language": "ca"
+    },
+    {
+      "id": "RH017",
+      "instruction": "Indica els punts febles del text",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "issues",
+      "expected_scope": "paragraph",
+      "expected_is_question": false,
+      "notes": "Anàlisi qualitativa",
+      "language": "ca"
+    },
+    {
+      "id": "RH018",
+      "instruction": "Busca on es parla dels objectius",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["objectius"],
+      "expected_scope": "section",
+      "expected_is_question": false,
+      "notes": "Cerca de contingut",
+      "language": "ca"
+    },
+    {
+      "id": "RH019",
+      "instruction": "El document té faltes d'ortografia?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "errors",
+      "expected_scope": "word",
+      "expected_is_question": true,
+      "notes": "Pregunta sobre errors",
+      "language": "ca"
+    },
+    {
+      "id": "RH020",
+      "instruction": "Ressalta les conclusions",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "structure",
+      "expected_keywords": ["conclusions"],
+      "expected_scope": "section",
+      "expected_is_question": false,
+      "notes": "Ressaltar secció",
+      "language": "ca"
+    },
+    {
+      "id": "RH021",
+      "instruction": "Veus algun problema amb el text?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "issues",
+      "expected_scope": "paragraph",
+      "expected_is_question": true,
+      "notes": "Pregunta genèrica sobre problemes",
+      "language": "ca"
+    },
+    {
+      "id": "RH022",
+      "instruction": "Es menciona l'ajuntament?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["ajuntament"],
+      "expected_scope": "phrase",
+      "expected_is_question": true,
+      "notes": "Pregunta sobre menció específica",
+      "language": "ca"
+    },
+    {
+      "id": "RH023",
+      "instruction": "Localitza les dates importants",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["dates"],
+      "expected_scope": "phrase",
+      "expected_is_question": false,
+      "notes": "Localització d'elements",
+      "language": "ca"
+    },
+    {
+      "id": "RH024",
+      "instruction": "Quins articles esmenta?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["articles"],
+      "expected_scope": "phrase",
+      "expected_is_question": true,
+      "notes": "Cerca de referències",
+      "language": "ca"
+    },
+    {
+      "id": "RH025",
+      "instruction": "Destaca els termes legals",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["termes legals"],
+      "expected_scope": "word",
+      "expected_is_question": false,
+      "notes": "Ressaltar terminologia",
+      "language": "ca"
+    },
+    {
+      "id": "RH026",
+      "instruction": "Comprova si hi ha errors de puntuació",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "errors",
+      "expected_scope": "word",
+      "expected_is_question": false,
+      "notes": "Errors de puntuació",
+      "language": "ca"
+    },
+    {
+      "id": "RH027",
+      "instruction": "Identifica les idees principals",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "structure",
+      "expected_scope": "paragraph",
+      "expected_is_question": false,
+      "notes": "Anàlisi estructural",
+      "language": "ca"
+    },
+    {
+      "id": "RH028",
+      "instruction": "A quin paràgraf parla del cost?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_keywords": ["cost"],
+      "expected_scope": "paragraph",
+      "expected_is_question": true,
+      "notes": "Localització específica",
+      "language": "ca"
+    },
+    {
+      "id": "RH029",
+      "instruction": "Existeixen contradiccions?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "issues",
+      "expected_scope": "paragraph",
+      "expected_is_question": true,
+      "notes": "Detecció de contradiccions",
+      "language": "ca"
+    },
+    {
+      "id": "RH030",
+      "instruction": "Analitza l'estructura del document",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "structure",
+      "expected_scope": "document",
+      "expected_is_question": false,
+      "notes": "Anàlisi estructural complet",
+      "language": "ca"
+    },
+
+    {
+      "id": "CO001",
+      "instruction": "Què diu l'article 3?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta de contingut sense necessitat de marcar",
+      "language": "ca"
+    },
+    {
+      "id": "CO002",
+      "instruction": "Explica'm el document",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": false,
+      "notes": "Explicació general",
+      "language": "ca"
+    },
+    {
+      "id": "CO003",
+      "instruction": "Quin és el tema principal?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta abstracta",
+      "language": "ca"
+    },
+    {
+      "id": "CO004",
+      "instruction": "Resumeix el contingut",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": false,
+      "notes": "Resum informatiu",
+      "language": "ca"
+    },
+    {
+      "id": "CO005",
+      "instruction": "Quin és l'objectiu del document?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta interpretativa",
+      "language": "ca"
+    },
+    {
+      "id": "CO006",
+      "instruction": "De què tracta?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta bàsica",
+      "language": "ca"
+    },
+    {
+      "id": "CO007",
+      "instruction": "Qui ha escrit això?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta sobre autoria",
+      "language": "ca"
+    },
+    {
+      "id": "CO008",
+      "instruction": "Quants paràgrafs té?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta factual",
+      "language": "ca"
+    },
+    {
+      "id": "CO009",
+      "instruction": "¿De qué trata el documento?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Castellà - pregunta de contingut",
+      "language": "es"
+    },
+    {
+      "id": "CO010",
+      "instruction": "What is this document about?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Anglès - pregunta de contingut",
+      "language": "en"
+    },
+    {
+      "id": "CO011",
+      "instruction": "Quin to té el text?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta sobre estil",
+      "language": "ca"
+    },
+    {
+      "id": "CO012",
+      "instruction": "A qui va dirigit?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta sobre audiència",
+      "language": "ca"
+    },
+    {
+      "id": "CO013",
+      "instruction": "Quina és la idea central?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta interpretativa",
+      "language": "ca"
+    },
+    {
+      "id": "CO014",
+      "instruction": "Explica el primer paràgraf",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": false,
+      "notes": "Explicació específica",
+      "language": "ca"
+    },
+    {
+      "id": "CO015",
+      "instruction": "Què vol dir aquest terme?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta de vocabulari",
+      "language": "ca"
+    },
+    {
+      "id": "CO016",
+      "instruction": "És un text formal?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta sobre registre",
+      "language": "ca"
+    },
+    {
+      "id": "CO017",
+      "instruction": "Quin tipus de document és?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Classificació de document",
+      "language": "ca"
+    },
+    {
+      "id": "CO018",
+      "instruction": "Fes-me un resum breu",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": false,
+      "notes": "Resum sense modificació",
+      "language": "ca"
+    },
+    {
+      "id": "CO019",
+      "instruction": "Quantes seccions té?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta factual",
+      "language": "ca"
+    },
+    {
+      "id": "CO020",
+      "instruction": "Què conclou el document?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "notes": "Pregunta sobre conclusions",
+      "language": "ca"
+    },
+
+    {
+      "id": "UP001",
+      "instruction": "Corregeix les faltes de l'article 5",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [5],
+      "expected_modification_type": "fix",
+      "expected_is_question": false,
+      "notes": "Correcció específica",
+      "language": "ca"
+    },
+    {
+      "id": "UP002",
+      "instruction": "Canvia 'connexió' per 'connexió' al paràgraf 3",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [3],
+      "expected_modification_type": "fix",
+      "expected_is_question": false,
+      "notes": "Substitució explícita",
+      "language": "ca"
+    },
+    {
+      "id": "UP003",
+      "instruction": "Millora el segon paràgraf",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [2],
+      "expected_modification_type": "improve",
+      "expected_is_question": false,
+      "notes": "Millora específica",
+      "language": "ca"
+    },
+    {
+      "id": "UP004",
+      "instruction": "Simplifica el paràgraf 4",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [4],
+      "expected_modification_type": "improve",
+      "expected_is_question": false,
+      "notes": "Simplificació",
+      "language": "ca"
+    },
+    {
+      "id": "UP005",
+      "instruction": "Afegeix més detall al punt 3",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [3],
+      "expected_modification_type": "add",
+      "expected_is_question": false,
+      "notes": "Ampliació",
+      "language": "ca"
+    },
+    {
+      "id": "UP006",
+      "instruction": "Elimina la frase redundant del paràgraf 7",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [7],
+      "expected_modification_type": "delete",
+      "expected_is_question": false,
+      "notes": "Eliminació parcial",
+      "language": "ca"
+    },
+    {
+      "id": "UP007",
+      "instruction": "Reformula l'últim paràgraf",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_modification_type": "improve",
+      "expected_is_question": false,
+      "notes": "Reformulació",
+      "language": "ca"
+    },
+    {
+      "id": "UP008",
+      "instruction": "Pots millorar el paràgraf 2?",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [2],
+      "expected_modification_type": "improve",
+      "expected_is_question": true,
+      "notes": "Pregunta amb intent d'edició",
+      "language": "ca"
+    },
+    {
+      "id": "UP009",
+      "instruction": "Arregla l'error de l'article 10",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [10],
+      "expected_modification_type": "fix",
+      "expected_is_question": false,
+      "notes": "Correcció específica",
+      "language": "ca"
+    },
+    {
+      "id": "UP010",
+      "instruction": "Escurça el paràgraf 5",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [5],
+      "expected_modification_type": "improve",
+      "expected_is_question": false,
+      "notes": "Reducció",
+      "language": "ca"
+    },
+    {
+      "id": "UP011",
+      "instruction": "Mejora el párrafo 3",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [3],
+      "expected_modification_type": "improve",
+      "expected_is_question": false,
+      "notes": "Castellà - millora",
+      "language": "es"
+    },
+    {
+      "id": "UP012",
+      "instruction": "Fix the error in paragraph 2",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [2],
+      "expected_modification_type": "fix",
+      "expected_is_question": false,
+      "notes": "Anglès - correcció",
+      "language": "en"
+    },
+    {
+      "id": "UP013",
+      "instruction": "Formalitza el paràgraf 1",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [1],
+      "expected_modification_type": "improve",
+      "expected_is_question": false,
+      "notes": "Canvi de registre",
+      "language": "ca"
+    },
+    {
+      "id": "UP014",
+      "instruction": "Clarifica el punt 6",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [6],
+      "expected_modification_type": "improve",
+      "expected_is_question": false,
+      "notes": "Clarificació",
+      "language": "ca"
+    },
+    {
+      "id": "UP015",
+      "instruction": "Poleix el tercer paràgraf",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [3],
+      "expected_modification_type": "improve",
+      "expected_is_question": false,
+      "notes": "Refinament",
+      "language": "ca"
+    },
+
+    {
+      "id": "RW001",
+      "instruction": "Fes el document més formal",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Canvi global d'estil",
+      "language": "ca"
+    },
+    {
+      "id": "RW002",
+      "instruction": "Resumeix tot el document",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Transformació completa",
+      "language": "ca"
+    },
+    {
+      "id": "RW003",
+      "instruction": "Reescriu el document en un to més amigable",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Canvi de to global",
+      "language": "ca"
+    },
+    {
+      "id": "RW004",
+      "instruction": "Tradueix tot al castellà",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Traducció completa",
+      "language": "ca"
+    },
+    {
+      "id": "RW005",
+      "instruction": "Simplifica tot el text",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Simplificació global",
+      "language": "ca"
+    },
+    {
+      "id": "RW006",
+      "instruction": "Reorganitza l'estructura del document",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Reestructuració",
+      "language": "ca"
+    },
+    {
+      "id": "RW007",
+      "instruction": "Fes-lo més curt",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Reducció global",
+      "language": "ca"
+    },
+    {
+      "id": "RW008",
+      "instruction": "Amplia el contingut amb més detalls",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Ampliació global",
+      "language": "ca"
+    },
+    {
+      "id": "RW009",
+      "instruction": "Haz el documento más profesional",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Castellà - canvi d'estil",
+      "language": "es"
+    },
+    {
+      "id": "RW010",
+      "instruction": "Rewrite the entire document",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Anglès - reescriptura",
+      "language": "en"
+    },
+    {
+      "id": "RW011",
+      "instruction": "Converteix-lo en un resum executiu",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Transformació de format",
+      "language": "ca"
+    },
+    {
+      "id": "RW012",
+      "instruction": "Adapta el document per a un públic juvenil",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Canvi d'audiència",
+      "language": "ca"
+    },
+    {
+      "id": "RW013",
+      "instruction": "Pots reescriure tot el document?",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": true,
+      "notes": "Pregunta amb intent de reescriptura",
+      "language": "ca"
+    },
+    {
+      "id": "RW014",
+      "instruction": "Reformula el document completament",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Reformulació total",
+      "language": "ca"
+    },
+    {
+      "id": "RW015",
+      "instruction": "Fes el text més tècnic",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "expected_is_question": false,
+      "notes": "Canvi de registre global",
+      "language": "ca"
+    },
+
+    {
+      "id": "CL001",
+      "instruction": "Corregeix l'article 5",
+      "expected_mode": "CLARIFICATION_NEEDED",
+      "expected_clarification": true,
+      "expected_confidence_range": [0.5, 0.79],
+      "notes": "Ambigu: corregir errors o millorar?",
+      "language": "ca"
+    },
+    {
+      "id": "CL002",
+      "instruction": "Fes algo amb això",
+      "expected_mode": "CLARIFICATION_NEEDED",
+      "expected_clarification": true,
+      "expected_confidence_range": [0.0, 0.5],
+      "notes": "Massa ambigu",
+      "language": "ca"
+    },
+    {
+      "id": "CL003",
+      "instruction": "Canvia l'estil",
+      "expected_mode": "CLARIFICATION_NEEDED",
+      "expected_clarification": true,
+      "expected_confidence_range": [0.4, 0.7],
+      "notes": "Ambigu: quin estil?",
+      "language": "ca"
+    },
+    {
+      "id": "CL004",
+      "instruction": "Millora això",
+      "expected_mode": "CLARIFICATION_NEEDED",
+      "expected_clarification": true,
+      "expected_confidence_range": [0.3, 0.6],
+      "notes": "Ambigu: què és 'això'?",
+      "language": "ca"
+    },
+    {
+      "id": "CL005",
+      "instruction": "Arregla-ho",
+      "expected_mode": "CLARIFICATION_NEEDED",
+      "expected_clarification": true,
+      "expected_confidence_range": [0.3, 0.6],
+      "notes": "Ambigu sense context",
+      "language": "ca"
+    },
+    {
+      "id": "CL006",
+      "instruction": "Fes-lo millor",
+      "expected_mode": "CLARIFICATION_NEEDED",
+      "expected_clarification": true,
+      "expected_confidence_range": [0.4, 0.7],
+      "notes": "Ambigu: millor en quin sentit?",
+      "language": "ca"
+    },
+    {
+      "id": "CL007",
+      "instruction": "Modifica el text",
+      "expected_mode": "CLARIFICATION_NEEDED",
+      "expected_clarification": true,
+      "expected_confidence_range": [0.4, 0.7],
+      "notes": "Ambigu: quina modificació?",
+      "language": "ca"
+    },
+    {
+      "id": "CL008",
+      "instruction": "Ajuda'm amb el paràgraf",
+      "expected_mode": "CLARIFICATION_NEEDED",
+      "expected_clarification": true,
+      "expected_confidence_range": [0.3, 0.6],
+      "notes": "Ambigu: quin paràgraf? quina ajuda?",
+      "language": "ca"
+    },
+    {
+      "id": "CL009",
+      "instruction": "Revisa això",
+      "expected_mode": "CLARIFICATION_NEEDED",
+      "expected_clarification": true,
+      "expected_confidence_range": [0.4, 0.7],
+      "notes": "Ambigu: revisar per errors o contingut?",
+      "language": "ca"
+    },
+    {
+      "id": "CL010",
+      "instruction": "Treballa amb el document",
+      "expected_mode": "CLARIFICATION_NEEDED",
+      "expected_clarification": true,
+      "expected_confidence_range": [0.2, 0.5],
+      "notes": "Massa genèric",
+      "language": "ca"
+    },
+
+    {
+      "id": "AN001",
+      "instruction": "marca-ho",
+      "context": {
+        "last_user": "Veus faltes al document?",
+        "last_assistant_mode": "CHAT_ONLY",
+        "last_assistant_summary": "He trobat 3 errors ortogràfics als paràgrafs 2, 5 i 7"
+      },
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_target_paragraphs": [2, 5, 7],
+      "notes": "Anàfora: 'ho' refereix als errors mencionats",
+      "language": "ca"
+    },
+    {
+      "id": "AN002",
+      "instruction": "I el 4?",
+      "context": {
+        "last_user": "Què diu l'article 3?",
+        "last_assistant_mode": "CHAT_ONLY"
+      },
+      "expected_mode": "CHAT_ONLY",
+      "notes": "Anàfora: 'el 4' refereix a 'article 4'",
+      "language": "ca"
+    },
+    {
+      "id": "AN003",
+      "instruction": "Sí, formal",
+      "context": {
+        "last_assistant": "Vols un to formal o informal?",
+        "pending_intent": {
+          "state": "waiting_clarification",
+          "original_mode": "REWRITE",
+          "missing_param": "tone"
+        }
+      },
+      "expected_mode": "REWRITE",
+      "notes": "Resposta a clarificació",
+      "language": "ca"
+    },
+    {
+      "id": "AN004",
+      "instruction": "l'anterior",
+      "context": {
+        "last_discussed_paragraphs": [5, 6, 7],
+        "last_highlighted": 7
+      },
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_target_paragraphs": [6],
+      "notes": "Anàfora: 'l'anterior' al paràgraf 7 és el 6",
+      "language": "ca"
+    },
+    {
+      "id": "AN005",
+      "instruction": "i aquest?",
+      "context": {
+        "last_user": "Pots millorar el paràgraf 3?",
+        "last_discussed_paragraphs": [3]
+      },
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [3],
+      "notes": "Anàfora: 'aquest' refereix al paràgraf anterior",
+      "language": "ca"
+    },
+
+    {
+      "id": "SG001",
+      "instruction": "Veus errors? Corregeix-los",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_secondary_mode": "UPDATE_BY_ID",
+      "notes": "Primer mostra, després ofereix corregir",
+      "language": "ca"
+    },
+    {
+      "id": "SG002",
+      "instruction": "Elimina tot el document",
+      "expected_mode": "REWRITE",
+      "expected_requires_confirmation": true,
+      "expected_risk_level": "high",
+      "notes": "Acció destructiva, requereix confirmació",
+      "language": "ca"
+    },
+    {
+      "id": "SG003",
+      "instruction": "Hi ha errors? Si n'hi ha, corregeix-los automàticament",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "notes": "Pregunta, primer ha de mostrar errors",
+      "language": "ca"
+    },
+
+    {
+      "id": "RH031",
+      "instruction": "Verifica les cites bibliogràfiques",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_scope": "phrase",
+      "language": "ca"
+    },
+    {
+      "id": "RH032",
+      "instruction": "Comprova que no hi hagi plagis",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "issues",
+      "expected_scope": "paragraph",
+      "language": "ca"
+    },
+    {
+      "id": "RH033",
+      "instruction": "Mostra'm els tecnicismes",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "mentions",
+      "expected_scope": "word",
+      "language": "ca"
+    },
+    {
+      "id": "RH034",
+      "instruction": "Identifica els arguments principals",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "structure",
+      "expected_scope": "paragraph",
+      "language": "ca"
+    },
+    {
+      "id": "RH035",
+      "instruction": "Hi ha alguna cosa que no quedi clara?",
+      "expected_mode": "REFERENCE_HIGHLIGHT",
+      "expected_strategy": "issues",
+      "expected_scope": "sentence",
+      "expected_is_question": true,
+      "language": "ca"
+    },
+
+    {
+      "id": "CO021",
+      "instruction": "Qui és el destinatari del document?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "language": "ca"
+    },
+    {
+      "id": "CO022",
+      "instruction": "Quin any es va escriure?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "language": "ca"
+    },
+    {
+      "id": "CO023",
+      "instruction": "Explica'm la secció 2",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": false,
+      "language": "ca"
+    },
+    {
+      "id": "CO024",
+      "instruction": "Què significa aquesta paraula?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "language": "ca"
+    },
+    {
+      "id": "CO025",
+      "instruction": "Quin registre lingüístic utilitza?",
+      "expected_mode": "CHAT_ONLY",
+      "expected_is_question": true,
+      "language": "ca"
+    },
+
+    {
+      "id": "UP016",
+      "instruction": "Afegeix una conclusió al final",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_modification_type": "add",
+      "expected_is_question": false,
+      "language": "ca"
+    },
+    {
+      "id": "UP017",
+      "instruction": "Canvia el títol",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [0],
+      "expected_modification_type": "modify",
+      "expected_is_question": false,
+      "language": "ca"
+    },
+    {
+      "id": "UP018",
+      "instruction": "Expandeix el segon punt",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [2],
+      "expected_modification_type": "add",
+      "expected_is_question": false,
+      "language": "ca"
+    },
+    {
+      "id": "UP019",
+      "instruction": "Condensa el paràgraf 8",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [8],
+      "expected_modification_type": "improve",
+      "expected_is_question": false,
+      "language": "ca"
+    },
+    {
+      "id": "UP020",
+      "instruction": "Pots simplificar el punt 4?",
+      "expected_mode": "UPDATE_BY_ID",
+      "expected_target_paragraphs": [4],
+      "expected_modification_type": "improve",
+      "expected_is_question": true,
+      "language": "ca"
+    }
+  ]
+}

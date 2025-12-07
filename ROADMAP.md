@@ -18,12 +18,12 @@ Construir el **motor d'enginyeria documental** més potent, aplicant els mateixo
 
 ---
 
-## Estat Actual: v6.8
+## Estat Actual: v6.9
 
 ```
 ████████████████████████████████████████ 100%
 
-✅ Motor d'Enginyeria Documental (System Prompt v6.8)
+✅ Motor d'Enginyeria Documental (System Prompt v6.9)
 ✅ Chain of Thought obligatori
 ✅ Shadow Validator amb Retry Loop
 ✅ Mode Selector (Edit/Xat)
@@ -31,11 +31,12 @@ Construir el **motor d'enginyeria documental** més potent, aplicant els mateixo
 ✅ Smart Selection Context (v5.4) - ⟦SEL⟧ markers
 ✅ Document References (v6.7) - icones 👁️ clicables
 ✅ Reference Highlighting (v6.7) - ressaltat de colors
+✅ Prompts Professionals (v6.9) - receptes millorades
 ✅ Multimodal AI (v6.0) - anàlisi d'imatges
 ✅ Table Support (v6.0) - lectura Markdown
 ✅ Knowledge Library (v5.1) - fitxers compartits
 ✅ Chat History (v5.0) - converses persistents
-✅ Receipts/Macros (v5.3) - accions personalitzades
+✅ Receipts/Macros (v5.3) - 5 carpetes, 17 receptes
 ✅ Timeline d'edicions (v6.6)
 ✅ Event Sourcing (edit_events)
 ✅ Context Engine (DocScanner + Skeleton)
@@ -43,11 +44,21 @@ Construir el **motor d'enginyeria documental** més potent, aplicant els mateixo
 ✅ Banned Expressions
 ✅ Dark/Light Theme
 ✅ File Upload amb validació (v6.5)
+✅ Navegació Receptes (v6.9) - botó tornar enrere
 ```
 
 ---
 
 ## Versions Completades
+
+### v6.9 - Professional Prompts & UX (2024-12-07)
+
+- **Prompts Professionals**: Totes les receptes millorades amb instruccions específiques
+- **Nova recepta "Clarificar"**: Reorganitza idees, explicita connexions, elimina ambigüitats
+- **Navegació Receptes**: Botó tornar enrere a l'esquerra del camp de cerca
+- **Fix icones receptes**: `addBubbleHtml` per renderitzar correctament
+- **Fix landing receptes**: S'amaga quan s'executa una recepta
+- **Política privacitat actualitzada**: Conversation History i Knowledge Library documentats
 
 ### v6.8 - UI Refinements (2024-12-06)
 
