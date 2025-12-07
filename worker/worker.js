@@ -800,15 +800,26 @@ PAS 1: IDENTIFICA EL TIPUS D'INSTRUCCIÓ
   Avaluació: avalua, valora, opina sobre, què en penses
   Pregunta: què és, quin és, com és, per què, quants, qui
 
+▸ VERBS DE VISUALITZACIÓ (v7.1) (el resultat és MARCAR parts del document):
+  Detecció: detecta, troba, busca, localitza, identifica errors/faltes/problemes
+  Revisió: revisa gramàtica/ortografia/estil, comprova, verifica
+  Assenyalar: marca, assenyala, indica, mostra, ressalta, destaca, subratlla
+  Localització: on puc millorar, quines parts, on hi ha errors
+  Qualitat: inconsistències, ambigüitats, repeticions, punts febles
+  Preguntes: hi ha errors?, què està malament?, què puc millorar?
+
 PAS 2: APLICA LA REGLA DE CONTEXT
 
-| MODE USUARI     | TIPUS INSTRUCCIÓ | ACCIÓ JSON        |
-|-----------------|------------------|-------------------|
-| EDIT + Selecció | Transformació    | UPDATE_BY_ID      |
-| EDIT + Selecció | Extracció        | CHAT_ONLY         |
-| EDIT + No sel.  | Transformació    | REWRITE           |
-| EDIT + No sel.  | Extracció        | CHAT_ONLY         |
-| CHAT            | Qualsevol        | CHAT_ONLY         |
+| MODE USUARI     | TIPUS INSTRUCCIÓ | ACCIÓ JSON          |
+|-----------------|------------------|---------------------|
+| QUALSEVOL       | Visualització    | REFERENCE_HIGHLIGHT |  ← PRIORITAT MÀXIMA
+| EDIT + Selecció | Transformació    | UPDATE_BY_ID        |
+| EDIT + Selecció | Extracció        | CHAT_ONLY           |
+| EDIT + No sel.  | Transformació    | REWRITE             |
+| EDIT + No sel.  | Extracció        | CHAT_ONLY           |
+| CHAT            | Qualsevol        | CHAT_ONLY           |
+
+IMPORTANT: Visualització té PRIORITAT sobre les altres regles. Si l'usuari demana detectar, trobar, revisar o marcar problemes → SEMPRE usa REFERENCE_HIGHLIGHT independentment del mode.
 
 ═══════════════════════════════════════════════════════════════
 MODES DE RESPOSTA JSON
@@ -826,21 +837,85 @@ Acció: Edita NOMÉS els paràgrafs afectats via {{ID}}. Cirurgia, no reemplaça
 Quan: L'usuari demana CREAR contingut NOU (escriu un email, genera una llista, crea des de zero).
 Acció: Genera estructura nova amb blocks tipats.
 
-[REFERENCE_HIGHLIGHT] → Marcar i explicar
-Quan: L'usuari demana VISUALITZAR parts del document (detecta repeticions, quines parts clarificar, on estan els arguments).
-Acció: Marca parts del document amb colors i explica per què. NO edites res.
+[REFERENCE_HIGHLIGHT] → Marcar i explicar (v7.1 - OBLIGATORI per detecció)
+
+⚠️ REGLA CRÍTICA: Si l'usuari pregunta per errors, faltes, problemes, repeticions, o qualsevol cosa que requereixi LOCALITZAR parts del document → USA REFERENCE_HIGHLIGHT, MAI CHAT_ONLY.
+
+Triggers OBLIGATORIS (usa SEMPRE REFERENCE_HIGHLIGHT):
+- "Hi ha errors?" / "Veus errors?" / "Detecta errors" → REFERENCE_HIGHLIGHT
+- "Revisa gramàtica/ortografia" → REFERENCE_HIGHLIGHT
+- "On puc millorar?" / "Què està malament?" → REFERENCE_HIGHLIGHT
+- "Troba repeticions/inconsistències" → REFERENCE_HIGHLIGHT
+- "Quines parts són febles/confuses?" → REFERENCE_HIGHLIGHT
+- Qualsevol pregunta que impliqui LOCALITZAR problemes → REFERENCE_HIGHLIGHT
+
+⛔ ERROR COMÚ: Respondre amb CHAT_ONLY llistant {{4}}, {{6}}, etc. en text pla.
+✅ CORRECTE: Usar mode REFERENCE_HIGHLIGHT amb array "highlights".
+
+Acció: Marca parts del document amb colors i explica. NO edites res.
 Format:
 {
   "thought": "[Anàlisi: quines parts destaco i per què]",
   "mode": "REFERENCE_HIGHLIGHT",
-  "ai_response": "Explicació en llenguatge natural",
+  "ai_response": "Explicació en llenguatge natural amb context",
   "highlights": [
-    {"para_id": 5, "color": "yellow", "reason": "'important' x4", "snippet": "Això és important..."},
-    {"para_id": 12, "color": "orange", "reason": "frase confusa", "snippet": "Resulta evident que..."}
+    {"para_id": 5, "color": "orange", "reason": "error ortogràfic: 'increiblement'", "snippet": "...és increiblement...", "start": 15, "end": 28},
+    {"para_id": 12, "color": "yellow", "reason": "repetició: 'important' x3", "snippet": "Això és important..."},
+    {"para_id": 8, "color": "purple", "reason": "frase ambigua", "snippet": "Es podria interpretar..."}
   ]
 }
-Colors disponibles: "yellow" (atenció), "orange" (problema), "blue" (recomanació), "purple" (clarificació)
-Límit: Màxim 5 highlights per resposta. Usa para_id exactes del document ({{0}}, {{1}}, etc.).
+
+Camps dels highlights:
+- para_id: Índex del paràgraf ({{0}}, {{1}}, etc.) - OBLIGATORI
+- color: "yellow" (atenció/repetició), "orange" (error/problema), "blue" (recomanació), "purple" (ambigüitat/pregunta) - OBLIGATORI
+- reason: Motiu breu del marcatge - OBLIGATORI
+- snippet: Fragment de text afectat (màx 50 chars) - OBLIGATORI
+- start: Posició inicial dins el paràgraf (opcional, per marcar fragment específic)
+- end: Posició final dins el paràgraf (opcional, per marcar fragment específic)
+
+Si start/end no s'especifiquen, es marca el paràgraf sencer.
+Usa para_id exactes del document ({{0}}, {{1}}, etc.). Marca TOTS els problemes que trobis, sense límit.
+
+EXEMPLE COMPLET - Usuari pregunta "veus errors ortogràfics?":
+{
+  "thought": "L'usuari demana detectar errors. Trobo 'tramet' ({{4}}), 'edn' ({{6}}). Uso REFERENCE_HIGHLIGHT.",
+  "mode": "REFERENCE_HIGHLIGHT",
+  "ai_response": "He detectat els següents errors ortogràfics:",
+  "highlights": [
+    {"para_id": 4, "color": "orange", "reason": "'tramet' → 'trametre'", "snippet": "...tramet..."},
+    {"para_id": 6, "color": "orange", "reason": "'edn' → 'en'", "snippet": "...edn el document..."}
+  ]
+}
+
+⛔ INCORRECTE (NO fer això):
+{
+  "mode": "CHAT_ONLY",
+  "chat_response": "He detectat errors: {{4}} tramet, {{6}} edn..."
+}
+
+═══════════════════════════════════════════════════════════════
+DISTINCIÓ CRÍTICA: PREGUNTES vs ORDRES (v7.3)
+═══════════════════════════════════════════════════════════════
+
+⚠️ REGLA D'OR: Una PREGUNTA sobre problemes → MARCAR, no editar.
+⚠️ Una ORDRE de correcció → EDITAR.
+
+| INSTRUCCIÓ                        | MODE               | RAONAMENT                      |
+|-----------------------------------|--------------------|---------------------------------|
+| "Veus errors ortogràfics?"        | REFERENCE_HIGHLIGHT | Pregunta d'anàlisi → marcar    |
+| "Hi ha faltes de gramàtica?"      | REFERENCE_HIGHLIGHT | Pregunta d'anàlisi → marcar    |
+| "Detecta inconsistències"         | REFERENCE_HIGHLIGHT | Detecció → marcar              |
+| "Corregeix els errors"            | UPDATE_BY_ID       | Ordre explícita → editar       |
+| "Arregla l'ortografia"            | UPDATE_BY_ID       | Ordre explícita → editar       |
+| "Pots simplificar el text?"       | UPDATE_BY_ID       | Pregunta AMB intenció edició   |
+| "Podries millorar-ho?"            | UPDATE_BY_ID       | Pregunta AMB intenció edició   |
+
+PATRÓ PREGUNTA AMB INTENCIÓ D'EDICIÓ:
+- "Pots/Podries/Sabries + [verb d'edició]?" → SÍ editar
+- Exemples: "Pots simplificar?", "Podries resumir?", "Pots fer-ho més curt?"
+
+⛔ ERROR GREU: "Veus errors?" → Corregir directament sense permís
+✅ CORRECTE: "Veus errors?" → REFERENCE_HIGHLIGHT amb els errors marcats
 
 ═══════════════════════════════════════════════════════════════
 GESTIÓ DE CONTINUÏTAT (CRÍTIC)
@@ -1285,6 +1360,145 @@ function isTransformVerb(instruction) {
 }
 
 /**
+ * v7.1: Detecta si una instrucció és de VISUALITZACIÓ (hauria de fer REFERENCE_HIGHLIGHT)
+ * @param {string} instruction - La instrucció de l'usuari
+ * @returns {boolean} true si és visualització/anàlisi que requereix marcar el document
+ */
+function isVisualizationVerb(instruction) {
+  if (!instruction) return false;
+
+  const normalized = instruction.toLowerCase().trim();
+
+  // Patrons que indiquen que l'usuari vol VEURE/LOCALITZAR coses al document
+  const visualizationPatterns = [
+    // Detecció d'errors
+    /\b(detecta|troba|busca|localitza|identifica)\b.{0,30}\b(error|falta|problema|incorrecci)/i,
+    /\b(hi ha|tens?|veus?|existeix)\b.{0,30}\b(error|falta|problema|repetici)/i,
+    /\berrors?\s+(ortogràfic|gramatical|de\s+puntuaci)/i,
+    /\bfaltes?\s+(d'ortografia|de\s+gramàtica)/i,
+
+    // Revisió i anàlisi
+    /\b(revisa|analitza|examina|comprova|verifica)\b.{0,20}\b(gramàtica|ortografia|estil|coherència|puntuaci)/i,
+    /\b(revisa|analitza|examina)\b.{0,10}(el\s+text|el\s+document|això)/i,
+
+    // Marcar/assenyalar explícit
+    /\b(marca|assenyala|indica|mostra|ressalta|destaca|subratlla)\b/i,
+
+    // Localització de problemes
+    /\b(on|a on|quines?\s+parts?|quins?\s+llocs?|què)\b.{0,20}\b(millorar|corregir|revisar|canviar|arreglar)/i,
+    /\bon\s+(hi\s+ha|estan?|trobo?|puc)/i,
+
+    // Problemes específics
+    /\b(inconsistènci|ambigü|confús|confusi|feble|repetit|redundan)/i,
+    /\bpunts?\s+(forts?|febles?|clau|crítics?|millorables?)/i,
+    /\bparts?\s+(confus|febl|problemàti|millorabl)/i,
+
+    // Preguntes sobre qualitat
+    /\bquè\s+(està\s+malament|falla|no\s+funciona|puc\s+millorar)/i,
+    /\b(com\s+puc|què\s+hauria)\b.{0,15}millorar/i,
+
+    // Repeticions i redundàncies
+    /\b(repetici|redundànci|reiteraci)/i,
+    /\b(paraules?|frases?|expressions?)\s+(repetid|redundant)/i,
+
+    // Estructura i coherència
+    /\b(estructura|organitzaci|flux|coherència|cohesi)/i,
+    /\bsalts?\s+(lògics?|argumentals?)/i,
+
+    // Cites i referències
+    /\b(cites?|referències?|fonts?)\s+(sense|incorrect|problemàti)/i,
+
+    // Estil
+    /\bproblemes?\s+(d'estil|estilístic)/i,
+    /\bestil\s+(inconsistent|problemàtic|millorable)/i,
+  ];
+
+  return visualizationPatterns.some(pattern => pattern.test(normalized));
+}
+
+/**
+ * v7.2: Detecta si una instrucció és una PREGUNTA (acaba amb ?)
+ * Les preguntes MAI haurien de modificar el document directament.
+ * @param {string} instruction - La instrucció de l'usuari
+ * @returns {boolean} true si és una pregunta
+ */
+function isQuestion(instruction) {
+  if (!instruction) return false;
+
+  const trimmed = instruction.trim();
+
+  // Pregunta directa (acaba amb ?)
+  if (trimmed.endsWith('?')) return true;
+
+  // Patrons interrogatius implícits (sense ? però clarament preguntes)
+  const questionPatterns = [
+    /^(hi ha|tens?|veus?|trobes?|detectes?|existeix)/i,
+    /^(quin|quina|quins|quines|què|com|on|per què|quan)\b/i,
+    /\b(pots? dir-me|em pots? dir|saps?|coneixes?)\b/i,
+  ];
+
+  return questionPatterns.some(p => p.test(trimmed));
+}
+
+/**
+ * v7.3: Detecta si una PREGUNTA té intenció d'edició
+ * Exemples: "Pots simplificar el text?", "Podries corregir les faltes?"
+ * Aquestes preguntes SÍ haurien de poder modificar el document.
+ * @param {string} instruction - La instrucció de l'usuari
+ * @returns {boolean} true si és una pregunta amb intenció d'edició
+ */
+function isQuestionWithEditIntent(instruction) {
+  if (!instruction) return false;
+
+  const trimmed = instruction.trim().toLowerCase();
+
+  // Ha de ser una pregunta
+  if (!isQuestion(instruction)) return false;
+
+  // Patrons de petició d'edició en forma de pregunta
+  const editIntentPatterns = [
+    // "Pots/Podries + verb d'edició"
+    /\b(pots?|podries?|sabries?|series capaç)\s+(de\s+)?(corregir|millorar|simplificar|resumir|ampliar|traduir|reescriure|reformular|parafrasej|arreglar|esmenar|polir|refinar|optimitzar|sintetitzar|condensar|escurçar|desenvolupar|elaborar|detallar|clarificar|formalitzar|canviar|substituir|eliminar|afegir|estructurar|organitzar|reordenar)/i,
+    // "Em pots + verb d'edició"
+    /\bem\s+pots?\s+(corregir|millorar|simplificar|resumir|traduir|arreglar)/i,
+    // "Pots fer + més curt/llarg/formal/etc."
+    /\bpots?\s+(fer|posar)[^?]*(més\s+(curt|llarg|formal|informal|simple|clar|concís|breu))/i,
+  ];
+
+  return editIntentPatterns.some(p => p.test(trimmed));
+}
+
+/**
+ * v7.2: Detecta si una instrucció és una ORDRE EXPLÍCITA de modificació
+ * Només retorna true per ordres imperatives clares com "corregeix", "millora", etc.
+ * @param {string} instruction - La instrucció de l'usuari
+ * @returns {boolean} true si és una ordre explícita de modificació
+ */
+function isExplicitEditOrder(instruction) {
+  if (!instruction) return false;
+
+  const trimmed = instruction.trim().toLowerCase();
+
+  // Si és pregunta, NO és ordre explícita
+  if (isQuestion(instruction)) return false;
+
+  // Ordres imperatives clares (verb a l'inici, sense interrogant)
+  const editOrderPatterns = [
+    /^(corregeix|corregir|esmena|arregla)\b/i,
+    /^(millora|millorar|poleix|refina|optimitza)\b/i,
+    /^(reescriu|reescriure|reformula|parafraseja)\b/i,
+    /^(tradueix|traduir|passa\s+a)\b/i,
+    /^(resumeix|resumir|sintetitza|condensa|escurça)\b/i,
+    /^(amplia|ampliar|desenvolupa|elabora|detalla)\b/i,
+    /^(simplifica|clarifica|formalitza)\b/i,
+    /^(canvia|substitueix|elimina|afegeix)\b/i,
+    /^(estructura|organitza|reordena)\b/i,
+  ];
+
+  return editOrderPatterns.some(p => p.test(trimmed));
+}
+
+/**
  * Extreu l'ID del paràgraf seleccionat del text amb marcadors
  * @param {string} text - Text del document amb marcadors {{ID}} i ⟦SEL⟧
  * @returns {string|null} - ID del paràgraf seleccionat o null
@@ -1442,22 +1656,36 @@ function parseAndValidate(rawText) {
     }
   }
 
-  // ─── VALIDATE REFERENCE_HIGHLIGHT (v7.0) ───
+  // ─── VALIDATE REFERENCE_HIGHLIGHT (v7.1 - Ampliat) ───
   if (parsed.mode === 'REFERENCE_HIGHLIGHT') {
     if (!parsed.highlights || !Array.isArray(parsed.highlights)) {
       parsed.highlights = [];
     }
-    // Filter invalid highlights and limit to 5
+    // v7.1: Filter invalid highlights - NO LIMIT (era màx 5)
     const validColors = ['yellow', 'orange', 'blue', 'purple'];
     parsed.highlights = parsed.highlights
       .filter(h => typeof h.para_id === 'number' && h.para_id >= 0)
-      .slice(0, 5)
-      .map(h => ({
-        para_id: h.para_id,
-        color: validColors.includes(h.color) ? h.color : 'yellow',
-        reason: String(h.reason || '').substring(0, 50),
-        snippet: String(h.snippet || '').substring(0, 30)
-      }));
+      .map(h => {
+        const highlight = {
+          para_id: h.para_id,
+          color: validColors.includes(h.color) ? h.color : 'yellow',
+          reason: String(h.reason || '').substring(0, 100),  // v7.1: Ampliat de 50 a 100
+          snippet: String(h.snippet || '').substring(0, 60)  // v7.1: Ampliat de 30 a 60
+        };
+        // v7.1: Suport per highlights parcials (start/end)
+        if (typeof h.start === 'number' && h.start >= 0) {
+          highlight.start = h.start;
+        }
+        if (typeof h.end === 'number' && h.end > 0) {
+          highlight.end = h.end;
+        }
+        // Validar que end > start si tots dos existeixen
+        if (highlight.start !== undefined && highlight.end !== undefined && highlight.end <= highlight.start) {
+          delete highlight.start;
+          delete highlight.end;
+        }
+        return highlight;
+      });
     // If no valid highlights, convert to CHAT_ONLY
     if (parsed.highlights.length === 0) {
       parsed.mode = 'CHAT_ONLY';
@@ -1981,13 +2209,92 @@ INSTRUCCIÓ DE L'USUARI:
     _meta.warnings = lastValidation.warnings;
   }
 
-  // 5.1 Mode enforcement (v6.7: Improved classification)
+  // 5.1 Mode enforcement (v7.2: Safety-first - block edits for questions/visualization)
   const effectiveMode = user_mode || 'edit';
   const instructionIsTransform = isTransformVerb(user_instruction);
+  const instructionIsVisualization = isVisualizationVerb(user_instruction);
+  const instructionIsAQuestion = isQuestion(user_instruction);  // v7.2
+  const instructionIsExplicitEdit = isExplicitEditOrder(user_instruction);  // v7.2
+  const instructionIsQuestionWithEdit = isQuestionWithEditIntent(user_instruction);  // v7.3
+
+  // ═══════════════════════════════════════════════════════════════
+  // v7.3: SAFETY GATE - PREGUNTES MAI MODIFIQUEN EL DOCUMENT
+  // ═══════════════════════════════════════════════════════════════
+  // Regla de seguretat: Si és una pregunta (?) i la IA vol modificar,
+  // BLOQUEGEM i convertim a CHAT_ONLY o REFERENCE_HIGHLIGHT
+  // EXCEPCIÓ v7.3: Preguntes amb intenció d'edició ("Pots simplificar?") SÍ poden modificar
+  if (instructionIsAQuestion && !instructionIsQuestionWithEdit && (parsedResponse.mode === 'REWRITE' || parsedResponse.mode === 'UPDATE_BY_ID')) {
+    console.warn(`[Mode Enforcement v7.2] ⛔ BLOCKED: Question "${user_instruction}" tried to trigger ${parsedResponse.mode}`);
+
+    // Si és visualització, convertim a CHAT_ONLY amb hint
+    // (REFERENCE_HIGHLIGHT requereix que la IA generi highlights, no podem inventar-los)
+    const originalResponse = parsedResponse.change_summary || parsedResponse.chat_response || '';
+    parsedResponse = {
+      mode: 'CHAT_ONLY',
+      chat_response: originalResponse || 'He analitzat el document.',
+      change_summary: 'Consulta processada sense modificar el document',
+      thought: (parsedResponse.thought || '') + ' [v7.2: Bloqueig de seguretat - pregunta no pot editar]'
+    };
+
+    _meta.safety_block = {
+      reason: 'question_blocked_edit',
+      original_mode: parsedResponse.mode,
+      instruction: user_instruction.substring(0, 100)
+    };
+    console.log(`[Mode Enforcement v7.2] Converted to CHAT_ONLY for safety`);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // v7.2: SAFETY GATE - VISUALITZACIÓ MAI MODIFICA (sense ordre explícita)
+  // ═══════════════════════════════════════════════════════════════
+  // Si és visualització i NO és ordre explícita, bloquegem edicions
+  if (instructionIsVisualization && !instructionIsExplicitEdit &&
+      (parsedResponse.mode === 'REWRITE' || parsedResponse.mode === 'UPDATE_BY_ID')) {
+    console.warn(`[Mode Enforcement v7.2] ⛔ BLOCKED: Visualization "${user_instruction}" tried to trigger ${parsedResponse.mode}`);
+
+    const originalResponse = parsedResponse.change_summary || parsedResponse.chat_response || '';
+    parsedResponse = {
+      mode: 'CHAT_ONLY',
+      chat_response: originalResponse || 'He revisat el document.',
+      change_summary: 'Anàlisi completada sense modificar el document',
+      thought: (parsedResponse.thought || '') + ' [v7.2: Bloqueig - visualització sense ordre explícita]'
+    };
+
+    _meta.safety_block = {
+      reason: 'visualization_blocked_edit',
+      original_mode: parsedResponse.mode,
+      instruction: user_instruction.substring(0, 100)
+    };
+    console.log(`[Mode Enforcement v7.2] Visualization converted to CHAT_ONLY`);
+  }
+
+  // v7.1: Visualització té PRIORITAT - si l'usuari demana detectar/revisar/marcar problemes
+  if (instructionIsVisualization && parsedResponse.mode === 'CHAT_ONLY') {
+    // La IA hauria d'haver usat REFERENCE_HIGHLIGHT però va retornar CHAT_ONLY
+    console.warn(`[Mode Enforcement v7.1] Visualization verb detected but AI returned CHAT_ONLY: "${user_instruction}"`);
+
+    // Intentem detectar si la resposta menciona problemes/errors que podrien ser highlights
+    const responseText = parsedResponse.chat_response || '';
+    const mentionsIssues = /\b(error|falta|problema|repetici|inconsist|ambig|incorrec|millorar|corregir)\b/i.test(responseText);
+
+    if (mentionsIssues) {
+      // La IA va detectar problemes però no va usar REFERENCE_HIGHLIGHT
+      // Afegim un hint perquè l'usuari sàpiga que pot demanar marcatge
+      _meta.visualization_hint = true;
+      _meta.misclassification = {
+        instruction: user_instruction,
+        ai_mode: 'CHAT_ONLY',
+        expected_mode: 'REFERENCE_HIGHLIGHT',
+        reason: 'Visualization verb with issues detected in response'
+      };
+      console.log(`[Mode Enforcement v7.1] AI detected issues but didn't highlight. Adding visualization hint.`);
+    }
+  }
 
   if (effectiveMode === 'chat') {
     // Force CHAT_ONLY: Never edit, convert any edit response to chat
-    if (parsedResponse.mode !== 'CHAT_ONLY') {
+    // PERÒ: v7.1 - Si és visualització, permetem REFERENCE_HIGHLIGHT (no edita el document)
+    if (parsedResponse.mode !== 'CHAT_ONLY' && parsedResponse.mode !== 'REFERENCE_HIGHLIGHT') {
       parsedResponse = {
         mode: 'CHAT_ONLY',
         chat_response: parsedResponse.change_summary || parsedResponse.chat_response || "Entesos.",
@@ -1996,8 +2303,8 @@ INSTRUCCIÓ DE L'USUARI:
     }
   } else if (effectiveMode === 'edit') {
     // v6.7: Detect misclassification - AI returned CHAT_ONLY for transform verb
-    if (parsedResponse.mode === 'CHAT_ONLY' && has_selection && instructionIsTransform) {
-      // AI misclassified a transform instruction as chat
+    if (parsedResponse.mode === 'CHAT_ONLY' && has_selection && instructionIsTransform && !instructionIsVisualization) {
+      // AI misclassified a transform instruction as chat (only if not visualization)
       console.warn(`[Mode Enforcement v6.7] AI misclassified transform verb as CHAT_ONLY: "${user_instruction}"`);
 
       // Try to convert chat_response to UPDATE_BY_ID
@@ -2023,7 +2330,7 @@ INSTRUCCIÓ DE L'USUARI:
     }
     // v6.7: If AI returned CHAT_ONLY for extraction verb, that's correct - no action needed
   }
-  // v6.7: Mode classification is now based on verb type (transform vs extract)
+  // v7.1: Mode classification now includes visualization detection
 
   // 5.2 Save edit event (v3.0 Event Sourcing)
   let savedEventId = null;
@@ -2118,14 +2425,16 @@ INSTRUCCIÓ DE L'USUARI:
     auto_ban: autoBanWords,  // v4.0: Words to auto-ban from NL detection
     _meta: _meta,  // v3.1: Shadow Validator metadata
     _debug: {
-      version: "6.7.0",
+      version: "7.1.0",
       has_selection: has_selection,
       history_length: chat_history?.length || 0,
       has_last_edit: !!last_edit,
       user_mode: effectiveMode,
       ai_mode: parsedResponse.mode,
       instruction_is_transform: instructionIsTransform,
+      instruction_is_visualization: instructionIsVisualization,  // v7.1
       auto_converted: _meta.auto_converted || false,
+      visualization_hint: _meta.visualization_hint || false,  // v7.1
       retries: retryCount,
       timeout_aborted: timeoutAborted,
       validation_passed: lastValidation?.isValid ?? false,
@@ -2918,7 +3227,7 @@ async function handleGenerateTitle(body, env, corsHeaders) {
 
   // Get conversation messages
   const getResponse = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/conversations?id=eq.${conversation_id}&license_key_hash=eq.${licenseHash}&select=messages,title,metadata`,
+    `${env.SUPABASE_URL}/rest/v1/conversations?id=eq.${conversation_id}&license_key_hash=eq.${licenseHash}&select=messages,title`,
     {
       method: 'GET',
       headers: {
@@ -2930,7 +3239,9 @@ async function handleGenerateTitle(body, env, corsHeaders) {
   );
 
   if (!getResponse.ok) {
-    throw new Error("supabase_error");
+    const errText = await getResponse.text();
+    console.error('[generate_title] Supabase GET error:', getResponse.status, errText);
+    throw new Error("supabase_error: " + getResponse.status + " - " + errText.substring(0, 100));
   }
 
   const conversations = await getResponse.json();
@@ -2940,8 +3251,15 @@ async function handleGenerateTitle(body, env, corsHeaders) {
 
   const conv = conversations[0];
 
-  // Skip if already has AI-generated title
-  if (conv.metadata?.ai_title_generated) {
+  // v9.5: Simple logic for when to generate title:
+  // 1. "Nova conversa" = provisional, needs AI title
+  // 2. Title > 50 chars = probably user message saved as title (legacy bug)
+  // 3. Anything else (short, non-default) = already AI-generated, skip
+  const needsTitle = !conv.title ||
+                     conv.title === 'Nova conversa' ||
+                     conv.title.length > 50;
+
+  if (!needsTitle) {
     return new Response(JSON.stringify({
       status: "ok",
       title: conv.title,
@@ -2949,8 +3267,8 @@ async function handleGenerateTitle(body, env, corsHeaders) {
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  // Get first few messages for context
-  const msgs = (conv.messages || []).slice(0, 4);
+  // Get first few messages for context (up to 6 for better context)
+  const msgs = (conv.messages || []).slice(0, 6);
   if (msgs.length < 2) {
     return new Response(JSON.stringify({
       status: "ok",
@@ -2960,31 +3278,32 @@ async function handleGenerateTitle(body, env, corsHeaders) {
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  // Generate title with Gemini - extract user question and AI response
-  const userMsg = msgs.find(m => m.role === 'user');
-  const aiMsg = msgs.find(m => m.role === 'assistant' || m.role === 'model');
+  // v10.2: Build conversation summary from all available messages
+  const userMsgs = msgs.filter(m => m.role === 'user').map(m => m.content.substring(0, 150)).join('\n');
+  const aiMsgs = msgs.filter(m => m.role === 'assistant' || m.role === 'model').map(m => m.content.substring(0, 150)).join('\n');
 
-  const prompt = `Crea un títol CURT (2-4 paraules) que identifiqui el TEMA de la conversa.
+  const prompt = `Generate a SHORT and NATURAL title for this conversation.
 
-EXEMPLES DE TÍTOLS CORRECTES:
-- Pregunta sobre CSS → "Estils CSS"
-- Com puc exportar a PDF? → "Exportació PDF"
-- Tinc un error al login → "Error autenticació"
-- Ajuda'm amb aquest codi Python → "Codi Python"
-- Quina és la capital de França? → "Geografia França"
+RULES:
+- 2-4 words maximum
+- Use the SAME LANGUAGE as the conversation
+- Must sound NATURAL with correct grammar and prepositions
+- Identify the main topic, don't copy text literally
 
-EXEMPLES DE TÍTOLS INCORRECTES (NO facis això):
-❌ "Com puc exportar..." (copiar pregunta)
-❌ "Tinc un error al..." (copiar inici)
-❌ "Ajuda'm amb aquest..." (copiar literal)
+EXAMPLES BY LANGUAGE:
+Català: "Correcció d'ortografia", "Millora d'estil", "Resum del text"
+Español: "Corrección de errores", "Mejora del estilo", "Resumen del texto"
+English: "Spelling correction", "Style improvement", "Text summary"
 
-PREGUNTA DE L'USUARI:
-${userMsg ? userMsg.content.substring(0, 300) : 'No disponible'}
+AVOID unnatural word order:
+- "Errors detection" ❌ → "Error detection" ✓
+- "Ortografia correcció" ❌ → "Correcció ortogràfica" ✓
 
-RESPOSTA DE L'ASSISTENT:
-${aiMsg ? aiMsg.content.substring(0, 300) : 'No disponible'}
+CONVERSATION:
+User: ${userMsgs || 'N/A'}
+Assistant: ${(aiMsgs || 'N/A').substring(0, 100)}
 
-Escriu NOMÉS el títol (2-4 paraules, sense copiar el text original):`;
+Write ONLY the title (natural, 2-4 words, same language as conversation):`;
 
   const geminiResponse = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,

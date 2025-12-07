@@ -82,13 +82,15 @@
       <!-- Chat Header with History Button -->
       <div class="chat-header">
         <div class="chat-header-left">
-          <button class="chat-history-btn" onclick="openConversationsDrawer()" title="Historial de converses">Els teus xats</button>
-          <span class="chat-current-title" id="chatCurrentTitle" onclick="editCurrentTitle()" title="Clic per editar">Hola.</span>
+          <span class="chat-current-title" id="chatCurrentTitle" onclick="editCurrentTitle()" title="Clic per editar">Nova conversa</span>
           <span class="save-indicator" id="saveIndicator"></span>
         </div>
         <div class="chat-header-right">
           <button class="chat-history-btn" onclick="switchTab('recipes')" title="Receptes">Receptes</button>
-          <button class="chat-new-btn" onclick="createNewConversation()">+ Nova</button>
+          <button class="chat-history-btn" onclick="openConversationsDrawer()" title="Historial de converses">Xats</button>
+          <button class="chat-new-btn" onclick="createNewConversation()" title="Nova conversa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
         </div>
       </div>
       <div class="chat-messages" id="chatHistory">
@@ -1296,7 +1298,8 @@
       }
 
       function updateConversationTitle(title) {
-        document.getElementById('chatCurrentTitle').textContent = title || 'Hola.';
+        console.log('%c[TITLE UPDATE] ' + (title || 'Nova conversa'), 'background: #4CAF50; color: white; padding: 2px 6px; border-radius: 3px;');
+        document.getElementById('chatCurrentTitle').textContent = title || 'Nova conversa';
       }
 
       function updateActiveConversation(activeId) {
@@ -1312,7 +1315,7 @@
       function createNewConversation() {
         currentConversationId = null;
         conversationMessageCount = 0; // v5.2: Reset counter
-        updateConversationTitle('Hola.');
+        updateConversationTitle('Nova conversa');
         closeConversationsDrawer();
 
         // v7.1: Mostrar landing interactiva en lloc de missatge simple
@@ -2156,6 +2159,43 @@
           return;
         }
 
+        // v10.3: Handle Rewrite Preview (confirmació abans de reescriure)
+        if (res.status === 'rewrite_preview') {
+          addBubble('ai', res.ai_response, false);
+
+          // Guardar dades del preview per a la confirmació
+          window._pendingRewrite = {
+            blocks: res.blocks,
+            is_selection: res.is_selection,
+            original_text: res.original_text,
+            proposed_text: res.proposed_text
+          };
+
+          // Mostrar nota amb botons d'acceptar/cancel·lar
+          const previewNote = `
+            <div class="rewrite-preview-actions">
+              <span>${icon('alertCircle', 'i--sm i--warning')} Es proposa reescriure ${res.is_selection ? 'la selecció' : 'el document'}.</span>
+              <div class="preview-buttons">
+                <button class="btn-accept-rewrite" onclick="acceptRewrite()" title="Aplicar canvis">
+                  ${icon('check', 'i--sm')} Acceptar
+                </button>
+                <button class="btn-cancel-rewrite" onclick="cancelRewrite()" title="Descartar canvis">
+                  ${icon('x', 'i--sm')} Cancel·lar
+                </button>
+                <button class="btn-diff-rewrite" onclick="showRewriteDiff()" title="Veure diferències">
+                  ${icon('eye', 'i--sm')} Diferències
+                </button>
+              </div>
+            </div>
+          `;
+          addBubble('review-note', previewNote);
+
+          if (res.credits !== undefined) {
+            updateCredits(res.credits);
+          }
+          return;
+        }
+
         // Normal response handling (chat mode or fallback)
         // v10.2: No mostrar badge antic - ara tot passa per preview
         addBubble('ai', res.ai_response, false);
@@ -2275,7 +2315,7 @@
 
         try {
           if (!currentConversationId) {
-            // Create new conversation with first message as title
+            // v9.5: Create with provisional title, AI will generate real title later
             const firstUserMsg = messagesToSave.find(m => m.role === 'user');
 
             // v9.1: No crear conversa si no hi ha missatges d'usuari
@@ -2285,11 +2325,7 @@
               return;
             }
 
-            const title = firstUserMsg
-              ? (firstUserMsg.content.length > 47
-                  ? firstUserMsg.content.substring(0, 47) + '...'
-                  : firstUserMsg.content)
-              : 'Nova conversa';
+            const title = 'Nova conversa'; // Provisional, AI generates real title after 2+ messages
 
             console.log('[v5.2] Creating conversation:', title);
 
@@ -2310,7 +2346,17 @@
             if (result && result.conversation_id) {
               currentConversationId = result.conversation_id;
               conversationMessageCount = messagesToSave.length;
+              console.log('[Conversation] Created with ID:', result.conversation_id, 'Title:', title, 'Messages:', conversationMessageCount);
               updateConversationTitle(title);
+
+              // v10.2: Trigger auto-title after creation
+              // Delay 5s to ensure Supabase has saved the conversation
+              if (conversationMessageCount >= 2) {
+                setTimeout(function() {
+                  console.log('[Conversation] Triggering auto-title with', conversationMessageCount, 'messages');
+                  triggerAutoTitle();
+                }, 5000);
+              }
 
               // Add to local list instead of reloading
               if (conversationsLoaded) {
@@ -2350,9 +2396,11 @@
             console.log('[v5.2] Append result:', result);
 
             conversationMessageCount += messagesToSave.length;
+            console.log('[Conversation] Message count now:', conversationMessageCount);
 
             // Trigger auto-title after first AI response (2 messages = 1 turn)
             if (conversationMessageCount === 2) {
+              console.log('[Conversation] Triggering auto-title (2 messages reached)');
               triggerAutoTitle();
             }
             showSaveIndicator('saved');
@@ -2378,12 +2426,25 @@
       // ═══════════════════════════════════════════════════════════
 
       function triggerAutoTitle() {
-        if (!currentConversationId) return;
-        if (!currentSettings.license_key) return;
+        console.log('[Auto-title] Triggering...', {
+          conversationId: currentConversationId,
+          hasLicense: !!currentSettings.license_key
+        });
+
+        if (!currentConversationId) {
+          console.warn('[Auto-title] No conversation ID, skipping');
+          return;
+        }
+        if (!currentSettings.license_key) {
+          console.warn('[Auto-title] No license key, skipping');
+          return;
+        }
 
         google.script.run
           .withSuccessHandler(function(res) {
+            console.log('[Auto-title] Response:', res);
             if (res.status === 'ok' && res.generated && res.title) {
+              console.log('[Auto-title] Updating title to:', res.title);
               updateConversationTitle(res.title);
               // Update in list too
               const conv = conversationsList.find(c => c.id === currentConversationId);
@@ -2391,6 +2452,8 @@
                 conv.title = res.title;
                 renderConversationsList(conversationsList);
               }
+            } else {
+              console.warn('[Auto-title] Not generated:', res);
             }
           })
           .withFailureHandler(function(err) {
@@ -2851,12 +2914,9 @@
           // v6.8: AI responses with markdown rendering
           const mdResult = renderMarkdown(text);
           const mdHtml = typeof mdResult === 'object' ? mdResult.html : mdResult;
-          const firstRef = typeof mdResult === 'object' ? mdResult.firstRef : null;
 
-          // Només mostrar ull si hi ha referència (isEdit=false)
-          const eyeBtn = createEyeButton(firstRef, false);
-          bubble.innerHTML = eyeBtn + '<div class="md-content">' + mdHtml + '</div>';
-          if (firstRef) bubble.dataset.docRef = firstRef;
+          // v9.5: No mostrar ull quan no hi ha edicions (només text de xat)
+          bubble.innerHTML = '<div class="md-content">' + mdHtml + '</div>';
 
         } else if (type === 'error' || type === 'system') {
           bubble.innerHTML = text;
@@ -6595,6 +6655,109 @@
 
         // Then scroll in document
         google.script.run.scrollToParagraph(idx);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // v10.3: REWRITE PREVIEW FUNCTIONS
+      // ═══════════════════════════════════════════════════════════════
+
+      /**
+       * Accepta i aplica el rewrite pendent
+       */
+      function acceptRewrite() {
+        if (!window._pendingRewrite) {
+          showToast('No hi ha rewrite pendent', 'warning');
+          return;
+        }
+
+        const { blocks, is_selection } = window._pendingRewrite;
+
+        // Desactivar botons mentre s'aplica
+        document.querySelectorAll('.rewrite-preview-actions button').forEach(btn => {
+          btn.disabled = true;
+        });
+
+        showToast('Aplicant canvis...', 'info');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.ok) {
+              showToast('Document reescrit correctament', 'success');
+              // Eliminar la nota de preview
+              const lastReviewNote = document.querySelector('.chat-bubble.review-note:last-of-type');
+              if (lastReviewNote) {
+                lastReviewNote.innerHTML = '<span>' + icon('check', 'i--sm i--success') + ' Canvis aplicats</span>';
+              }
+            } else {
+              showToast(result.error || 'Error aplicant rewrite', 'error');
+            }
+            window._pendingRewrite = null;
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error: ' + err.message, 'error');
+            // Re-activar botons
+            document.querySelectorAll('.rewrite-preview-actions button').forEach(btn => {
+              btn.disabled = false;
+            });
+          })
+          .applyPendingRewrite(blocks, is_selection);
+      }
+
+      /**
+       * Cancel·la el rewrite pendent
+       */
+      function cancelRewrite() {
+        window._pendingRewrite = null;
+        showToast('Rewrite cancel·lat', 'info');
+
+        // Actualitzar la nota de preview
+        const lastReviewNote = document.querySelector('.chat-bubble.review-note:last-of-type');
+        if (lastReviewNote) {
+          lastReviewNote.innerHTML = '<span>' + icon('x', 'i--sm i--muted') + ' Canvis descartats</span>';
+        }
+      }
+
+      /**
+       * Mostra les diferències entre l'original i el proposat
+       */
+      function showRewriteDiff() {
+        if (!window._pendingRewrite) {
+          showToast('No hi ha rewrite pendent', 'warning');
+          return;
+        }
+
+        const { original_text, proposed_text } = window._pendingRewrite;
+
+        // Crear modal de diferències
+        const diffModal = document.createElement('div');
+        diffModal.className = 'diff-modal';
+        diffModal.innerHTML = `
+          <div class="diff-modal-content">
+            <div class="diff-header">
+              <h3>Diferències</h3>
+              <button onclick="this.closest('.diff-modal').remove()" class="btn-close-diff">${icon('x', 'i--sm')}</button>
+            </div>
+            <div class="diff-columns">
+              <div class="diff-column diff-original">
+                <h4>Original</h4>
+                <pre>${escapeHtml(original_text || '(buit)')}</pre>
+              </div>
+              <div class="diff-column diff-proposed">
+                <h4>Proposat</h4>
+                <pre>${escapeHtml(proposed_text || '(buit)')}</pre>
+              </div>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(diffModal);
+
+        // Tancar amb click fora
+        diffModal.addEventListener('click', function(e) {
+          if (e.target === diffModal) {
+            diffModal.remove();
+          }
+        });
       }
 
       /**

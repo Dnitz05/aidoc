@@ -1836,7 +1836,78 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
       if (capturedLastEdit) {
         saveLastEdit(capturedLastEdit);
       }
+    // v10.3: Branca explícita per REWRITE amb suport preview i undo
+    } else if (aiData.mode === 'REWRITE' && aiData.blocks) {
+      // Capturar contingut original ABANS de modificar (per preview i undo)
+      let originalContent = '';
+      if (isSelection && elementsToProcess.length > 0) {
+        originalContent = elementsToProcess[0].asText().getText();
+      } else {
+        // Capturar tot el document
+        const allElements = getEditableElements(body);
+        originalContent = allElements.map(el => el.asText().getText()).join('\n');
+      }
+
+      const proposedContent = aiData.blocks.map(b => b.text).join('\n');
+
+      // v10.3: PREVIEW MODE per REWRITE
+      if (previewMode) {
+        logDiagnostic('REWRITE_PREVIEW', {
+          original_length: originalContent.length,
+          proposed_length: proposedContent.length,
+          blocks_count: aiData.blocks.length,
+          is_selection: isSelection
+        });
+
+        return {
+          ok: true,
+          status: 'rewrite_preview',
+          ai_response: aiData.change_summary,
+          original_text: originalContent,
+          proposed_text: proposedContent,
+          blocks: aiData.blocks,
+          is_selection: isSelection,
+          credits: json.credits_remaining,
+          mode: 'edit'
+        };
+      }
+
+      // v10.3: Capturar undo snapshot ABANS d'aplicar REWRITE
+      undoSnapshot = {
+        type: 'rewrite',
+        originalText: originalContent,
+        isSelection: isSelection
+      };
+
+      // Aplicar REWRITE
+      if (isSelection && elementsToProcess.length > 0) {
+        elementsToProcess[0].asText().setText(proposedContent);
+      } else {
+        renderFullDocument(body, aiData.blocks);
+      }
+
+      // Guardar lastEdit per poder mostrar amb l'ull
+      saveLastEdit({
+        type: 'rewrite',
+        originalText: originalContent,
+        currentText: proposedContent,
+        isSelection: isSelection
+      });
+
+      logDiagnostic('REWRITE_APPLIED', {
+        original_length: originalContent.length,
+        new_length: proposedContent.length,
+        is_selection: isSelection
+      });
+
     } else {
+      // Fallback genèric (no hauria d'arribar aquí normalment)
+      logDiagnostic('WARNING', {
+        issue: 'UNEXPECTED_FALLBACK',
+        mode: aiData.mode,
+        has_blocks: !!aiData.blocks,
+        has_updates: !!aiData.updates
+      });
       if (isSelection && elementsToProcess.length > 0) {
          elementsToProcess[0].asText().setText(aiData.blocks.map(b=>b.text).join('\n'));
       } else {
@@ -4535,6 +4606,68 @@ function clearHighlight() {
 // LEGACY WRAPPERS (per compatibilitat - criden highlightElement)
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v10.3: APPLY PENDING REWRITE
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Aplica un rewrite que estava pendent de confirmació
+ * @param {Array} blocks - Array de blocs {text, heading?} a aplicar
+ * @param {boolean} isSelection - Si és una selecció o tot el document
+ * @returns {Object} {ok: boolean, error?: string}
+ */
+function applyPendingRewrite(blocks, isSelection) {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+
+    if (!blocks || blocks.length === 0) {
+      return { ok: false, error: 'No hi ha blocs per aplicar' };
+    }
+
+    const proposedContent = blocks.map(b => b.text).join('\n');
+
+    // Capturar contingut original per undo
+    let originalContent = '';
+    const allElements = getEditableElements(body);
+    originalContent = allElements.map(el => el.asText().getText()).join('\n');
+
+    // Guardar undo snapshot
+    saveLastEdit({
+      type: 'rewrite',
+      originalText: originalContent,
+      currentText: proposedContent,
+      isSelection: isSelection
+    });
+
+    // Aplicar el rewrite
+    if (isSelection) {
+      const selection = doc.getSelection();
+      if (selection) {
+        const elements = selection.getRangeElements();
+        if (elements.length > 0) {
+          elements[0].getElement().asText().setText(proposedContent);
+        }
+      } else {
+        // Si no hi ha selecció activa, aplicar a tot el document
+        renderFullDocument(body, blocks);
+      }
+    } else {
+      renderFullDocument(body, blocks);
+    }
+
+    logDiagnostic('REWRITE_APPLIED_FROM_PREVIEW', {
+      blocks_count: blocks.length,
+      is_selection: isSelection
+    });
+
+    return { ok: true };
+  } catch (error) {
+    console.error('[applyPendingRewrite] Error:', error);
+    return { ok: false, error: error.message };
+  }
+}
+
 /**
  * @deprecated Usar highlightElement({mode:'bodyIndex', value:idx})
  * Mantingut per compatibilitat amb crides existents
@@ -4590,20 +4723,21 @@ function findInDocumentWithFallback(searchText) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// REFERENCE HIGHLIGHTING v7.0
+// REFERENCE HIGHLIGHTING v7.1 - Suport parcial + sense límit
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Aplica highlights de referència al document
- * @param {Array} highlights - Array de {para_id, color, reason}
+ * Aplica highlights de referència al document (v7.1 - Suport parcial)
+ * @param {Array} highlights - Array de {para_id, color, reason, start?, end?}
  * @returns {Object} - {success, applied, errors}
  */
 function applyReferenceHighlights(highlights) {
   try {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
-    const results = { applied: 0, errors: [] };
+    const results = { applied: 0, errors: [], partial: 0 };
     const highlightedIndices = [];
+    const highlightDetails = [];  // v7.1: Guardem detalls per neteja precisa
 
     // Construir mapa d'elements editables
     const elementsToProcess = getEditableElements(body);
@@ -4631,11 +4765,28 @@ function applyReferenceHighlights(highlights) {
 
         if (textLength === 0) continue;
 
+        // v7.1: Determinar rang de highlight (parcial o complet)
+        let startPos = 0;
+        let endPos = textLength - 1;
+
+        if (typeof hl.start === 'number' && typeof hl.end === 'number') {
+          // Highlight parcial - validar límits
+          startPos = Math.max(0, Math.min(hl.start, textLength - 1));
+          endPos = Math.max(startPos, Math.min(hl.end - 1, textLength - 1));
+          results.partial++;
+        }
+
         // Aplicar color de fons
         const color = REFERENCE_COLORS[hl.color] || REFERENCE_COLORS.yellow;
-        textObj.setBackgroundColor(0, textLength - 1, color);
+        textObj.setBackgroundColor(startPos, endPos, color);
 
         highlightedIndices.push(hl.para_id);
+        // v7.1: Guardar detalls complets per neteja precisa
+        highlightDetails.push({
+          para_id: hl.para_id,
+          start: startPos,
+          end: endPos
+        });
         results.applied++;
 
       } catch (e) {
@@ -4643,10 +4794,11 @@ function applyReferenceHighlights(highlights) {
       }
     }
 
-    // Guardar índexs per netejar després
+    // Guardar índexs i detalls per netejar després
     if (highlightedIndices.length > 0) {
       const props = PropertiesService.getDocumentProperties();
       props.setProperty('referenceHighlights', JSON.stringify(highlightedIndices));
+      props.setProperty('referenceHighlightDetails', JSON.stringify(highlightDetails));  // v7.1
     }
 
     results.success = results.applied > 0;
@@ -4658,7 +4810,7 @@ function applyReferenceHighlights(highlights) {
 }
 
 /**
- * Neteja tots els highlights de referència
+ * Neteja tots els highlights de referència (v7.1 - Suport parcial)
  * @returns {Object} - {success, cleared}
  */
 function clearReferenceHighlights() {
@@ -4668,9 +4820,11 @@ function clearReferenceHighlights() {
     const props = PropertiesService.getDocumentProperties();
 
     const savedIndices = props.getProperty('referenceHighlights');
+    const savedDetails = props.getProperty('referenceHighlightDetails');  // v7.1
     if (!savedIndices) return { success: true, cleared: 0 };
 
     const indices = JSON.parse(savedIndices);
+    const details = savedDetails ? JSON.parse(savedDetails) : null;  // v7.1
 
     // Reconstruir mapa d'elements
     const elementsToProcess = getEditableElements(body);
@@ -4686,23 +4840,47 @@ function clearReferenceHighlights() {
 
     let cleared = 0;
 
-    for (const idx of indices) {
-      try {
-        const element = mapIdToElement[idx];
-        if (element && element.editAsText) {
-          const textObj = element.editAsText();
-          const len = textObj.getText().length;
-          if (len > 0) {
-            textObj.setBackgroundColor(0, len - 1, null);
-            cleared++;
+    // v7.1: Si tenim detalls, usem neteja precisa; sinó, neteja completa
+    if (details && Array.isArray(details)) {
+      for (const detail of details) {
+        try {
+          const element = mapIdToElement[detail.para_id];
+          if (element && element.editAsText) {
+            const textObj = element.editAsText();
+            const len = textObj.getText().length;
+            if (len > 0) {
+              // Netejar el rang específic (o tot si no hi ha detalls)
+              const startPos = detail.start || 0;
+              const endPos = detail.end !== undefined ? detail.end : len - 1;
+              textObj.setBackgroundColor(startPos, Math.min(endPos, len - 1), null);
+              cleared++;
+            }
           }
+        } catch (e) {
+          // Ignorar errors individuals
         }
-      } catch (e) {
-        // Ignorar errors individuals
+      }
+    } else {
+      // Fallback: neteja tot el paràgraf (comportament antic)
+      for (const idx of indices) {
+        try {
+          const element = mapIdToElement[idx];
+          if (element && element.editAsText) {
+            const textObj = element.editAsText();
+            const len = textObj.getText().length;
+            if (len > 0) {
+              textObj.setBackgroundColor(0, len - 1, null);
+              cleared++;
+            }
+          }
+        } catch (e) {
+          // Ignorar errors individuals
+        }
       }
     }
 
     props.deleteProperty('referenceHighlights');
+    props.deleteProperty('referenceHighlightDetails');  // v7.1
     return { success: true, cleared: cleared };
 
   } catch (e) {
