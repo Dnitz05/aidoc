@@ -1,5 +1,8 @@
 /**
- * REFERENCE_HIGHLIGHT Executor v8.3
+ * REFERENCE_HIGHLIGHT Executor v8.4
+ *
+ * v8.4: Word boundary multilingüe per precisió total en detecció de paraules
+ *       (evita "el" dins "del", funciona amb accents: és, àrea, ç, ñ)
  *
  * Executor per destacar text al document sense modificar-lo.
  * Genera highlights amb comentaris per a:
@@ -13,6 +16,17 @@ import { Mode, HighlightStrategy, createErrorResult } from '../types.js';
 import { GEMINI, TIMEOUTS } from '../config.js';
 import { logInfo, logDebug, logError, logWarn } from '../telemetry.js';
 import { formatContextForPrompt, formatContextForExecutor } from '../context.js';
+
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS PER WORD BOUNDARY MULTILINGÜE
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Caràcters considerats "part de paraula" per català, castellà i anglès.
+ * Inclou lletres (amb accents), números i caràcters especials comuns.
+ * IMPORTANT: \b de JavaScript NO reconeix accents com a word chars!
+ */
+const WORD_CHARS = 'a-zA-Z0-9àèéíòóúüïçñÀÈÉÍÒÓÚÜÏÇÑáéíóúÁÉÍÓÚ';
 
 // ═══════════════════════════════════════════════════════════════
 // SYSTEM PROMPTS PER ESTRATÈGIA
@@ -480,27 +494,74 @@ function findExactPositionAvoidingUsed(searchText, paragraphText, usedRanges) {
 
 /**
  * Troba TOTES les posicions d'un text dins d'un paràgraf
+ *
+ * LÒGICA v8.4: Per paraules úniques, usa word boundary PRIMER per evitar
+ * falsos positius (ex: "el" dins "del"). Fallback a substring si no troba.
+ *
+ * @param {string} searchText - Text a buscar
+ * @param {string} paragraphText - Text del paràgraf
  * @returns {Array} - Array de { start, end, matched_text, _meta }
  */
 function findAllPositions(searchText, paragraphText) {
   const positions = [];
   if (!searchText || !paragraphText) return positions;
 
-  // ESTRATÈGIA 1: Cerca exacta - totes les ocurrències
+  // Determinar si és una paraula única (sense espais)
+  const isSingleWord = !/\s/.test(searchText.trim());
+
+  // ═══════════════════════════════════════════════════════════════
+  // ESTRATÈGIA 1: WORD BOUNDARY MULTILINGÜE (prioritària per paraules)
+  // Evita trobar "el" dins "del", "cel", etc.
+  // Funciona amb accents: és, àrea, ñ, ç
+  // ═══════════════════════════════════════════════════════════════
+  if (isSingleWord) {
+    try {
+      const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Lookbehind/lookahead negatius per caràcters de paraula multilingües
+      const pattern = `(?<![${WORD_CHARS}])${escaped}(?![${WORD_CHARS}])`;
+      const regex = new RegExp(pattern, 'gi');
+      let match;
+      while ((match = regex.exec(paragraphText)) !== null) {
+        positions.push({
+          start: match.index,
+          end: match.index + match[0].length,
+          matched_text: match[0],
+          _meta: { match_type: 'word_boundary_multilingual' }
+        });
+      }
+      // Si trobem amb word boundary, retornar (és el resultat més precís)
+      if (positions.length > 0) {
+        logDebug('findAllPositions: word boundary match', {
+          search: searchText,
+          found: positions.length
+        });
+        return positions;
+      }
+    } catch (e) {
+      // Si el regex falla (navegadors antics sense lookbehind), continuar
+      logDebug('findAllPositions: lookbehind not supported, using fallback');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ESTRATÈGIA 2: SUBSTRING EXACTE (per frases o fallback)
+  // ═══════════════════════════════════════════════════════════════
   let idx = 0;
   while ((idx = paragraphText.indexOf(searchText, idx)) !== -1) {
     positions.push({
       start: idx,
       end: idx + searchText.length,
       matched_text: searchText,
-      _meta: { match_type: 'exact' }
+      _meta: { match_type: 'exact_substring' }
     });
-    idx += 1; // Continuar buscant (permet solapaments parcials)
+    idx += 1;
   }
 
   if (positions.length > 0) return positions;
 
-  // ESTRATÈGIA 2: Case-insensitive - totes les ocurrències
+  // ═══════════════════════════════════════════════════════════════
+  // ESTRATÈGIA 3: CASE-INSENSITIVE (últim recurs)
+  // ═══════════════════════════════════════════════════════════════
   const lowerSearch = searchText.toLowerCase();
   const lowerPara = paragraphText.toLowerCase();
   idx = 0;
@@ -513,26 +574,6 @@ function findAllPositions(searchText, paragraphText) {
       _meta: { match_type: 'case_insensitive' }
     });
     idx += 1;
-  }
-
-  if (positions.length > 0) return positions;
-
-  // ESTRATÈGIA 3: Regex amb word boundaries per paraules soltes
-  // Útil per trobar "el" sense trobar "del", "cel", etc.
-  try {
-    const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const wordRegex = new RegExp(`\\b${escapedSearch}\\b`, 'gi');
-    let match;
-    while ((match = wordRegex.exec(paragraphText)) !== null) {
-      positions.push({
-        start: match.index,
-        end: match.index + match[0].length,
-        matched_text: match[0],
-        _meta: { match_type: 'word_boundary' }
-      });
-    }
-  } catch (e) {
-    // Ignorar errors de regex
   }
 
   return positions;
