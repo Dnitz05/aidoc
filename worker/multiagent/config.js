@@ -55,10 +55,10 @@ const FEATURE_FLAGS = {
 // ═══════════════════════════════════════════════════════════════
 
 const TIMEOUTS = {
-  classifier: 8000,        // 8s màxim per classificar (gemini-2.5-flash pot trigar)
-  executor: 18000,         // 18s màxim per executar (gemini-2.5-flash amb thinking)
-  total_pipeline: 25000,   // 25s màxim total (deixa marge per GAS 30s limit)
-  api_call: 20000,         // 20s timeout al fetch
+  classifier: 5000,        // 5s màxim per classificar
+  executor: 10000,         // 10s màxim per executar (flash-lite és ràpid)
+  total_pipeline: 15000,   // 15s màxim total
+  api_call: 12000,         // 12s timeout al fetch
   cache_computing: 30000,  // 30s timeout per cache COMPUTING state
 };
 
@@ -108,10 +108,10 @@ const CACHE = {
 
 const API = {
   gemini: {
-    // Model pel classifier (ràpid, econòmic)
-    classifier_model: 'gemini-2.5-flash',
-    // Model pels executors (mateix model)
-    executor_model: 'gemini-2.5-flash',
+    // Model pel classifier (ràpid, sense thinking)
+    classifier_model: 'gemini-2.5-flash-lite',
+    // Model pels executors (mateix model, optimitzat per velocitat)
+    executor_model: 'gemini-2.5-flash-lite',
     // Model per embeddings (cache semàntic)
     embedding_model: 'text-embedding-004',
     // Base URL
