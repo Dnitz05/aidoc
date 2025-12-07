@@ -55,10 +55,10 @@ const FEATURE_FLAGS = {
 // ═══════════════════════════════════════════════════════════════
 
 const TIMEOUTS = {
-  classifier: 5000,        // 5s màxim per classificar
-  executor: 8000,          // 8s màxim per executar
-  total_pipeline: 12000,   // 12s màxim total
-  api_call: 10000,         // 10s timeout al fetch
+  classifier: 8000,        // 8s màxim per classificar (gemini-2.5-flash pot trigar)
+  executor: 18000,         // 18s màxim per executar (gemini-2.5-flash amb thinking)
+  total_pipeline: 25000,   // 25s màxim total (deixa marge per GAS 30s limit)
+  api_call: 20000,         // 20s timeout al fetch
   cache_computing: 30000,  // 30s timeout per cache COMPUTING state
 };
 
