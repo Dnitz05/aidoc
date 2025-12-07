@@ -6726,6 +6726,12 @@
           return;
         }
 
+        // v10.3.1: Evitar múltiples modals - tancar existent primer
+        const existingModal = document.querySelector('.diff-modal');
+        if (existingModal) {
+          existingModal.remove();
+        }
+
         const { original_text, proposed_text } = window._pendingRewrite;
 
         // Crear modal de diferències

@@ -1462,10 +1462,13 @@ function isQuestionWithEditIntent(instruction) {
     // "Em pots + verb d'edició"
     /\bem\s+pots?\s+(corregir|millorar|simplificar|resumir|traduir|arreglar)/i,
     // "Pots fer + més curt/llarg/formal/etc."
-    /\bpots?\s+(fer|posar)[^?]*(més\s+(curt|llarg|formal|informal|simple|clar|concís|breu))/i,
+    // v7.3.1: Canviat [^?]* per .* per evitar que el ? final interfereixi
+    /\bpots?\s+(fer|posar).*(més\s+(curt|llarg|formal|informal|simple|clar|concís|breu))/i,
   ];
 
-  return editIntentPatterns.some(p => p.test(trimmed));
+  // v7.3.1: Treure el ? final abans de testejar per evitar interferències amb regex
+  const trimmedNoQuestion = trimmed.replace(/\?+$/, '');
+  return editIntentPatterns.some(p => p.test(trimmedNoQuestion));
 }
 
 /**
@@ -2224,24 +2227,27 @@ INSTRUCCIÓ DE L'USUARI:
   // BLOQUEGEM i convertim a CHAT_ONLY o REFERENCE_HIGHLIGHT
   // EXCEPCIÓ v7.3: Preguntes amb intenció d'edició ("Pots simplificar?") SÍ poden modificar
   if (instructionIsAQuestion && !instructionIsQuestionWithEdit && (parsedResponse.mode === 'REWRITE' || parsedResponse.mode === 'UPDATE_BY_ID')) {
-    console.warn(`[Mode Enforcement v7.2] ⛔ BLOCKED: Question "${user_instruction}" tried to trigger ${parsedResponse.mode}`);
+    // v7.3.1: Guardar mode original ABANS de sobreescriure
+    const blockedMode = parsedResponse.mode;
+    console.warn(`[Mode Enforcement v7.3] ⛔ BLOCKED: Question "${user_instruction}" tried to trigger ${blockedMode}`);
 
     // Si és visualització, convertim a CHAT_ONLY amb hint
     // (REFERENCE_HIGHLIGHT requereix que la IA generi highlights, no podem inventar-los)
     const originalResponse = parsedResponse.change_summary || parsedResponse.chat_response || '';
+    const originalThought = parsedResponse.thought || '';
     parsedResponse = {
       mode: 'CHAT_ONLY',
       chat_response: originalResponse || 'He analitzat el document.',
       change_summary: 'Consulta processada sense modificar el document',
-      thought: (parsedResponse.thought || '') + ' [v7.2: Bloqueig de seguretat - pregunta no pot editar]'
+      thought: originalThought + ' [v7.3: Bloqueig de seguretat - pregunta no pot editar]'
     };
 
     _meta.safety_block = {
       reason: 'question_blocked_edit',
-      original_mode: parsedResponse.mode,
+      original_mode: blockedMode,  // v7.3.1: Ara guarda el mode original correctament
       instruction: user_instruction.substring(0, 100)
     };
-    console.log(`[Mode Enforcement v7.2] Converted to CHAT_ONLY for safety`);
+    console.log(`[Mode Enforcement v7.3] Converted ${blockedMode} to CHAT_ONLY for safety`);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -2250,22 +2256,25 @@ INSTRUCCIÓ DE L'USUARI:
   // Si és visualització i NO és ordre explícita, bloquegem edicions
   if (instructionIsVisualization && !instructionIsExplicitEdit &&
       (parsedResponse.mode === 'REWRITE' || parsedResponse.mode === 'UPDATE_BY_ID')) {
-    console.warn(`[Mode Enforcement v7.2] ⛔ BLOCKED: Visualization "${user_instruction}" tried to trigger ${parsedResponse.mode}`);
+    // v7.3.1: Guardar mode original ABANS de sobreescriure
+    const blockedMode = parsedResponse.mode;
+    console.warn(`[Mode Enforcement v7.3] ⛔ BLOCKED: Visualization "${user_instruction}" tried to trigger ${blockedMode}`);
 
     const originalResponse = parsedResponse.change_summary || parsedResponse.chat_response || '';
+    const originalThought = parsedResponse.thought || '';
     parsedResponse = {
       mode: 'CHAT_ONLY',
       chat_response: originalResponse || 'He revisat el document.',
       change_summary: 'Anàlisi completada sense modificar el document',
-      thought: (parsedResponse.thought || '') + ' [v7.2: Bloqueig - visualització sense ordre explícita]'
+      thought: originalThought + ' [v7.3: Bloqueig - visualització sense ordre explícita]'
     };
 
     _meta.safety_block = {
       reason: 'visualization_blocked_edit',
-      original_mode: parsedResponse.mode,
+      original_mode: blockedMode,  // v7.3.1: Ara guarda el mode original correctament
       instruction: user_instruction.substring(0, 100)
     };
-    console.log(`[Mode Enforcement v7.2] Visualization converted to CHAT_ONLY`);
+    console.log(`[Mode Enforcement v7.3] Visualization converted ${blockedMode} to CHAT_ONLY`);
   }
 
   // v7.1: Visualització té PRIORITAT - si l'usuari demana detectar/revisar/marcar problemes

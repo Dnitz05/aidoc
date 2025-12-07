@@ -1908,10 +1908,18 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
         has_blocks: !!aiData.blocks,
         has_updates: !!aiData.updates
       });
-      if (isSelection && elementsToProcess.length > 0) {
-         elementsToProcess[0].asText().setText(aiData.blocks.map(b=>b.text).join('\n'));
+      // v10.3.1: Guarda per evitar error si aiData.blocks és undefined
+      if (aiData.blocks && Array.isArray(aiData.blocks)) {
+        if (isSelection && elementsToProcess.length > 0) {
+           elementsToProcess[0].asText().setText(aiData.blocks.map(b=>b.text).join('\n'));
+        } else {
+           renderFullDocument(body, aiData.blocks);
+        }
       } else {
-         renderFullDocument(body, aiData.blocks);
+        logDiagnostic('ERROR', {
+          issue: 'FALLBACK_NO_BLOCKS',
+          mode: aiData.mode
+        });
       }
     }
 
