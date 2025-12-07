@@ -870,22 +870,37 @@ Camps dels highlights:
 - color: "yellow" (atenció/repetició), "orange" (error/problema), "blue" (recomanació), "purple" (ambigüitat/pregunta) - OBLIGATORI
 - reason: Motiu breu del marcatge - OBLIGATORI
 - snippet: Fragment de text afectat (màx 50 chars) - OBLIGATORI
-- start: Posició inicial dins el paràgraf (opcional, per marcar fragment específic)
-- end: Posició final dins el paràgraf (opcional, per marcar fragment específic)
+- start: Posició inicial DINS el paràgraf - MOLT RECOMANAT per granularitat
+- end: Posició final DINS el paràgraf - MOLT RECOMANAT per granularitat
 
-Si start/end no s'especifiquen, es marca el paràgraf sencer.
+⚠️ GRANULARITAT OBLIGATÒRIA (v7.4):
+- SEMPRE proporciona start/end quan l'error és en una paraula o frase concreta
+- NO marquis paràgrafs sencers si l'error és puntual
+- start = posició del PRIMER caràcter del problema (0-indexed)
+- end = posició DESPRÉS de l'últim caràcter
+
+Exemple: Si el paràgraf és "El document tramet informació" i l'error és "tramet":
+- start: 13 (posició de 't' de 'tramet')
+- end: 19 (posició després de 't' final)
+
 Usa para_id exactes del document ({{0}}, {{1}}, etc.). Marca TOTS els problemes que trobis, sense límit.
 
-EXEMPLE COMPLET - Usuari pregunta "veus errors ortogràfics?":
+EXEMPLE COMPLET AMB GRANULARITAT - Usuari pregunta "veus errors ortogràfics?":
 {
-  "thought": "L'usuari demana detectar errors. Trobo 'tramet' ({{4}}), 'edn' ({{6}}). Uso REFERENCE_HIGHLIGHT.",
+  "thought": "L'usuari demana detectar errors. Trobo 'tramet' ({{4}} posició 13-19), 'edn' ({{6}} posició 8-11). Uso REFERENCE_HIGHLIGHT amb posicions exactes.",
   "mode": "REFERENCE_HIGHLIGHT",
   "ai_response": "He detectat els següents errors ortogràfics:",
   "highlights": [
-    {"para_id": 4, "color": "orange", "reason": "'tramet' → 'trametre'", "snippet": "...tramet..."},
-    {"para_id": 6, "color": "orange", "reason": "'edn' → 'en'", "snippet": "...edn el document..."}
+    {"para_id": 4, "color": "orange", "reason": "'tramet' → 'trametre'", "snippet": "...tramet...", "start": 13, "end": 19},
+    {"para_id": 6, "color": "orange", "reason": "'edn' → 'en'", "snippet": "...edn el...", "start": 8, "end": 11}
   ]
 }
+
+⚠️ EXEMPLE INCORRECTE (sense granularitat):
+{"para_id": 4, "color": "orange", "reason": "error", "snippet": "..."} ← Marca TOT el paràgraf!
+
+✅ EXEMPLE CORRECTE (amb granularitat):
+{"para_id": 4, "color": "orange", "reason": "'tramet'→'trametre'", "snippet": "tramet", "start": 13, "end": 19} ← Marca NOMÉS la paraula!
 
 ⛔ INCORRECTE (NO fer això):
 {
@@ -1411,6 +1426,26 @@ function isVisualizationVerb(instruction) {
     // Estil
     /\bproblemes?\s+(d'estil|estilístic)/i,
     /\bestil\s+(inconsistent|problemàtic|millorable)/i,
+
+    // v7.4: Preguntes sobre contingut (proactiu)
+    /\b(què|que)\s+diu\b.{0,30}\b(sobre|de|del|respecte)/i,
+    /\b(hi ha|existeix|apareix|es menciona|parla)\b.{0,20}(referènci|menció|sobre)/i,
+    /\bon\s+(parla|tracta|menciona|apareix|diu)\b/i,
+    /\b(quin|quina|quins|quines)\s+(argument|conclusi|punt|idea|part)/i,
+    /\b(quines?\s+parts?|quins?\s+fragments?)\b.{0,20}(parlen?|tracten?|mencionen?)/i,
+
+    // v7.4: Preguntes d'anàlisi qualitativa (proactiu)
+    /\b(és|està)\s+(coherent|consistent|adequat|correcte|clar|ben\s+escrit)/i,
+    /\b(el\s+to|l'estil|el\s+registre)\s+(és|sembla|està)/i,
+    /\b(quines?\s+conclusions?|què\s+conclou)/i,
+    /\b(està\s+ben|és\s+correcte|és\s+adequat)/i,
+    /\b(és\s+massa|està\s+massa)\s+(llarg|curt|formal|informal|tècnic)/i,
+    /\b(entén|s'entén|queda\s+clar)/i,
+
+    // v7.4: Localització de conceptes
+    /\b(on|a\s+on)\s+(es\s+)?parla\s+de\b/i,
+    /\b(localitza|troba|busca)\b.{0,15}\b(on|a\s+on|lloc)/i,
+    /\b(en\s+quin|quins?)\s+(paràgraf|part|secció|lloc)/i,
   ];
 
   return visualizationPatterns.some(pattern => pattern.test(normalized));
@@ -2277,26 +2312,151 @@ INSTRUCCIÓ DE L'USUARI:
     console.log(`[Mode Enforcement v7.3] Visualization converted ${blockedMode} to CHAT_ONLY`);
   }
 
-  // v7.1: Visualització té PRIORITAT - si l'usuari demana detectar/revisar/marcar problemes
+  // ═══════════════════════════════════════════════════════════════
+  // v7.4: PROACTIVE REFERENCE_HIGHLIGHT - Retry i Auto-Parsing
+  // ═══════════════════════════════════════════════════════════════
   if (instructionIsVisualization && parsedResponse.mode === 'CHAT_ONLY') {
-    // La IA hauria d'haver usat REFERENCE_HIGHLIGHT però va retornar CHAT_ONLY
-    console.warn(`[Mode Enforcement v7.1] Visualization verb detected but AI returned CHAT_ONLY: "${user_instruction}"`);
+    console.warn(`[Mode Enforcement v7.4] Visualization verb detected but AI returned CHAT_ONLY: "${user_instruction}"`);
 
-    // Intentem detectar si la resposta menciona problemes/errors que podrien ser highlights
     const responseText = parsedResponse.chat_response || '';
-    const mentionsIssues = /\b(error|falta|problema|repetici|inconsist|ambig|incorrec|millorar|corregir)\b/i.test(responseText);
 
-    if (mentionsIssues) {
-      // La IA va detectar problemes però no va usar REFERENCE_HIGHLIGHT
-      // Afegim un hint perquè l'usuari sàpiga que pot demanar marcatge
-      _meta.visualization_hint = true;
-      _meta.misclassification = {
-        instruction: user_instruction,
-        ai_mode: 'CHAT_ONLY',
-        expected_mode: 'REFERENCE_HIGHLIGHT',
-        reason: 'Visualization verb with issues detected in response'
-      };
-      console.log(`[Mode Enforcement v7.1] AI detected issues but didn't highlight. Adding visualization hint.`);
+    // Detectar si la resposta menciona paràgrafs {{N}} o problemes
+    const mentionsParas = /\{\{(\d+)\}\}/.test(responseText);
+    const mentionsIssues = /\b(error|falta|problema|repetici|inconsist|ambig|incorrec|millorar|corregir|errada|tramet|ortogràfic|gramatical)\b/i.test(responseText);
+
+    if (mentionsParas || mentionsIssues) {
+      console.log(`[Mode Enforcement v7.4] Response mentions paras: ${mentionsParas}, issues: ${mentionsIssues}`);
+
+      // P2: INTENT 1 - Auto-parsejar {{N}} de la resposta per construir highlights
+      const autoHighlights = [];
+
+      // Patró: {{N}} seguit de text explicatiu (fins a punt, coma, o següent {{)
+      const paraPattern = /\{\{(\d+)\}\}\s*[""'«]?([^""'»\n{]+?)(?:[""'»]?\s*[:：\-–—]?\s*)?([^{.\n]*?)(?=[.،,;]|\{\{|$)/gi;
+      let match;
+      const seenParas = new Set();
+
+      while ((match = paraPattern.exec(responseText)) !== null) {
+        const paraId = parseInt(match[1], 10);
+        if (seenParas.has(paraId)) continue;
+        seenParas.add(paraId);
+
+        const snippet = (match[2] || '').trim().substring(0, 50);
+        const reason = (match[3] || match[2] || '').trim().substring(0, 100);
+
+        // Determinar color basat en contingut
+        let color = 'yellow';
+        if (/error|falta|incorrec|errada/i.test(reason)) color = 'orange';
+        if (/ambig|confús/i.test(reason)) color = 'purple';
+        if (/recoman|sugger|millor/i.test(reason)) color = 'blue';
+
+        autoHighlights.push({
+          para_id: paraId,
+          color: color,
+          reason: reason || `Problema detectat al paràgraf ${paraId}`,
+          snippet: snippet || '...'
+        });
+      }
+
+      if (autoHighlights.length > 0) {
+        // Èxit! Convertim a REFERENCE_HIGHLIGHT amb els highlights auto-generats
+        console.log(`[Mode Enforcement v7.4] ✅ Auto-parsed ${autoHighlights.length} highlights from CHAT_ONLY response`);
+
+        parsedResponse = {
+          mode: 'REFERENCE_HIGHLIGHT',
+          ai_response: responseText,
+          highlights: autoHighlights,
+          thought: (parsedResponse.thought || '') + ' [v7.4: Auto-converted from CHAT_ONLY]'
+        };
+        _meta.auto_highlight = {
+          source: 'chat_parsing',
+          count: autoHighlights.length
+        };
+      } else if (mentionsIssues && !_meta.reference_highlight_retry_done) {
+        // P0: INTENT 2 - Retry amb prompt explícit si no hem pogut parsejar
+        console.log(`[Mode Enforcement v7.4] 🔄 Attempting REFERENCE_HIGHLIGHT retry...`);
+
+        const elapsedTime = Date.now() - startTime;
+        if (elapsedTime < TIMEOUT_CUTOFF - 5000) {  // Només si tenim temps
+          try {
+            const retryPrompt = `
+⚠️ CORRECCIÓ OBLIGATÒRIA: Has retornat CHAT_ONLY però havies d'usar REFERENCE_HIGHLIGHT.
+
+La teva resposta anterior va ser:
+"${responseText.substring(0, 500)}"
+
+TORNA A RESPONDRE amb aquest format JSON EXACTE:
+{
+  "mode": "REFERENCE_HIGHLIGHT",
+  "ai_response": "[la mateixa explicació]",
+  "highlights": [
+    {"para_id": N, "color": "orange|yellow|blue|purple", "reason": "explicació breu", "snippet": "fragment afectat", "start": X, "end": Y}
+  ]
+}
+
+IMPORTANT:
+- para_id: número del paràgraf (0, 1, 2...)
+- start/end: posicions DINS del paràgraf per marcar EXACTAMENT el fragment problemàtic
+- Marca TOTS els problemes que has detectat
+`;
+
+            // Afegir al context i fer retry
+            const retryContents = [...currentContents,
+              { role: 'model', parts: [{ text: JSON.stringify(parsedResponse) }] },
+              { role: 'user', parts: [{ text: retryPrompt }] }
+            ];
+
+            const retryResp = await fetch(geminiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: retryContents,
+                system_instruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                  responseMimeType: "application/json",
+                  temperature: 0.1  // Molt baixa per forçar format
+                }
+              })
+            });
+
+            if (retryResp.ok) {
+              const retryJson = await retryResp.json();
+              const retryText = retryJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+              if (retryText) {
+                const retryParsed = parseAndValidate(retryText);
+
+                if (retryParsed.mode === 'REFERENCE_HIGHLIGHT' && retryParsed.highlights?.length > 0) {
+                  console.log(`[Mode Enforcement v7.4] ✅ Retry successful! Got ${retryParsed.highlights.length} highlights`);
+                  parsedResponse = retryParsed;
+                  _meta.reference_highlight_retry_done = true;
+                  _meta.auto_highlight = {
+                    source: 'retry',
+                    count: retryParsed.highlights.length
+                  };
+                } else {
+                  console.warn(`[Mode Enforcement v7.4] Retry returned ${retryParsed.mode}, keeping original`);
+                  _meta.reference_highlight_retry_done = true;
+                }
+              }
+            }
+          } catch (retryErr) {
+            console.error(`[Mode Enforcement v7.4] Retry error:`, retryErr);
+          }
+        } else {
+          console.warn(`[Mode Enforcement v7.4] Not enough time for retry (${elapsedTime}ms elapsed)`);
+        }
+      }
+
+      // Si encara som CHAT_ONLY, afegir hint
+      if (parsedResponse.mode === 'CHAT_ONLY') {
+        _meta.visualization_hint = true;
+        _meta.misclassification = {
+          instruction: user_instruction,
+          ai_mode: 'CHAT_ONLY',
+          expected_mode: 'REFERENCE_HIGHLIGHT',
+          reason: 'Could not auto-convert or retry'
+        };
+      }
     }
   }
 
