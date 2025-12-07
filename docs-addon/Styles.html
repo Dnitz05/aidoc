@@ -290,7 +290,7 @@
       }
 
       .chat-messages::-webkit-scrollbar {
-        width: 6px;
+        width: 8px;
       }
 
       .chat-messages::-webkit-scrollbar-track {
@@ -300,10 +300,13 @@
       .chat-messages::-webkit-scrollbar-thumb {
         background: var(--border-hover);
         border-radius: var(--radius-full);
+        border-right: 2px solid transparent;
+        background-clip: padding-box;
       }
 
       .chat-messages::-webkit-scrollbar-thumb:hover {
         background: var(--text-muted);
+        background-clip: padding-box;
       }
 
       /* Message Bubbles */
@@ -419,12 +422,54 @@
         100% { transform: scale(1); }
       }
 
+      /* v9.2: Inline eye button for system messages */
+      .inline-eye-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        padding: 2px;
+        margin-right: 2px;
+        cursor: pointer;
+        border-radius: var(--radius-sm);
+        vertical-align: middle;
+        transition: background 0.15s ease;
+      }
+      .inline-eye-btn:hover {
+        background: var(--bg-tertiary);
+      }
+      .inline-eye-btn:hover .i {
+        color: var(--accent);
+      }
+      /* v9.4: Animació respiració mentre es processa */
+      .inline-eye-btn.breathing {
+        animation: eyeBreathe 0.8s ease-in-out infinite;
+      }
+      .inline-eye-btn.breathing .i {
+        color: var(--accent);
+      }
+      @keyframes eyeBreathe {
+        0%, 100% { opacity: 0.5; transform: scale(0.95); }
+        50% { opacity: 1; transform: scale(1.1); }
+      }
+
       .msg.system {
         align-self: center;
         background: transparent;
         color: var(--text-muted);
         font-size: 11px;
         padding: var(--space-sm);
+      }
+
+      /* v9.2: Nota de revisió - alineada esquerra, prop de la bombolla AI */
+      .msg.review-note {
+        align-self: flex-start;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 11px;
+        padding: 2px 0 0 0;
+        margin-top: -8px;
       }
 
       .msg.error {
@@ -452,6 +497,48 @@
 
       .edit-badge::before {
         content: '';
+      }
+
+      /* v10.2: Botó Desfer dins del badge */
+      .undo-badge-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        background: transparent;
+        border: 1px solid var(--text-muted);
+        color: var(--text-secondary);
+        padding: 1px 6px;
+        border-radius: var(--radius-xs);
+        font-size: 9px;
+        font-weight: 500;
+        cursor: pointer;
+        margin-left: 6px;
+        transition: all 0.15s ease;
+      }
+
+      .undo-badge-btn:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .undo-badge-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* v10.2: Badge desfet */
+      .undone-badge {
+        color: var(--accent);
+        background: var(--accent-muted);
+        border-color: var(--accent);
+      }
+
+      /* v10.2: Badge desactivat (quan hi ha nous canvis) */
+      .edit-badge.disabled .undo-badge-btn {
+        opacity: 0.4;
+        pointer-events: none;
+        text-decoration: line-through;
       }
 
       /* v5.3: Selection Badge - mostra text seleccionat al xat */
@@ -851,7 +938,7 @@
       /* Salutació */
       .landing-greeting {
         text-align: center;
-        margin-top: 20px;
+        margin-top: 40px;
         margin-bottom: 20px;
       }
 
@@ -965,14 +1052,14 @@
       }
 
       .landing-tip .tip-icon {
-        width: 14px;
-        height: 14px;
+        width: 18px;
+        height: 18px;
         color: #f59e0b;
         flex-shrink: 0;
       }
 
       .landing-tip .tip-text {
-        font-size: 9px;
+        font-size: 10px;
         color: var(--text-muted);
         white-space: nowrap;
       }
@@ -1289,6 +1376,21 @@
         border-color: var(--text-muted);
       }
 
+      .preview-bar-btn.force-clean {
+        flex: 0 0 auto;
+        width: 36px;
+        padding: 0;
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+      }
+
+      .preview-bar-btn.force-clean:hover {
+        background: rgba(239, 83, 80, 0.1);
+        color: #EF5350;
+        border-color: #EF5350;
+      }
+
       .preview-bar-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
@@ -1473,7 +1575,7 @@
 
       .input-area {
         padding: var(--space-sm) var(--space-md) var(--space-md);
-        background: var(--bg-secondary);
+        background: transparent;
         transition: background-color 0.2s ease, border-color 0.2s ease;
       }
 
@@ -1566,7 +1668,7 @@
       }
 
       .input-wrapper {
-        background: var(--bg-tertiary);
+        background: var(--bg-secondary);
         border: 1px solid var(--border);
         border-radius: var(--radius-lg);
         padding: var(--space-sm);
@@ -5850,11 +5952,10 @@
         grid-template-columns: 1fr auto;
         align-items: center;
         gap: 4px;
-        padding: 6px 8px 6px 12px;
+        padding: 6px 8px 2px 12px;
         margin: 0;
-        background: var(--bg-secondary);
+        background: transparent;
         border-top: 1px solid var(--border);
-        border-bottom: 1px solid var(--border);
         font-size: 11px;
         color: var(--text-primary);
         flex-shrink: 0;
@@ -5862,6 +5963,11 @@
 
       .selection-indicator.hidden {
         display: none;
+      }
+
+      /* v6.9: Recipes selection - padding simètric per centrar verticalment */
+      .selection-indicator.recipes-selection {
+        padding: 6px 12px;
       }
 
       .selection-scope {
@@ -5891,12 +5997,12 @@
         font-weight: 600;
         color: var(--accent);
         flex-shrink: 0;
-        margin-right: 4px;
+        margin-right: 1px;
       }
 
       .selection-scope .scope-text {
         font-style: italic;
-        font-size: 10px;
+        font-size: 9px;
         color: var(--text-primary);
         overflow: hidden;
         text-overflow: ellipsis;
@@ -5910,25 +6016,37 @@
         margin-left: 2px;
       }
 
-      /* Polling indicator - breathing dot */
+      /* Icon wrapper for polling indicator overlay */
+      .scope-icon-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 0;
+      }
+
+      /* Polling indicator - breathing dot on icon */
       .polling-indicator {
-        width: 5px;
-        height: 5px;
+        position: absolute;
+        top: 50%;
+        left: 35%;
+        transform: translate(-50%, -50%);
+        width: 4px;
+        height: 4px;
         border-radius: 50%;
         background: var(--accent);
-        margin-left: 4px;
-        flex-shrink: 0;
-        opacity: 0.4;
+        opacity: 0.6;
         animation: breathe 1.5s ease-in-out infinite;
       }
 
       .polling-indicator.fast {
         animation: breathe 0.6s ease-in-out infinite;
+        opacity: 0.8;
       }
 
       @keyframes breathe {
-        0%, 100% { opacity: 0.3; transform: scale(0.9); }
-        50% { opacity: 0.8; transform: scale(1.1); }
+        0%, 100% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.8); }
+        50% { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
       }
 
       /* Mode selector dins selection-indicator */
@@ -5940,7 +6058,7 @@
 
       .selection-indicator .mode-btn {
         padding: 2px 6px;
-        font-size: 10px;
+        font-size: 9px;
         color: var(--accent);
         font-weight: 600;
       }
@@ -5956,7 +6074,7 @@
 
       .selection-word-count {
         flex-shrink: 0;
-        font-size: 10px;
+        font-size: 9px;
         color: var(--text-muted);
         margin-left: auto;
       }
@@ -6464,6 +6582,7 @@
       #chatPanel.landing-active .chat-new-btn {
         display: none;
       }
+
 
       .chat-header-left {
         display: flex;

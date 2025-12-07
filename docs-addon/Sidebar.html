@@ -325,10 +325,35 @@
       <!-- v6.9: Selection indicator for recipes (shows where prompt applies) -->
       <div class="selection-indicator recipes-selection" id="recipesSelectionIndicator">
         <div class="selection-scope">
-          <span class="i i--xs i--accent"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></span>
+          <span class="scope-icon-wrapper">
+            <span class="i i--xs i--accent"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></span>
+            <span class="polling-indicator" id="recipesPollingIndicator"></span>
+          </span>
           <span class="scope-label">Abast:</span>
           <span class="scope-text" id="recipesSelectionPreview">Tot el document</span>
           <span class="selection-word-count" id="recipesSelectionWordCount"></span>
+        </div>
+        <div class="mode-selector" id="recipesModeSelector">
+          <button class="mode-btn" onclick="toggleModeDropdown('recipes')" type="button">
+            <span id="recipesModeLabel">Edit</span>
+            <svg class="mode-arrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="mode-dropdown">
+            <button class="mode-option selected" data-mode="edit" onclick="selectMode('edit')">
+              <span class="i"><svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></span>
+              <div class="details">
+                <div class="name">Mode Edit</div>
+                <div class="desc">La IA pot editar el document</div>
+              </div>
+            </button>
+            <button class="mode-option" data-mode="chat" onclick="selectMode('chat')">
+              <span class="i"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span>
+              <div class="details">
+                <div class="name">Mode Xat</div>
+                <div class="desc">Només conversa, mai edita</div>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -612,20 +637,6 @@
         </label>
       </div>
 
-      <div class="toggle-row">
-        <div class="toggle-label">
-          <span class="i i--default"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-          <div>
-            <div class="text">Mode Preview</div>
-            <div class="hint">Previsualitza canvis abans d'aplicar</div>
-          </div>
-        </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="previewToggle" onchange="togglePreviewMode()">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-
       <button class="save-btn" id="saveBtn" onclick="saveSettings()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -660,17 +671,22 @@
         <button class="preview-bar-btn cancel" onclick="cancelInDocPreview()">
           <span class="i i--error i--sm"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Cancel·lar
         </button>
+        <button class="preview-bar-btn force-clean" onclick="forceCleanPreview()" title="Força neteja si el preview queda trabat">
+          <span class="i i--warning i--sm"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
+        </button>
       </div>
     </div>
 
     <!-- v5.3: Selection preview + Mode selector -->
     <div class="selection-indicator" id="selectionIndicator">
       <div class="selection-scope">
-        <span class="i i--xs i--accent"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></span>
+        <span class="scope-icon-wrapper">
+          <span class="i i--xs i--accent"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></span>
+          <span class="polling-indicator" id="pollingIndicator"></span>
+        </span>
         <span class="scope-label">Abast:</span>
         <span class="scope-text" id="selectionPreview">Tot el document</span>
         <span class="selection-word-count" id="selectionWordCount"></span>
-        <span class="polling-indicator" id="pollingIndicator"></span>
       </div>
       <div class="mode-selector" id="modeSelector">
         <button class="mode-btn" onclick="toggleModeDropdown()" type="button">
@@ -681,14 +697,14 @@
           <button class="mode-option selected" data-mode="edit" onclick="selectMode('edit')">
             <span class="i"><svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></span>
             <div class="details">
-              <div class="name">Edit</div>
+              <div class="name">Mode Edit</div>
               <div class="desc">La IA pot editar el document</div>
             </div>
           </button>
           <button class="mode-option" data-mode="chat" onclick="selectMode('chat')">
             <span class="i"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span>
             <div class="details">
-              <div class="name">Xat</div>
+              <div class="name">Mode Xat</div>
               <div class="desc">Només conversa, mai edita</div>
             </div>
           </button>
@@ -900,7 +916,7 @@
       let pendingUndo = null; // v2.6 Sprint: Snapshot per Optimistic UI Undo
       let pendingPreviewChanges = null; // v3.2: Canvis pendents d'aprovar
       let pendingDocSnapshot = null;    // v3.3: Snapshot per detectar race conditions
-      let previewModeEnabled = true;    // v3.2: Toggle per activar/desactivar preview
+      const previewModeEnabled = true;  // v10.2: Sempre activat (preview obligatori)
       let cachedTimelineData = null;    // v4.1: Pre-loaded timeline data
 
       // v5.3: Selection polling
@@ -941,7 +957,10 @@
 
       function updateModeLabel() {
         const mode = MODES[currentMode];
+        // Update both chat and recipes mode labels
         document.getElementById('modeLabel').textContent = mode.label;
+        const recipesLabel = document.getElementById('recipesModeLabel');
+        if (recipesLabel) recipesLabel.textContent = mode.label;
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -1212,7 +1231,10 @@
               // Use markdown for AI messages
               bubble.innerHTML = '<div class="md-content">' + renderMarkdown(msg.content) + '</div>';
             } else {
-              bubble.innerText = msg.content;
+              // v6.9: Sanitize user messages and wrap in user-text div
+              // Filter out any HTML tags that might have been saved accidentally
+              const cleanText = msg.content.replace(/<[^>]*>/g, '').trim();
+              bubble.innerHTML = '<div class="user-text">' + cleanText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') + '</div>';
             }
 
             if (prepend) {
@@ -1348,30 +1370,6 @@
         localStorage.setItem('docmile-theme', isDark ? 'dark' : 'light');
       }
 
-      function togglePreviewMode() {
-        const checkbox = document.getElementById('previewToggle');
-        previewModeEnabled = checkbox ? checkbox.checked : !previewModeEnabled;
-        localStorage.setItem('docmile-preview', previewModeEnabled ? 'true' : 'false');
-        showToast(previewModeEnabled ? 'Preview Mode activat' : 'Canvis directes activats', 'info');
-      }
-
-      function initPreviewMode() {
-        // v6.6: Migració - forçar preview activat per defecte
-        const migrated = localStorage.getItem('docmile-preview-v2');
-        if (!migrated) {
-          localStorage.setItem('docmile-preview', 'true');
-          localStorage.setItem('docmile-preview-v2', '1');
-        }
-
-        const saved = localStorage.getItem('docmile-preview');
-        previewModeEnabled = saved !== 'false';
-
-        const checkbox = document.getElementById('previewToggle');
-        if (checkbox) {
-          checkbox.checked = previewModeEnabled;
-        }
-      }
-
       // ═══════════════════════════════════════════════════════════
       // IN-DOCUMENT PREVIEW (v3.8)
       // ═══════════════════════════════════════════════════════════
@@ -1412,7 +1410,10 @@
             hideInDocPreviewBar();
             if (result && result.ok) {
               showToast(result.message || 'Fet!', 'success');
-              addMessage('assistant', icon('checkCircle', 'i--success') + ' He aplicat ' + result.applied + ' canvi' + (result.applied !== 1 ? 's' : '') + '.');
+
+              // v10.2: Afegir badge "Fet!" + "Desfer" a l'última bombolla AI
+              addCommitBadgeToLastAiBubble(result.undo_snapshot);
+
             } else {
               showToast(result?.message || 'Error aplicant canvis', 'warning');
               addMessage('assistant', icon('alertTriangle', 'i--warning') + ' Error: ' + (result?.message || 'No s\'han pogut aplicar els canvis'));
@@ -1436,6 +1437,97 @@
             if (cancelBtn) cancelBtn.disabled = false;
           })
           .commitInDocumentPreview();
+      }
+
+      // v10.2: Afegir badge "Fet!" + "Desfer" a l'última bombolla AI
+      function addCommitBadgeToLastAiBubble(undoSnapshot) {
+        const chatHistory = document.getElementById('chatHistory');
+        if (!chatHistory) return;
+
+        // Trobar l'última bombolla AI (no review-note)
+        const bubbles = chatHistory.querySelectorAll('.msg.ai:not(.review-note)');
+        const lastAiBubble = bubbles[bubbles.length - 1];
+        if (!lastAiBubble) return;
+
+        // Guardar snapshot per desfer
+        if (undoSnapshot) {
+          pendingUndo = undoSnapshot;
+        }
+
+        // Crear badge HTML
+        let badgeHtml = '<div class="edit-badge commit-badge">' +
+          icon('check', 'i--sm i--success') + ' Fet!';
+
+        // Afegir botó Desfer si tenim snapshot
+        if (undoSnapshot) {
+          badgeHtml += '<button class="undo-badge-btn" onclick="undoLastCommit()" title="Desfer aquest canvi">' +
+            icon('undo', 'i--sm') + ' Desfer</button>';
+        }
+        badgeHtml += '</div>';
+
+        // Inserir badge al principi de la bombolla
+        lastAiBubble.insertAdjacentHTML('afterbegin', badgeHtml);
+
+        // Marcar la bombolla com a "committed"
+        lastAiBubble.classList.add('committed');
+      }
+
+      // v10.2: Desactivar el botó Desfer quan es fa un nou canvi
+      function disablePendingUndo() {
+        if (!pendingUndo) return;
+
+        // Marcar tots els badges com a desactivats
+        const badges = document.querySelectorAll('.commit-badge');
+        badges.forEach(function(badge) {
+          badge.classList.add('disabled');
+        });
+
+        // Netejar el snapshot
+        pendingUndo = null;
+      }
+
+      // v10.2: Desfer l'últim commit
+      function undoLastCommit() {
+        if (!pendingUndo) {
+          showToast('No hi ha res per desfer', 'warning');
+          return;
+        }
+
+        // Desactivar botó mentre es processa
+        const undoBtn = document.querySelector('.undo-badge-btn');
+        if (undoBtn) {
+          undoBtn.disabled = true;
+          undoBtn.innerHTML = icon('loader', 'i--sm') + ' Desfent...';
+        }
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.status === 'restored') {
+              showToast('Canvi desfet!', 'undo');
+              // Eliminar el badge i marcar com desfet
+              const badge = document.querySelector('.commit-badge');
+              if (badge) {
+                badge.innerHTML = icon('undo', 'i--sm i--accent') + ' Desfet';
+                badge.classList.remove('commit-badge');
+                badge.classList.add('undone-badge');
+              }
+              pendingUndo = null;
+            } else {
+              showToast('Error: ' + (result?.error || 'No s\'ha pogut desfer'), 'error');
+              if (undoBtn) {
+                undoBtn.disabled = false;
+                undoBtn.innerHTML = icon('undo', 'i--sm') + ' Desfer';
+              }
+            }
+          })
+          .withFailureHandler(function(error) {
+            showToast('Error: ' + error.message, 'error');
+            if (undoBtn) {
+              undoBtn.disabled = false;
+              undoBtn.innerHTML = icon('undo', 'i--sm') + ' Desfer';
+            }
+          })
+          .restoreText(pendingUndo.targetId, pendingUndo.originalText, pendingUndo.bodyIndex);
       }
 
       function cancelInDocPreview() {
@@ -1478,6 +1570,40 @@
           .cancelInDocumentPreview();
       }
 
+      function forceCleanPreview() {
+        const forceBtn = document.querySelector('.preview-bar-btn.force-clean');
+        if (forceBtn) {
+          forceBtn.disabled = true;
+          forceBtn.innerHTML = icon('loader', 'i--warning') + ' Netejant...';
+        }
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            hideInDocPreviewBar();
+            if (result && result.ok) {
+              showToast(result.message || 'Document netejat', 'success');
+              if (result.cleaned > 0) {
+                addMessage('assistant', icon('trash', 'i--warning') + ' Força neteja: ' + result.message);
+              }
+            } else {
+              showToast(result?.error || 'Error netejant', 'error');
+            }
+            if (forceBtn) {
+              forceBtn.disabled = false;
+              forceBtn.innerHTML = icon('trash', 'i--warning');
+            }
+          })
+          .withFailureHandler(function(error) {
+            hideInDocPreviewBar();
+            showToast('Error: ' + error.message, 'error');
+            if (forceBtn) {
+              forceBtn.disabled = false;
+              forceBtn.innerHTML = icon('trash', 'i--warning');
+            }
+          })
+          .forceCleanPreview();
+      }
+
       // Check if there's a pending in-doc preview on page load
       function checkPendingInDocPreview() {
         google.script.run
@@ -1504,9 +1630,6 @@
       window.onload = function() {
         // Initialize theme
         initTheme();
-
-        // Initialize preview mode (v3.2)
-        initPreviewMode();
 
         // v3.8: Check for pending in-document preview
         checkPendingInDocPreview();
@@ -1659,6 +1782,7 @@
         let pollingInterval = 600;
         let pollingTimeoutId = null;
         const pollingIndicator = document.getElementById('pollingIndicator');
+        const recipesPollingIndicator = document.getElementById('recipesPollingIndicator');
 
         function scheduleNextPoll() {
           pollingTimeoutId = setTimeout(function() {
@@ -1675,6 +1799,7 @@
         document.addEventListener('blur', function() {
           pollingInterval = 200;
           if (pollingIndicator) pollingIndicator.classList.add('fast');
+          if (recipesPollingIndicator) recipesPollingIndicator.classList.add('fast');
           // Reiniciar amb nou interval
           clearTimeout(pollingTimeoutId);
           scheduleNextPoll();
@@ -1683,6 +1808,7 @@
         document.addEventListener('focus', function() {
           pollingInterval = 600;
           if (pollingIndicator) pollingIndicator.classList.remove('fast');
+          if (recipesPollingIndicator) recipesPollingIndicator.classList.remove('fast');
         });
 
         // Pausar polling mentre escriu (però NO amagar l'indicador)
@@ -1730,27 +1856,40 @@
         if (savedMode === 'auto') savedMode = 'edit';
         selectMode(savedMode, false);
 
-        // Close dropdown when clicking outside
+        // Close dropdown when clicking outside (both selectors)
         document.addEventListener('click', function(e) {
-          const selector = document.getElementById('modeSelector');
-          if (selector && !selector.contains(e.target)) {
-            selector.classList.remove('open');
+          const chatSelector = document.getElementById('modeSelector');
+          const recipesSelector = document.getElementById('recipesModeSelector');
+          if (chatSelector && !chatSelector.contains(e.target)) {
+            chatSelector.classList.remove('open');
+          }
+          if (recipesSelector && !recipesSelector.contains(e.target)) {
+            recipesSelector.classList.remove('open');
           }
         });
       }
 
-      function toggleModeDropdown() {
-        const selector = document.getElementById('modeSelector');
-        selector.classList.toggle('open');
+      function toggleModeDropdown(source) {
+        // v6.9: Support both chat and recipes selectors
+        const chatSelector = document.getElementById('modeSelector');
+        const recipesSelector = document.getElementById('recipesModeSelector');
+
+        if (source === 'recipes') {
+          recipesSelector.classList.toggle('open');
+          chatSelector.classList.remove('open');
+        } else {
+          chatSelector.classList.toggle('open');
+          if (recipesSelector) recipesSelector.classList.remove('open');
+        }
       }
 
       function selectMode(mode, save = true) {
         currentMode = mode;
 
-        // Update button display
+        // Update button display (both selectors)
         updateModeLabel();
 
-        // Update selected state in dropdown
+        // Update selected state in ALL dropdowns
         document.querySelectorAll('.mode-option').forEach(function(opt) {
           opt.classList.remove('selected');
           if (opt.dataset.mode === mode) {
@@ -1758,8 +1897,10 @@
           }
         });
 
-        // Close dropdown
+        // Close both dropdowns
         document.getElementById('modeSelector').classList.remove('open');
+        const recipesSelector = document.getElementById('recipesModeSelector');
+        if (recipesSelector) recipesSelector.classList.remove('open');
 
         // Persist
         if (save) {
@@ -1951,7 +2092,8 @@
         if (res.status === 'in_doc_preview') {
           const previewCount = res.changes_count || res.preview_info?.count || 1;
           addBubble('ai', res.ai_response, false);
-          addBubble('system', icon('eye', 'i--sm i--accent') + ' Revisa els canvis que he marcat al document.');
+          // v9.2: Nota de revisió just sota la bombolla AI, alineada esquerra
+          addBubble('review-note', '<button class="inline-eye-btn" onclick="scrollToLastEdit(this)" title="Veure al document">' + icon('eye', 'i--sm i--accent') + '</button> Revisa els canvis al document.');
           showInDocPreviewBar(previewCount);
           if (res.credits !== undefined) {
             updateCredits(res.credits);
@@ -2106,6 +2248,14 @@
           if (!currentConversationId) {
             // Create new conversation with first message as title
             const firstUserMsg = messagesToSave.find(m => m.role === 'user');
+
+            // v9.1: No crear conversa si no hi ha missatges d'usuari
+            if (!firstUserMsg) {
+              console.log('[v9.1] No user messages, skipping conversation creation');
+              showSaveIndicator('');
+              return;
+            }
+
             const title = firstUserMsg
               ? (firstUserMsg.content.length > 47
                   ? firstUserMsg.content.substring(0, 47) + '...'
@@ -2445,6 +2595,9 @@
         // v8.0: Allow sending file without text, or text without file
         if (!text && !pendingAttachment) return;
 
+        // v10.2: Desactivar botó Desfer de canvis anteriors
+        disablePendingUndo();
+
         // v7.1: Amagar landing quan s'envia missatge
         hideChatLanding();
 
@@ -2636,11 +2789,13 @@
         }
 
         // v5.3: Badge de selecció per missatges d'usuari
+        // v9.2: Icona d'abast i "Tot el document" en lloc de "__ALL_DOC__"
         let selectionHtml = '';
         if (type === 'user' && selectionBadge) {
+          const badgeText = selectionBadge === '__ALL_DOC__' ? 'Tot el document' : sanitizeText(selectionBadge);
           selectionHtml = '<div class="selection-badge">' +
-            '<span class="i i--xs"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>' +
-            '<span class="selection-badge-text">' + sanitizeText(selectionBadge) + '</span></div>';
+            '<span class="i i--xs i--accent"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></span>' +
+            '<span class="selection-badge-text">' + badgeText + '</span></div>';
         }
 
         if (type === 'ai' && isEdit) {
@@ -2675,6 +2830,9 @@
           if (firstRef) bubble.dataset.docRef = firstRef;
 
         } else if (type === 'error' || type === 'system') {
+          bubble.innerHTML = text;
+        } else if (type === 'review-note') {
+          // v9.2: Nota de revisió alineada esquerra, sense marges extres
           bubble.innerHTML = text;
         } else if (type === 'user') {
           const saveBtn = '<button class="save-prompt-btn" onclick="saveAsRecipe(this)" title="Desar com a recepta">' +
@@ -2746,11 +2904,13 @@
         bubble.className = 'msg ' + type;
 
         // Selection badge for user messages
+        // v9.2: Icona d'abast i "Tot el document" en lloc de "__ALL_DOC__"
         let selectionHtml = '';
         if (type === 'user' && selectionBadge) {
+          const badgeText = selectionBadge === '__ALL_DOC__' ? 'Tot el document' : selectionBadge.replace(/</g, '&lt;').replace(/>/g, '&gt;');
           selectionHtml = '<div class="selection-badge">' +
-            '<span class="i i--xs"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>' +
-            '<span class="selection-badge-text">' + selectionBadge.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span></div>';
+            '<span class="i i--xs i--accent"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></span>' +
+            '<span class="selection-badge-text">' + badgeText + '</span></div>';
         }
 
         // v6.7: Save button for user messages
@@ -2910,6 +3070,8 @@
 
         // Afegir classe per amagar elements del header
         if (chatPanel) chatPanel.classList.add('landing-active');
+        const selIndicator = document.getElementById('selectionIndicator');
+        if (selIndicator) selIndicator.classList.add('landing-mode');
 
         // Si ja existeix, només mostrar-la
         if (existingLanding) {
@@ -2967,10 +3129,10 @@
         };
 
         const suggestions = [
-          { icon: icons.edit, color: '#4CAF50', text: "Corregeix", prompt: "Corregeix l'ortografia i la gramàtica" },
-          { icon: icons.lightbulb, color: '#FF9800', text: 'Explica', prompt: 'Explica aquest text de manera clara i senzilla' },
-          { icon: icons.summarize, color: '#2196F3', text: 'Resumeix', prompt: 'Resumeix el document en 3 punts clau' },
-          { icon: icons.style, color: '#9C27B0', text: "Millora", prompt: "Millora l'estil i la claredat del text" },
+          { icon: icons.edit, color: '#4CAF50', text: "Corregeix", prompt: "Corregeix tots els errors ortogràfics, gramaticals i de puntuació. Manté l'estil i to originals." },
+          { icon: icons.lightbulb, color: '#FF9800', text: 'Explica', prompt: "Explica el contingut d'aquest text de forma clara, destacant les idees principals i la seva relació." },
+          { icon: icons.summarize, color: '#2196F3', text: 'Resumeix', prompt: "Resumeix el text en un terç de la seva extensió original, preservant les idees clau i l'estructura argumentativa." },
+          { icon: icons.style, color: '#9C27B0', text: "Millora", prompt: "Millora la claredat, fluïdesa i precisió del text. Elimina redundàncies i reforça la cohesió entre frases." },
           { icon: icons.upload, color: '#00BCD4', text: "Puja Coneixements", action: "switchTab('knowledge')" },
           { icon: icons.layers, color: '#E91E63', text: "Estructura", action: "switchTab('structure')" }
         ];
@@ -3009,7 +3171,7 @@
           '</div>' +
           '<div class="landing-tip">' +
             '<svg class="tip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>' +
-            '<span class="tip-text">Selecciona parts o actua sobre tot el document</span>' +
+            '<span class="tip-text">Actua sobre parts seleccionades o tot el document</span>' +
           '</div>' +
         '</div>';
 
@@ -3035,6 +3197,8 @@
 
         // Treure classe per mostrar elements del header
         if (chatPanel) chatPanel.classList.remove('landing-active');
+        const selIndicator = document.getElementById('selectionIndicator');
+        if (selIndicator) selIndicator.classList.remove('landing-mode');
 
         if (landing) {
           landing.remove();
@@ -3238,7 +3402,11 @@
 
       function runReceipt(instruction, label) {
         switchTab('chat');
-        addBubble('user', icon('target', 'i--sm i--accent') + ' ' + label);
+        hideChatLanding();
+        // v9.3: Use addBubbleHtml to render icon properly (not escaped)
+        const escapedLabel = label.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const receiptHtml = '<div class="user-text">' + icon('target', 'i--sm i--accent') + ' ' + escapedLabel + '</div>';
+        addBubbleHtml('user', receiptHtml, null, instruction);
         showThinking();
 
         document.getElementById('sendBtn').disabled = true;
@@ -3572,11 +3740,11 @@
           icon: 'fileText',
           collapsed: false,
           recipes: [
-            { id: 'r1', name: 'Corregir', icon: 'edit', instruction: 'Corregeix tots els errors ortogràfics i gramaticals del text' },
-            { id: 'r2', name: 'Formal', icon: 'briefcase', instruction: 'Transforma el text a un to més formal i professional' },
-            { id: 'r3', name: 'Informal', icon: 'messageCircle', instruction: 'Fes el text més informal, proper i conversacional' },
-            { id: 'r4', name: 'Millorar', icon: 'wand', instruction: 'Millora la redacció general mantenint el significat original' },
-            { id: 'r5', name: 'Simplificar', icon: 'type', instruction: 'Simplifica el text per fer-lo més fàcil d\'entendre' }
+            { id: 'r1', name: 'Corregir', icon: 'edit', instruction: 'Corregeix tots els errors ortogràfics, gramaticals i de puntuació. No canviïs l\'estil ni el vocabulari.' },
+            { id: 'r2', name: 'Formal', icon: 'briefcase', instruction: 'Reescriu el text amb un registre formal i professional. Elimina col·loquialismes, usa vocabulari precís i estructura les frases de forma clara.' },
+            { id: 'r3', name: 'Informal', icon: 'messageCircle', instruction: 'Reformula el text amb un to proper i conversacional. Usa frases curtes, expressions naturals i un ritme àgil.' },
+            { id: 'r4', name: 'Millorar', icon: 'wand', instruction: 'Refina la redacció: millora la fluïdesa entre frases, elimina repeticions, precisa el vocabulari i reforça la cohesió textual.' },
+            { id: 'r5', name: 'Simplificar', icon: 'type', instruction: 'Simplifica el text: usa frases curtes, vocabulari comú i estructura clara. Fes-lo accessible per a qualsevol lector.' }
           ]
         },
         {
@@ -3585,10 +3753,10 @@
           icon: 'globe',
           collapsed: true,
           recipes: [
-            { id: 't1', name: 'Anglès', icon: 'globe', instruction: 'Tradueix tot el text a anglès' },
-            { id: 't2', name: 'Castellà', icon: 'globe', instruction: 'Tradueix tot el text a castellà' },
-            { id: 't3', name: 'Català', icon: 'globe', instruction: 'Tradueix tot el text a català' },
-            { id: 't4', name: 'Francès', icon: 'globe', instruction: 'Tradueix tot el text a francès' }
+            { id: 't1', name: 'Anglès', icon: 'globe', instruction: 'Tradueix el text a anglès. Adapta expressions idiomàtiques i manté el to i registre originals.' },
+            { id: 't2', name: 'Castellà', icon: 'globe', instruction: 'Tradueix el text a castellà. Adapta expressions idiomàtiques i manté el to i registre originals.' },
+            { id: 't3', name: 'Català', icon: 'globe', instruction: 'Tradueix el text a català. Adapta expressions idiomàtiques i manté el to i registre originals.' },
+            { id: 't4', name: 'Francès', icon: 'globe', instruction: 'Tradueix el text a francès. Adapta expressions idiomàtiques i manté el to i registre originals.' }
           ]
         },
         {
@@ -3597,9 +3765,9 @@
           icon: 'ruler',
           collapsed: true,
           recipes: [
-            { id: 'l1', name: 'Resumir', icon: 'minimize', instruction: 'Resumeix el text mantenint només les idees principals' },
-            { id: 'l2', name: 'Ampliar', icon: 'maximize', instruction: 'Amplia i desenvolupa el text amb més detalls i exemples' },
-            { id: 'l3', name: 'Concís', icon: 'target', instruction: 'Elimina redundàncies i fes el text més directe' }
+            { id: 'l1', name: 'Resumir', icon: 'minimize', instruction: 'Resumeix el text reduint-lo a un terç. Preserva les idees principals, elimina detalls secundaris i manté la coherència.' },
+            { id: 'l2', name: 'Ampliar', icon: 'maximize', instruction: 'Amplia el text afegint detalls, exemples i explicacions. Desenvolupa cada idea sense repetir-te ni afegir informació inventada.' },
+            { id: 'l3', name: 'Concís', icon: 'target', instruction: 'Condensa el text: elimina redundàncies, paraules de farcit i circumloquis. Cada frase ha de dir alguna cosa nova.' }
           ]
         },
         {
@@ -3608,10 +3776,10 @@
           icon: 'wand',
           collapsed: true,
           recipes: [
-            { id: 's1', name: 'Persuasiu', icon: 'zap', instruction: 'Fes el text més persuasiu i convincent' },
-            { id: 's2', name: 'Creatiu', icon: 'star', instruction: 'Afegeix creativitat i originalitat al text' },
-            { id: 's3', name: 'Tècnic', icon: 'settings', instruction: 'Transforma a un estil més tècnic i precís' },
-            { id: 's4', name: 'Bullets', icon: 'list', instruction: 'Organitza el contingut en llistes amb bullets' }
+            { id: 's1', name: 'Persuasiu', icon: 'zap', instruction: 'Reescriu el text amb to persuasiu: reforça els arguments, afegeix crides a l\'acció i usa llenguatge que connecti emocionalment amb el lector.' },
+            { id: 's2', name: 'Creatiu', icon: 'star', instruction: 'Reformula el text amb estil creatiu: usa metàfores, varia el ritme de les frases i afegeix un toc distintiu que el faci memorable.' },
+            { id: 's3', name: 'Tècnic', icon: 'settings', instruction: 'Transforma el text a un registre tècnic: usa terminologia precisa, estructura lògica i elimina ambigüitats. Manté la informació factual.' },
+            { id: 's4', name: 'Bullets', icon: 'list', instruction: 'Reorganitza el contingut en llista amb bullets. Cada punt ha de ser independent i complet. Agrupa elements relacionats.' }
           ]
         }
       ];
@@ -3821,7 +3989,13 @@
       // Run a recipe
       function runRecipe(instruction, label) {
         switchTab('chat');
-        addBubble('user', icon('clipboard', 'i--accent') + ' ' + label);
+        hideChatLanding();
+        // v10.2: Mostrar el prompt complet en lloc de només el títol
+        const escapedInstruction = instruction.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+        const recipeHtml = '<div class="user-text">' + escapedInstruction + '</div>';
+        // v9.4: Show selection badge when running recipe with selection (like chat)
+        const selectionBadge = lastSelectionText || null;
+        addBubbleHtml('user', recipeHtml, selectionBadge, instruction);
         showThinking();
 
         document.getElementById('sendBtn').disabled = true;
@@ -6354,32 +6528,60 @@
 
       /**
        * Scroll to the last edited paragraph in the document
-       * v6.8: FIX - targetId és elementId ({{0}}), no bodyIndex
+       * v9.3: Prioritzar bodyIndex (índex real) sobre elementId (pot desincronitzar-se)
+       * v9.4: Animació "respira" a l'ull mentre es processa
        * Auto-clear del highlight després de 2.5 segons
        */
-      function scrollToLastEdit() {
+      function scrollToLastEdit(btn) {
+        // v9.4: Activar animació de respiració
+        if (btn) btn.classList.add('breathing');
+
+        function stopBreathing() {
+          if (btn) btn.classList.remove('breathing');
+        }
+
         google.script.run
           .withSuccessHandler(function(lastEdit) {
-            if (lastEdit && lastEdit.targetId !== undefined && lastEdit.targetId !== null) {
-              // v6.8: Usar mode 'elementId' perquè targetId és ID del sistema {{0}}, {{1}}
-              google.script.run
-                .withSuccessHandler(function(result) {
-                  if (result.success) {
-                    // Auto-clear highlight after 2.5s
-                    setTimeout(function() {
-                      google.script.run.clearHighlight();
-                    }, 2500);
-                  }
-                })
-                .highlightElement({
-                  mode: 'elementId',
-                  value: parseInt(lastEdit.targetId, 10)
-                });
-            } else {
+            if (!lastEdit) {
+              stopBreathing();
               showToast('No hi ha edició recent', 'info');
+              return;
             }
+
+            // v9.3: Prioritzar bodyIndex (més fiable) sobre elementId
+            var mode, value;
+            if (lastEdit.bodyIndex !== undefined && lastEdit.bodyIndex >= 0) {
+              mode = 'bodyIndex';
+              value = lastEdit.bodyIndex;
+            } else if (lastEdit.targetId !== undefined && lastEdit.targetId !== null) {
+              mode = 'elementId';
+              value = parseInt(lastEdit.targetId, 10);
+            } else {
+              stopBreathing();
+              showToast('No hi ha edició recent', 'info');
+              return;
+            }
+
+            google.script.run
+              .withSuccessHandler(function(result) {
+                stopBreathing();
+                if (result.success) {
+                  // Auto-clear highlight after 2.5s
+                  setTimeout(function() {
+                    google.script.run.clearHighlight();
+                  }, 2500);
+                } else {
+                  showToast(result.error || 'Element no trobat', 'info');
+                }
+              })
+              .withFailureHandler(function(err) {
+                stopBreathing();
+                showToast('Error navegant al document', 'error');
+              })
+              .highlightElement({ mode: mode, value: value });
           })
           .withFailureHandler(function(err) {
+            stopBreathing();
             showToast('Error navegant', 'error');
           })
           .loadLastEdit();

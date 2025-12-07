@@ -99,11 +99,14 @@ function getKnowledgeFileInfo() {
 
 function clearKnowledgeFile() {
   const props = PropertiesService.getUserProperties();
+  // Netejar propietats antigues (legacy)
   props.deleteProperty('DOCMILE_FILE_URI');
   props.deleteProperty('DOCMILE_FILE_NAME');
   props.deleteProperty('DOCMILE_FILE_MIME');
   props.deleteProperty('DOCMILE_ACTIVE_LIBRARY_FILE');
-  return "Fitxer oblidat.";
+  // v9.4: Netejar també els fitxers actius nous
+  props.deleteProperty('DOCMILE_ACTIVE_FILES');
+  return "Fitxers esborrats.";
 }
 
 // --- SELECTION INFO (v5.3) ---
@@ -1296,8 +1299,9 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
   if (!settings.license_key) throw new Error("Falta llicència.");
 
   // v6.0: Multiple active files support
+  // v9.4: Filtrar fitxers sense URI vàlid per evitar errors d'expiració
   const activeFilesResult = getActiveKnowledgeFiles();
-  const knowledgeFiles = activeFilesResult.files || [];
+  const knowledgeFiles = (activeFilesResult.files || []).filter(f => f && f.uri && f.uri.trim().length > 0);
 
   // v5.2: Preparar elements per la captura (amb fallback a cache)
   let selectedElements = null;
@@ -1616,72 +1620,91 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           }
         }
 
-        // If no changes found (IDs don't match), fall back to normal mode
+        // If no changes found (IDs don't match), return error - no fallback to direct mode
         if (changes.length === 0) {
           logDiagnostic('WARNING', {
             issue: 'PREVIEW_NO_CHANGES',
             updates_from_ai: Object.keys(aiData.updates).length,
             map_ids_available: Object.keys(mapIdToElement).length
           });
-          // Fall through to apply directly
-        } else {
-          // v3.8: Aplicar preview VISUAL al document (Track Changes)
-          // v5.3: Passar mapIdToElement per mantenir consistència amb seleccions
-          const previewResult = applyInDocumentPreview(changes, mapIdToElement);
-
-          if (!previewResult.ok) {
-            // Si falla el preview in-doc, retornem error
-            logDiagnostic('ERROR', {
-              issue: 'IN_DOC_PREVIEW_FAILED',
-              error: previewResult.error
-            });
-            return {
-              ok: false,
-              error: previewResult.error || "Error aplicant preview"
-            };
-          }
-
-          // Log resposta PREVIEW IN-DOCUMENT
-          const responseInfo = {
-            mode: 'UPDATE_BY_ID',
-            sub_mode: 'IN_DOC_PREVIEW',
-            changes_count: previewResult.count,
-            credits_remaining: json.credits_remaining
-          };
-          metrics.setResponseInfo(responseInfo);
-          logDiagnostic('RESPONSE', {
-            mode: 'UPDATE_BY_ID',
-            sub_mode: 'IN_DOC_PREVIEW',
-            changes: previewResult.count,
-            doc_was_empty: isDocumentEmpty,
-            user_wanted: userMode
-          });
-          metrics.finalize();
-
+          // v10.2: No fall through - retornar error en lloc d'aplicar directament
           return {
             ok: true,
-            status: 'in_doc_preview',  // Nou status per frontend
-            changes_count: previewResult.count,
+            status: 'in_doc_preview_error',
             ai_response: aiData.change_summary,
             credits: json.credits_remaining,
-            thought: aiData.thought,
-            mode: 'edit',
-            // v3.8: Info per la barra d'acció del sidebar
-            preview_info: {
-              count: previewResult.count,
-              previews: previewResult.previews.map(p => ({
-                targetId: p.targetId,
-                originalPreview: p.originalText.substring(0, 50) + (p.originalText.length > 50 ? '...' : ''),
-                newPreview: p.newText.substring(0, 50) + (p.newText.length > 50 ? '...' : '')
-              }))
-            },
-            _diag: {
-              doc_chars: contentPayload.length,
-              doc_empty: isDocumentEmpty,
-              invisible_elements: docStats.invisible.table + docStats.invisible.inline_image
-            }
+            preview_error: 'No he pogut identificar els paràgrafs a modificar. Prova a seleccionar el text específic.',
+            mode: 'edit'
           };
         }
+
+        // v3.8: Aplicar preview VISUAL al document (Track Changes)
+        // v5.3: Passar mapIdToElement per mantenir consistència amb seleccions
+        const previewResult = applyInDocumentPreview(changes, mapIdToElement);
+
+        if (!previewResult.ok) {
+          // Si falla el preview in-doc, retornem error
+          logDiagnostic('ERROR', {
+            issue: 'IN_DOC_PREVIEW_FAILED',
+            error: previewResult.error
+          });
+          return {
+            ok: false,
+            error: previewResult.error || "Error aplicant preview"
+          };
+        }
+
+        // v9.2: Guardar lastEdit per l'ull de "Revisa els canvis"
+        if (previewResult.previews && previewResult.previews.length > 0) {
+          const firstPreview = previewResult.previews[0];
+          saveLastEdit({
+            targetId: firstPreview.targetId,
+            originalText: firstPreview.originalText,
+            currentText: firstPreview.newText,
+            bodyIndex: firstPreview.bodyIndex
+          });
+        }
+
+        // Log resposta PREVIEW IN-DOCUMENT
+        const responseInfo = {
+          mode: 'UPDATE_BY_ID',
+          sub_mode: 'IN_DOC_PREVIEW',
+          changes_count: previewResult.count,
+          credits_remaining: json.credits_remaining
+        };
+        metrics.setResponseInfo(responseInfo);
+        logDiagnostic('RESPONSE', {
+          mode: 'UPDATE_BY_ID',
+          sub_mode: 'IN_DOC_PREVIEW',
+          changes: previewResult.count,
+          doc_was_empty: isDocumentEmpty,
+          user_wanted: userMode
+        });
+        metrics.finalize();
+
+        return {
+          ok: true,
+          status: 'in_doc_preview',  // Nou status per frontend
+          changes_count: previewResult.count,
+          ai_response: aiData.change_summary,
+          credits: json.credits_remaining,
+          thought: aiData.thought,
+          mode: 'edit',
+          // v3.8: Info per la barra d'acció del sidebar
+          preview_info: {
+            count: previewResult.count,
+            previews: previewResult.previews.map(p => ({
+              targetId: p.targetId,
+              originalPreview: p.originalText.substring(0, 50) + (p.originalText.length > 50 ? '...' : ''),
+              newPreview: p.newText.substring(0, 50) + (p.newText.length > 50 ? '...' : '')
+            }))
+          },
+          _diag: {
+            doc_chars: contentPayload.length,
+            doc_empty: isDocumentEmpty,
+            invisible_elements: docStats.invisible.table + docStats.invisible.inline_image
+          }
+        };
       }
 
       // Normal mode - Apply changes directly
@@ -2220,10 +2243,21 @@ function commitInDocumentPreview() {
     // Netejar preview pendent
     clearPendingInDocPreview();
 
+    // v10.2: Retornar lastEdit per permetre desfer des del frontend
+    const lastEdit = loadLastEdit();
+
     return {
       ok: true,
       applied: applied,
-      message: `${applied} canvi${applied !== 1 ? 's' : ''} aplicat${applied !== 1 ? 's' : ''}`
+      message: `${applied} canvi${applied !== 1 ? 's' : ''} aplicat${applied !== 1 ? 's' : ''}`,
+      // v10.2: Info per botó Desfer
+      undo_available: !!lastEdit,
+      undo_snapshot: lastEdit ? {
+        targetId: lastEdit.targetId,
+        originalText: lastEdit.originalText,
+        originalHeading: lastEdit.originalHeading,
+        bodyIndex: lastEdit.bodyIndex
+      } : null
     };
 
   } catch (e) {
@@ -2304,6 +2338,65 @@ function cancelInDocumentPreview() {
 
   } catch (e) {
     console.error('[Cancel Preview Error]', e);
+    return { ok: false, error: e.message };
+  }
+}
+
+/**
+ * v9.4: Força la neteja de qualsevol preview orfe al document
+ * Elimina colors i text afegit (després de " → ")
+ */
+function forceCleanPreview() {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const numChildren = body.getNumChildren();
+    const separator = '  →  ';
+    let cleaned = 0;
+
+    for (let i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      const elementType = child.getType();
+
+      if (elementType === DocumentApp.ElementType.PARAGRAPH ||
+          elementType === DocumentApp.ElementType.LIST_ITEM) {
+        try {
+          const textObj = child.editAsText();
+          const text = textObj.getText();
+
+          // Buscar el separador del preview
+          const sepIndex = text.indexOf(separator);
+          if (sepIndex > 0) {
+            // Eliminar des del separador fins al final
+            textObj.deleteText(sepIndex, text.length - 1);
+            cleaned++;
+          }
+
+          // Netejar colors de fons i text (vermell/verd del preview)
+          const currentText = textObj.getText();
+          if (currentText.length > 0) {
+            textObj.setBackgroundColor(0, currentText.length - 1, null);
+            textObj.setForegroundColor(0, currentText.length - 1, null);
+          }
+        } catch (e) {
+          // Element sense text o error - continuar
+        }
+      }
+    }
+
+    // Netejar també l'estat del preview pendent
+    clearPendingInDocPreview();
+
+    return {
+      ok: true,
+      cleaned: cleaned,
+      message: cleaned > 0 ?
+        'Netejats ' + cleaned + ' paràgraf' + (cleaned !== 1 ? 's' : '') :
+        'Document net (no s\'han trobat previews)'
+    };
+
+  } catch (e) {
+    console.error('[Force Clean Preview Error]', e);
     return { ok: false, error: e.message };
   }
 }
@@ -4335,15 +4428,22 @@ function highlightElement(options) {
       end: endOffset
     }));
 
-    // 5. Scroll si cal
+    // 5. Scroll si cal (v9.3: usar setCursor en lloc de setSelection per evitar selecció visual)
     if (scroll) {
-      const rangeBuilder = doc.newRange();
-      if (startOffset >= 0 && endOffset >= 0 && startOffset !== 0) {
-        rangeBuilder.addElement(element, startOffset, endOffset);
-      } else {
-        rangeBuilder.addElement(element);
+      try {
+        // setCursor fa scroll sense crear selecció visual prominent
+        const position = doc.newPosition(element, 0);
+        doc.setCursor(position);
+      } catch (scrollErr) {
+        // Fallback a setSelection si setCursor falla (alguns elements no ho suporten)
+        try {
+          const rangeBuilder = doc.newRange();
+          rangeBuilder.addElement(element);
+          doc.setSelection(rangeBuilder.build());
+        } catch (e) {
+          // Ignorar errors de scroll - el highlight ja s'ha aplicat
+        }
       }
-      doc.setSelection(rangeBuilder.build());
     }
 
     return { success: true };

@@ -725,12 +725,12 @@ CONTEXT ACTUAL
 ${userMode === 'chat' ? `
 ⚠️ IMPORTANT - MODE XAT ACTIU:
 Estàs en mode XAT, no pots fer canvis al document.
-Si l'usuari demana una EDICIÓ (corregir, traduir, millorar, canviar, escurçar, etc.),
+Si l'usuari demana una TRANSFORMACIÓ del text (verb que implica canviar-lo),
 respon amb la teva resposta normal però AFEGEIX al final:
 
 💡 Per aplicar aquest canvi al document, canvia a mode **Edit** (botó superior esquerre).
 
-Exemples de peticions d'edició: "corregeix", "tradueix", "millora", "escurça", "canvia X per Y", "elimina", "afegeix"
+Exemples de transformacions: "resumeix", "tradueix", "corregeix", "millora", "escurça", "amplia", "reformula", "simplifica", "formalitza", "canvia X per Y"
 ` : ''}
 ═══════════════════════════════════════════════════════════════
 FORMAT DEL TEXT D'ENTRADA (v5.4)
@@ -751,49 +751,83 @@ IMPORTANT: Les taules es mostren com a referència. NO pots editar-les directame
 Si l'usuari demana canvis a una taula, explica-li que ha d'editar-la manualment.
 
 ═══════════════════════════════════════════════════════════════
-GESTIÓ DE SELECCIÓ INTEL·LIGENT (v5.4)
+GESTIÓ DE SELECCIÓ INTEL·LIGENT (v6.7)
 ═══════════════════════════════════════════════════════════════
-Quan vegis el marcador ⟦SEL⟧ al costat d'un paràgraf, significa que l'usuari
-té aquell text SELECCIONAT al document. També reps context (±3 paràgrafs al voltant).
+El marcador ⟦SEL⟧ indica text SELECCIONAT per l'usuari. Reps context (±3 paràgrafs).
 
-ANALITZA la pregunta de l'usuari i actua així:
+QUAN HI HA SELECCIÓ (⟦SEL⟧ present):
 
-1. EDICIÓ SOBRE SELECCIÓ (corregeix, tradueix, millora, escurça, canvia)
-   → Opera NOMÉS sobre els paràgrafs marcats amb ⟦SEL⟧
-   → Exemple: "tradueix" amb {{3}} ⟦SEL⟧ → Edita {{3}}
+1. TRANSFORMACIÓ SOBRE SELECCIÓ
+   Verbs: resumeix, tradueix, millora, corregeix, escurça, amplia, reformula, simplifica...
+   → MODE: UPDATE_BY_ID
+   → Transforma NOMÉS els paràgrafs marcats amb ⟦SEL⟧
+   → Exemple: "resumeix" amb {{3}} ⟦SEL⟧ → Retorna {"updates": {"3": "text resumit"}}
 
-2. PREGUNTA SOBRE EL DOCUMENT (títol, tema, resum, conclusió, autor)
-   → Usa TOT el context disponible per respondre
-   → Ignora el marcador ⟦SEL⟧ per la resposta
-   → Exemple: "quin és el títol?" → Busca el títol al context, no a la selecció
-
-3. PREGUNTA SOBRE LA SELECCIÓ (què significa això, explica'm aquest fragment)
+2. EXTRACCIÓ SOBRE SELECCIÓ
+   Verbs: explica, descriu, analitza, què significa, què vol dir...
+   → MODE: CHAT_ONLY
    → Respon basant-te en el text marcat amb ⟦SEL⟧
+   → Exemple: "explica això" → Resposta al xat sobre el fragment
 
-4. PREGUNTA AMBIGUA
-   → Prioritza el context complet per donar una resposta útil
-   → Si cal editar, edita la selecció
+3. PREGUNTA GENERAL (ignora selecció)
+   Patrons: quin és el títol, de què parla, qui és l'autor, quantes pàgines...
+   → MODE: CHAT_ONLY
+   → Usa TOT el context disponible, no només la selecció
+
+REGLA D'OR: Mode EDIT + Selecció + Verb de Transformació = SEMPRE UPDATE_BY_ID
 
 MAI inventis informació que no apareix al text proporcionat.
 
 ═══════════════════════════════════════════════════════════════
-MODES D'OPERACIÓ
+CLASSIFICACIÓ D'INSTRUCCIONS (v6.7)
 ═══════════════════════════════════════════════════════════════
 
-[MODE CONSULTOR] → "CHAT_ONLY"
-Quan: Preguntes, opinions, anàlisi, explicacions, resums informatius.
+PAS 1: IDENTIFICA EL TIPUS D'INSTRUCCIÓ
+
+▸ VERBS DE TRANSFORMACIÓ (el resultat REEMPLAÇA el text original):
+  Compressió: resumeix, sintetitza, condensa, escurça
+  Expansió: amplia, desenvolupa, elabora, detalla
+  Traducció: tradueix, passa a [idioma]
+  Correcció: corregeix, esmena, revisa, arregla
+  Millora: millora, poleix, refina, optimitza
+  Reformulació: reformula, parafraseja, reescriu, redacta de nou
+  Formalitat: formalitza, fes-ho més formal/informal
+  Simplificació: simplifica, clarifica, fes-ho més clar/entenedor
+
+▸ VERBS D'EXTRACCIÓ (el resultat és INFORMACIÓ sobre el text):
+  Explicació: explica, descriu, aclareix, què vol dir, què significa
+  Anàlisi: analitza, examina, estudia, revisa críticament
+  Avaluació: avalua, valora, opina sobre, què en penses
+  Pregunta: què és, quin és, com és, per què, quants, qui
+
+PAS 2: APLICA LA REGLA DE CONTEXT
+
+| MODE USUARI     | TIPUS INSTRUCCIÓ | ACCIÓ JSON        |
+|-----------------|------------------|-------------------|
+| EDIT + Selecció | Transformació    | UPDATE_BY_ID      |
+| EDIT + Selecció | Extracció        | CHAT_ONLY         |
+| EDIT + No sel.  | Transformació    | REWRITE           |
+| EDIT + No sel.  | Extracció        | CHAT_ONLY         |
+| CHAT            | Qualsevol        | CHAT_ONLY         |
+
+═══════════════════════════════════════════════════════════════
+MODES DE RESPOSTA JSON
+═══════════════════════════════════════════════════════════════
+
+[CHAT_ONLY] → Resposta conversacional
+Quan: Instrucció d'EXTRACCIÓ, o mode CHAT actiu.
 Acció: Respon al xat. NO toques el document.
 
-[MODE ENGINYER] → "UPDATE_BY_ID"
-Quan: L'usuari demana CANVIS (millora, tradueix, corregeix, canvia, escurça, amplia).
+[UPDATE_BY_ID] → Edició quirúrgica
+Quan: Instrucció de TRANSFORMACIÓ amb selecció activa.
 Acció: Edita NOMÉS els paràgrafs afectats via {{ID}}. Cirurgia, no reemplaçament.
 
-[MODE ARQUITECTE] → "REWRITE"
+[REWRITE] → Generació de contingut nou
 Quan: L'usuari demana CREAR contingut NOU (escriu un email, genera una llista, crea des de zero).
 Acció: Genera estructura nova amb blocks tipats.
 
-[MODE ANALISTA] → "REFERENCE_HIGHLIGHT"
-Quan: L'usuari demana ANALITZAR el document sense editar-lo (detecta repeticions, quines parts clarificar, on estan els arguments, revisa coherència).
+[REFERENCE_HIGHLIGHT] → Marcar i explicar
+Quan: L'usuari demana VISUALITZAR parts del document (detecta repeticions, quines parts clarificar, on estan els arguments).
 Acció: Marca parts del document amb colors i explica per què. NO edites res.
 Format:
 {
@@ -826,7 +860,8 @@ DIRECTIVES D'ESTIL
 - Sigues AUDAÇ: "millora-ho" = millores substancials, no cosmètiques
 - Preserva format Markdown (**negreta**, *cursiva*) en edicions
 - Respon en l'IDIOMA de l'usuari
-- Si tens dubtes → PREGUNTA abans d'editar
+- En mode EDIT amb selecció: si és verb de transformació → EDITA sense dubtar
+- En mode CHAT: mai editis, sempre respon al xat
 
 ═══════════════════════════════════════════════════════════════
 FORMAT JSON (OBLIGATORI - SENSE TEXT EXTRA)
@@ -1191,6 +1226,85 @@ Genera una resposta completa seguint el format JSON especificat.`;
   }
 
   return `ERROR: La resposta no ha passat la validació. Errors: ${validation.errors.join('; ')}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v6.7: INSTRUCTION CLASSIFIER - Detect transform vs extract verbs
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Detecta si una instrucció és de transformació (hauria de fer UPDATE_BY_ID)
+ * @param {string} instruction - La instrucció de l'usuari
+ * @returns {boolean} true si és transformació, false si és extracció
+ */
+function isTransformVerb(instruction) {
+  if (!instruction) return false;
+
+  const normalized = instruction.toLowerCase().trim();
+
+  // Verbs de transformació (el resultat reemplaça el text original)
+  const transformPatterns = [
+    /^resum/i,           // resumeix, resumir, resum
+    /^sintetitz/i,       // sintetitza, sintetitzar
+    /^condens/i,         // condensa, condensar
+    /^escurça/i,         // escurça, escurçar
+    /^tradueix/i,        // tradueix, traduir
+    /^tradui/i,          // traduir
+    /^passa.*a\s+(castellà|anglès|francès)/i,  // passa a castellà
+    /^corregeix/i,       // corregeix, corregir
+    /^esmena/i,          // esmena
+    /^arregla/i,         // arregla
+    /^millora/i,         // millora, millorar
+    /^poleix/i,          // poleix
+    /^refina/i,          // refina
+    /^optimitza/i,       // optimitza
+    /^reformula/i,       // reformula, reformular
+    /^parafraseja/i,     // parafraseja
+    /^reescriu/i,        // reescriu, reescriure
+    /^amplia/i,          // amplia, ampliar
+    /^desenvolupa/i,     // desenvolupa
+    /^elabora/i,         // elabora
+    /^detalla/i,         // detalla
+    /^formalitza/i,      // formalitza
+    /^simplifica/i,      // simplifica, simplificar
+    /^clarifica/i,       // clarifica
+    /^fes[- ]?ho.*clar/i,   // fes-ho més clar
+    /^fes[- ]?ho.*formal/i, // fes-ho més formal
+    /^fes[- ]?ho.*curt/i,   // fes-ho més curt
+    /^fes[- ]?ho.*llarg/i,  // fes-ho més llarg
+    /^canvia/i,          // canvia
+    /^substitueix/i,     // substitueix
+    /^elimina/i,         // elimina
+    /^afegeix/i,         // afegeix
+    /^estructura/i,      // estructura
+    /^organitza/i,       // organitza
+    /^reordena/i,        // reordena
+  ];
+
+  return transformPatterns.some(pattern => pattern.test(normalized));
+}
+
+/**
+ * Extreu l'ID del paràgraf seleccionat del text amb marcadors
+ * @param {string} text - Text del document amb marcadors {{ID}} i ⟦SEL⟧
+ * @returns {string|null} - ID del paràgraf seleccionat o null
+ */
+function extractSelectedParaId(text) {
+  if (!text) return null;
+
+  // Buscar patró: {{ID}} seguit de ⟦SEL⟧ (amb possible espai/text entremig)
+  const match = text.match(/\{\{(\d+)\}\}[^{]*⟦SEL⟧/);
+  if (match) {
+    return match[1];
+  }
+
+  // Alternativa: ⟦SEL⟧ precedit per {{ID}}
+  const altMatch = text.match(/\{\{(\d+)\}\}.*?⟦SEL⟧/s);
+  if (altMatch) {
+    return altMatch[1];
+  }
+
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1867,8 +1981,9 @@ INSTRUCCIÓ DE L'USUARI:
     _meta.warnings = lastValidation.warnings;
   }
 
-  // 5.1 Mode enforcement (v3.10: Simplified - only edit/chat)
+  // 5.1 Mode enforcement (v6.7: Improved classification)
   const effectiveMode = user_mode || 'edit';
+  const instructionIsTransform = isTransformVerb(user_instruction);
 
   if (effectiveMode === 'chat') {
     // Force CHAT_ONLY: Never edit, convert any edit response to chat
@@ -1880,15 +1995,35 @@ INSTRUCCIÓ DE L'USUARI:
       };
     }
   } else if (effectiveMode === 'edit') {
-    // Force EDIT: If AI chose CHAT_ONLY but user wants edit, keep as-is but flag it
-    // (We can't force an edit if AI didn't provide one, so we just note it)
-    if (parsedResponse.mode === 'CHAT_ONLY' && has_selection) {
-      // AI chose chat but user has selection and wants edit - add hint
-      parsedResponse.chat_response = (parsedResponse.chat_response || "") +
-        "\n\n💡 Tip: Si vols que editi el text seleccionat, reformula la instrucció.";
+    // v6.7: Detect misclassification - AI returned CHAT_ONLY for transform verb
+    if (parsedResponse.mode === 'CHAT_ONLY' && has_selection && instructionIsTransform) {
+      // AI misclassified a transform instruction as chat
+      console.warn(`[Mode Enforcement v6.7] AI misclassified transform verb as CHAT_ONLY: "${user_instruction}"`);
+
+      // Try to convert chat_response to UPDATE_BY_ID
+      const selectedParaId = extractSelectedParaId(text);
+      if (selectedParaId && parsedResponse.chat_response) {
+        console.log(`[Mode Enforcement v6.7] Converting CHAT_ONLY to UPDATE_BY_ID for para ${selectedParaId}`);
+        parsedResponse = {
+          mode: 'UPDATE_BY_ID',
+          updates: { [selectedParaId]: parsedResponse.chat_response.trim() },
+          change_summary: parsedResponse.change_summary || 'Transformació aplicada',
+          thought: (parsedResponse.thought || '') + ' [Conversió automàtica v6.7]'
+        };
+        _meta.auto_converted = true;
+      } else {
+        // Can't convert - log for analysis but don't add tip
+        console.warn(`[Mode Enforcement v6.7] Could not convert - no selectedParaId found`);
+        _meta.misclassification = {
+          instruction: user_instruction,
+          ai_mode: 'CHAT_ONLY',
+          expected_mode: 'UPDATE_BY_ID'
+        };
+      }
     }
+    // v6.7: If AI returned CHAT_ONLY for extraction verb, that's correct - no action needed
   }
-  // v3.10: Mode is now either 'edit' or 'chat' - no 'auto' mode
+  // v6.7: Mode classification is now based on verb type (transform vs extract)
 
   // 5.2 Save edit event (v3.0 Event Sourcing)
   let savedEventId = null;
@@ -1983,11 +2118,14 @@ INSTRUCCIÓ DE L'USUARI:
     auto_ban: autoBanWords,  // v4.0: Words to auto-ban from NL detection
     _meta: _meta,  // v3.1: Shadow Validator metadata
     _debug: {
-      version: "3.1.1",
+      version: "6.7.0",
       has_selection: has_selection,
       history_length: chat_history?.length || 0,
       has_last_edit: !!last_edit,
       user_mode: effectiveMode,
+      ai_mode: parsedResponse.mode,
+      instruction_is_transform: instructionIsTransform,
+      auto_converted: _meta.auto_converted || false,
       retries: retryCount,
       timeout_aborted: timeoutAborted,
       validation_passed: lastValidation?.isValid ?? false,
