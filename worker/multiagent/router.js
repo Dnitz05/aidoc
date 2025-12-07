@@ -109,8 +109,15 @@ function decideRouting(intent, session, documentContext) {
   // 5. Per UPDATE_BY_ID, verificar que tenim targets
   if (mode === Mode.UPDATE_BY_ID) {
     if (!intent.target_paragraphs || intent.target_paragraphs.length === 0) {
+      // Si scope és document, usar TOTS els paràgrafs
+      if (intent.scope === 'document' && documentContext?.paragraphs?.length > 0) {
+        intent.target_paragraphs = documentContext.paragraphs.map((_, i) => i);
+        logDebug('Using all paragraphs for document scope', {
+          targets: intent.target_paragraphs.length,
+          scope: 'document',
+        });
       // Si no hi ha targets però hi ha selecció, usar-la
-      if (documentContext?.selectedParagraphIds?.length > 0) {
+      } else if (documentContext?.selectedParagraphIds?.length > 0) {
         intent.target_paragraphs = documentContext.selectedParagraphIds;
         logDebug('Using selection as target paragraphs', {
           targets: intent.target_paragraphs,
