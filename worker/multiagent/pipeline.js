@@ -230,7 +230,7 @@ async function processInstruction(request, env) {
     const errorResponse = createErrorResponse(error, request.language || 'ca');
     return {
       ...errorResponse,
-      _telemetry: telemetry.getSummary(),
+      _telemetry: telemetry.finalize(),
     };
   }
 }
@@ -276,7 +276,7 @@ function finalizeResult(result, session, sessionId, telemetry, sanitizedInput) {
 
   // Afegir telemetria
   telemetry.checkpoint('finalize');
-  const telemetrySummary = telemetry.getSummary();
+  const telemetrySummary = telemetry.finalize();
 
   logInfo('Pipeline completed', {
     mode: result.mode,

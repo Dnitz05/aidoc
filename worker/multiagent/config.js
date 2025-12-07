@@ -110,8 +110,8 @@ const API = {
   gemini: {
     // Model pel classifier (ràpid, econòmic)
     classifier_model: 'gemini-2.0-flash',
-    // Model pels executors (més capacitat)
-    executor_model: 'gemini-1.5-pro',
+    // Model pels executors (mateix model, funciona amb v1beta)
+    executor_model: 'gemini-2.0-flash',
     // Model per embeddings (cache semàntic)
     embedding_model: 'text-embedding-004',
     // Base URL
