@@ -287,7 +287,7 @@ function buildHighlightPrompt(strategy, intent, documentContext, targetParagraph
  * Crida Gemini per generar highlights
  */
 async function callGeminiHighlight(systemPrompt, userPrompt, apiKey, signal) {
-  const url = `${GEMINI.base_url}/models/${GEMINI.model_executor}:generateContent?key=${apiKey}`;
+  const url = `${GEMINI.base_url}/models/${GEMINI.model_highlight}:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [

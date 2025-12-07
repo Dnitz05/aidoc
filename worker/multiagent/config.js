@@ -55,10 +55,12 @@ const FEATURE_FLAGS = {
 // ═══════════════════════════════════════════════════════════════
 
 const TIMEOUTS = {
-  classifier: 5000,        // 5s màxim per classificar
-  executor: 10000,         // 10s màxim per executar (flash-lite és ràpid)
-  total_pipeline: 15000,   // 15s màxim total
-  api_call: 12000,         // 12s timeout al fetch
+  classifier: 5000,        // 5s màxim per classificar (flash-lite, ràpid)
+  executor_fast: 8000,     // 8s per highlight (flash-lite, ràpid)
+  executor_thinking: 20000,// 20s per chat/update/rewrite (flash amb thinking)
+  executor: 20000,         // Default: assumir thinking
+  total_pipeline: 28000,   // 28s màxim total (deixa marge per GAS 30s)
+  api_call: 22000,         // 22s timeout al fetch
   cache_computing: 30000,  // 30s timeout per cache COMPUTING state
 };
 
@@ -110,7 +112,12 @@ const API = {
   gemini: {
     // Model pel classifier (ràpid, sense thinking)
     classifier_model: 'gemini-2.5-flash-lite',
-    // Model pels executors (mateix model, optimitzat per velocitat)
+    // Models per executors (separats per qualitat vs velocitat)
+    model_highlight: 'gemini-2.5-flash-lite',    // Ràpid: només busca/marca
+    model_update: 'gemini-2.5-flash',            // Thinking: qualitat en modificar
+    model_rewrite: 'gemini-2.5-flash',           // Thinking: qualitat en reescriure
+    model_chat: 'gemini-2.5-flash',              // Thinking: qualitat en respostes
+    // Legacy (per compatibilitat)
     executor_model: 'gemini-2.5-flash-lite',
     // Model per embeddings (cache semàntic)
     embedding_model: 'text-embedding-004',
@@ -129,7 +136,13 @@ const API = {
 // Shortcut per accedir a la config de Gemini directament
 const GEMINI = {
   model_classifier: API.gemini.classifier_model,
-  model_executor: API.gemini.executor_model,
+  model_executor: API.gemini.executor_model,  // Legacy
+  // Models específics per executor
+  model_highlight: API.gemini.model_highlight,
+  model_update: API.gemini.model_update,
+  model_rewrite: API.gemini.model_rewrite,
+  model_chat: API.gemini.model_chat,
+  // Altres
   model_embedding: API.gemini.embedding_model,
   base_url: API.gemini.base_url,
   max_retries: API.gemini.max_retries,

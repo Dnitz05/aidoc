@@ -13,12 +13,18 @@ Ets l'**Executor / Desenvolupador Senior**.
 - **DB**: Supabase (PostgreSQL + RLS).
 - **AI**: Google Gemini API (via REST).
 
-### ⚠️ OBLIGATORI: Model Gemini
-**SEMPRE usar `gemini-2.5-flash-lite`** per a totes les crides a l'API de Gemini:
-- Classifier: `gemini-2.5-flash-lite`
-- Executor: `gemini-2.5-flash-lite`
-- Raó: Optimitzat per velocitat, sense "thinking mode" per defecte
-- NO usar models amb thinking actiu (gemini-2.5-flash és lent!)
+### ⚠️ CONFIGURACIÓ: Models Gemini (Sistema Híbrid)
+Models diferents segons la funció:
+
+| Funció | Model | Raó |
+|--------|-------|-----|
+| Classifier | `gemini-2.5-flash-lite` | Ràpid, només classifica |
+| Highlight | `gemini-2.5-flash-lite` | Ràpid, només busca/marca |
+| **Update** | `gemini-2.5-flash` | Thinking: qualitat en modificar |
+| **Rewrite** | `gemini-2.5-flash` | Thinking: qualitat en reescriure |
+| **Chat** | `gemini-2.5-flash` | Thinking: qualitat en respostes |
+
+Configurat a `worker/multiagent/config.js`
 
 ---
 
