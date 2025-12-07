@@ -296,7 +296,7 @@ function buildUpdatePrompt(modificationType, intent, documentContext, targetPara
  * Crida Gemini per generar actualitzacions
  */
 async function callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal) {
-  const url = `${GEMINI.base_url}/${GEMINI.model_executor}:generateContent?key=${apiKey}`;
+  const url = `${GEMINI.base_url}/models/${GEMINI.model_executor}:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [

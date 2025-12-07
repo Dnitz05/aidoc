@@ -152,7 +152,7 @@ function buildChatPrompt(intent, documentContext, conversationContext) {
  * @returns {Promise<string>}
  */
 async function callGeminiChat(userPrompt, apiKey, signal) {
-  const url = `${GEMINI.base_url}/${GEMINI.model_executor}:generateContent?key=${apiKey}`;
+  const url = `${GEMINI.base_url}/models/${GEMINI.model_executor}:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [
