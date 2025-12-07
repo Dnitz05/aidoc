@@ -2192,7 +2192,7 @@ INSTRUCCIÓ DE L'USUARI:
   // ═══════════════════════════════════════════════════════════════
   // 4. SHADOW VALIDATOR LOOP (v3.1 - Unified Validation + Time Budget)
   // ═══════════════════════════════════════════════════════════════
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`;
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
 
   let parsedResponse = null;
   let retryCount = 0;
@@ -3543,7 +3543,7 @@ Assistant: ${(aiMsgs || 'N/A').substring(0, 100)}
 Write ONLY the title (natural, 2-4 words, same language as conversation):`;
 
   const geminiResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3625,7 +3625,7 @@ Descripció:`;
 
   try {
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
