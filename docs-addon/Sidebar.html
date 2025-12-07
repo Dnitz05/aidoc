@@ -294,6 +294,9 @@
       <div class="recipes-panel-content">
         <!-- Search Bar with View Toggle -->
         <div class="recipes-toolbar">
+          <button class="recipes-back-btn" onclick="goBackFromRecipes()" title="Tornar enrere">
+            <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></span>
+          </button>
           <div class="recipes-search-wrapper">
             <span class="recipes-search-icon"><span class="i i--sm i--default"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span></span>
             <input type="text" class="recipes-search" id="recipesSearch" placeholder="Cerca receptes..." oninput="filterRecipes()">
@@ -329,7 +332,12 @@
             <span class="i i--xs i--accent"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></span>
             <span class="polling-indicator" id="recipesPollingIndicator"></span>
           </span>
-          <span class="scope-label">Abast:</span>
+          <span class="scope-label">Abast:
+            <span class="scope-tooltip">
+              <span class="scope-tooltip-line"></span>
+              <span class="scope-tooltip-bubble">Pots actuar sobre parts seleccionades o sobre tot el document</span>
+            </span>
+          </span>
           <span class="scope-text" id="recipesSelectionPreview">Tot el document</span>
           <span class="selection-word-count" id="recipesSelectionWordCount"></span>
         </div>
@@ -337,6 +345,10 @@
           <button class="mode-btn" onclick="toggleModeDropdown('recipes')" type="button">
             <span id="recipesModeLabel">Edit</span>
             <svg class="mode-arrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+            <span class="mode-tooltip">
+              <span class="mode-tooltip-line"></span>
+              <span class="mode-tooltip-bubble"><b>Edit</b>: la IA pot modificar el document<br><b>Xat</b>: només respon, mai edita</span>
+            </span>
           </button>
           <div class="mode-dropdown">
             <button class="mode-option selected" data-mode="edit" onclick="selectMode('edit')">
@@ -684,7 +696,12 @@
           <span class="i i--xs i--accent"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></span>
           <span class="polling-indicator" id="pollingIndicator"></span>
         </span>
-        <span class="scope-label">Abast:</span>
+        <span class="scope-label" id="scopeLabel">Abast:
+          <span class="scope-tooltip">
+            <span class="scope-tooltip-line"></span>
+            <span class="scope-tooltip-bubble">Pots actuar sobre parts seleccionades o sobre tot el document</span>
+          </span>
+        </span>
         <span class="scope-text" id="selectionPreview">Tot el document</span>
         <span class="selection-word-count" id="selectionWordCount"></span>
       </div>
@@ -692,6 +709,10 @@
         <button class="mode-btn" onclick="toggleModeDropdown()" type="button">
           <span id="modeLabel">Edit</span>
           <svg class="mode-arrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+          <span class="mode-tooltip">
+            <span class="mode-tooltip-line"></span>
+            <span class="mode-tooltip-bubble"><b>Edit</b>: la IA pot modificar el document<br><b>Xat</b>: només respon, mai edita</span>
+          </span>
         </button>
         <div class="mode-dropdown">
           <button class="mode-option selected" data-mode="edit" onclick="selectMode('edit')">
@@ -1439,7 +1460,7 @@
           .commitInDocumentPreview();
       }
 
-      // v10.2: Afegir badge "Fet!" + "Desfer" a l'última bombolla AI
+      // v10.2: Afegir badges "Fet!" i "Desfer" separats a l'última bombolla AI
       function addCommitBadgeToLastAiBubble(undoSnapshot) {
         const chatHistory = document.getElementById('chatHistory');
         if (!chatHistory) return;
@@ -1454,19 +1475,22 @@
           pendingUndo = undoSnapshot;
         }
 
-        // Crear badge HTML
-        let badgeHtml = '<div class="edit-badge commit-badge">' +
-          icon('check', 'i--sm i--success') + ' Fet!';
+        // Crear badges HTML - separats i independents
+        let badgesHtml = '<div class="commit-badges-row">';
 
-        // Afegir botó Desfer si tenim snapshot
+        // Badge "Fet!" - sempre visible
+        badgesHtml += '<span class="commit-badge done-badge">' +
+          icon('check', 'i--xs') + ' Fet!</span>';
+
+        // Badge "Desfer" - separat, actiu o inactiu
         if (undoSnapshot) {
-          badgeHtml += '<button class="undo-badge-btn" onclick="undoLastCommit()" title="Desfer aquest canvi">' +
-            icon('undo', 'i--sm') + ' Desfer</button>';
+          badgesHtml += '<button class="commit-badge undo-badge active" onclick="undoLastCommit()" title="Desfer aquest canvi">' +
+            icon('undo', 'i--xs') + ' Desfer</button>';
         }
-        badgeHtml += '</div>';
+        badgesHtml += '</div>';
 
-        // Inserir badge al principi de la bombolla
-        lastAiBubble.insertAdjacentHTML('afterbegin', badgeHtml);
+        // Inserir badges al principi de la bombolla
+        lastAiBubble.insertAdjacentHTML('afterbegin', badgesHtml);
 
         // Marcar la bombolla com a "committed"
         lastAiBubble.classList.add('committed');
@@ -1476,10 +1500,13 @@
       function disablePendingUndo() {
         if (!pendingUndo) return;
 
-        // Marcar tots els badges com a desactivats
-        const badges = document.querySelectorAll('.commit-badge');
-        badges.forEach(function(badge) {
-          badge.classList.add('disabled');
+        // Marcar tots els botons Desfer com a inactius
+        const undoBadges = document.querySelectorAll('.undo-badge.active');
+        undoBadges.forEach(function(badge) {
+          badge.classList.remove('active');
+          badge.classList.add('inactive');
+          badge.disabled = true;
+          badge.title = 'Ja no es pot desfer (s\'han fet altres canvis)';
         });
 
         // Netejar el snapshot
@@ -1494,29 +1521,35 @@
         }
 
         // Desactivar botó mentre es processa
-        const undoBtn = document.querySelector('.undo-badge-btn');
+        const undoBtn = document.querySelector('.undo-badge.active');
         if (undoBtn) {
           undoBtn.disabled = true;
-          undoBtn.innerHTML = icon('loader', 'i--sm') + ' Desfent...';
+          undoBtn.innerHTML = icon('loader', 'i--xs') + ' Desfent...';
         }
 
         google.script.run
           .withSuccessHandler(function(result) {
             if (result && result.status === 'restored') {
               showToast('Canvi desfet!', 'undo');
-              // Eliminar el badge i marcar com desfet
-              const badge = document.querySelector('.commit-badge');
-              if (badge) {
-                badge.innerHTML = icon('undo', 'i--sm i--accent') + ' Desfet';
-                badge.classList.remove('commit-badge');
-                badge.classList.add('undone-badge');
+              // Actualitzar el badge Desfer a "Desfet"
+              if (undoBtn) {
+                undoBtn.innerHTML = icon('check', 'i--xs') + ' Desfet';
+                undoBtn.classList.remove('active');
+                undoBtn.classList.add('done');
+                undoBtn.disabled = true;
+              }
+              // Canviar el badge "Fet!" a estat desfet
+              const doneRow = undoBtn ? undoBtn.closest('.commit-badges-row') : null;
+              const doneBadge = doneRow ? doneRow.querySelector('.done-badge') : null;
+              if (doneBadge) {
+                doneBadge.classList.add('undone');
               }
               pendingUndo = null;
             } else {
               showToast('Error: ' + (result?.error || 'No s\'ha pogut desfer'), 'error');
               if (undoBtn) {
                 undoBtn.disabled = false;
-                undoBtn.innerHTML = icon('undo', 'i--sm') + ' Desfer';
+                undoBtn.innerHTML = icon('undo', 'i--xs') + ' Desfer';
               }
             }
           })
@@ -1524,7 +1557,7 @@
             showToast('Error: ' + error.message, 'error');
             if (undoBtn) {
               undoBtn.disabled = false;
-              undoBtn.innerHTML = icon('undo', 'i--sm') + ' Desfer';
+              undoBtn.innerHTML = icon('undo', 'i--xs') + ' Desfer';
             }
           })
           .restoreText(pendingUndo.targetId, pendingUndo.originalText, pendingUndo.bodyIndex);
@@ -2103,7 +2136,7 @@
 
         // Handle in_doc_preview with error
         if (res.status === 'in_doc_preview_error') {
-          addBubble('ai', res.ai_response, true);
+          addBubble('ai', res.ai_response, false);  // v10.2: false per no mostrar badge antic
           addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' ' + (res.preview_error || 'Error aplicant preview al document'));
           if (res.credits !== undefined) {
             updateCredits(res.credits);
@@ -2123,8 +2156,9 @@
           return;
         }
 
-        // Normal response handling
-        addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
+        // Normal response handling (chat mode or fallback)
+        // v10.2: No mostrar badge antic - ara tot passa per preview
+        addBubble('ai', res.ai_response, false);
 
         // v3.7: Log estadístiques d'edició per debugging
         if (res.edit_stats) {
@@ -2141,11 +2175,6 @@
 
         if (res.credits !== undefined) {
           updateCredits(res.credits);
-        }
-        // v2.6 Sprint: Show undo bar if edit was made
-        if (res.mode === 'edit' && res.undo_snapshot) {
-          pendingUndo = res.undo_snapshot;
-          showUndoBar();
         }
         // v4.0: Confirm hash after successful edit
         if (res.mode === 'edit' && res.event_id) {
@@ -3124,8 +3153,8 @@
           lightbulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.9V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.1A7 7 0 0 0 12 2z"/></svg>',
           summarize: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg>',
           style: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>',
-          upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
-          layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>'
+          settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>',
+          list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="5" cy="6" r="1.5" fill="currentColor"/><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="5" cy="18" r="1.5" fill="currentColor"/></svg>'
         };
 
         const suggestions = [
@@ -3133,8 +3162,8 @@
           { icon: icons.lightbulb, color: '#FF9800', text: 'Explica', prompt: "Explica el contingut d'aquest text de forma clara, destacant les idees principals i la seva relació." },
           { icon: icons.summarize, color: '#2196F3', text: 'Resumeix', prompt: "Resumeix el text en un terç de la seva extensió original, preservant les idees clau i l'estructura argumentativa." },
           { icon: icons.style, color: '#9C27B0', text: "Millora", prompt: "Millora la claredat, fluïdesa i precisió del text. Elimina redundàncies i reforça la cohesió entre frases." },
-          { icon: icons.upload, color: '#00BCD4', text: "Puja Coneixements", action: "switchTab('knowledge')" },
-          { icon: icons.layers, color: '#E91E63', text: "Estructura", action: "switchTab('structure')" }
+          { icon: icons.settings, color: '#607D8B', text: "Tècnic", prompt: "Transforma el text a un registre tècnic: usa terminologia precisa, estructura lògica i elimina ambigüitats. Manté la informació factual." },
+          { icon: icons.list, color: '#00BCD4', text: "Bullets", prompt: "Reorganitza el contingut en llista amb bullets. Cada punt ha de ser independent i complet. Agrupa elements relacionats." }
         ];
 
         let cardsHtml = suggestions.map(function(s) {
@@ -3168,10 +3197,6 @@
           '</div>' +
           '<div class="landing-suggestions">' +
             '<div class="suggestion-grid">' + cardsHtml + '</div>' +
-          '</div>' +
-          '<div class="landing-tip">' +
-            '<svg class="tip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>' +
-            '<span class="tip-text">Actua sobre parts seleccionades o tot el document</span>' +
           '</div>' +
         '</div>';
 
@@ -3416,7 +3441,29 @@
             hideThinking();
             document.getElementById('sendBtn').disabled = false;
 
-            // v3.3: Handle Preview Mode response (same logic as sendMessage)
+            // v10.2: Handle In-Document Preview (same logic as sendMessage)
+            if (res.status === 'in_doc_preview') {
+              const previewCount = res.changes_count || res.preview_info?.count || 1;
+              addBubble('ai', res.ai_response, false);
+              addBubble('review-note', '<button class="inline-eye-btn" onclick="scrollToLastEdit(this)" title="Veure al document">' + icon('eye', 'i--sm i--accent') + '</button> Revisa els canvis al document.');
+              showInDocPreviewBar(previewCount);
+              if (res.credits !== undefined) {
+                updateCredits(res.credits);
+              }
+              return;
+            }
+
+            // Handle in_doc_preview with error
+            if (res.status === 'in_doc_preview_error') {
+              addBubble('ai', res.ai_response, false);
+              addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' ' + (res.preview_error || 'Error aplicant preview al document'));
+              if (res.credits !== undefined) {
+                updateCredits(res.credits);
+              }
+              return;
+            }
+
+            // v3.3: Handle old Preview Mode response (sidebar panel - legacy)
             if (res.status === 'preview' && res.changes && res.changes.length > 0) {
               showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
               if (res.credits !== undefined) {
@@ -3427,16 +3474,16 @@
 
             // Handle preview with 0 changes (fallback)
             if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-              addBubble('ai', res.ai_response, true);
-          addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.');
+              addBubble('ai', res.ai_response, false);
+              addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.');
               if (res.credits !== undefined) {
                 updateCredits(res.credits);
               }
               return;
             }
 
-            // Normal response handling
-            addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
+            // Normal response handling (chat mode, no edits)
+            addBubble('ai', res.ai_response, false);
             if (res.credits !== undefined) {
               updateCredits(res.credits);
             }
@@ -3744,7 +3791,8 @@
             { id: 'r2', name: 'Formal', icon: 'briefcase', instruction: 'Reescriu el text amb un registre formal i professional. Elimina col·loquialismes, usa vocabulari precís i estructura les frases de forma clara.' },
             { id: 'r3', name: 'Informal', icon: 'messageCircle', instruction: 'Reformula el text amb un to proper i conversacional. Usa frases curtes, expressions naturals i un ritme àgil.' },
             { id: 'r4', name: 'Millorar', icon: 'wand', instruction: 'Refina la redacció: millora la fluïdesa entre frases, elimina repeticions, precisa el vocabulari i reforça la cohesió textual.' },
-            { id: 'r5', name: 'Simplificar', icon: 'type', instruction: 'Simplifica el text: usa frases curtes, vocabulari comú i estructura clara. Fes-lo accessible per a qualsevol lector.' }
+            { id: 'r5', name: 'Simplificar', icon: 'type', instruction: 'Simplifica el text: usa frases curtes, vocabulari comú i estructura clara. Fes-lo accessible per a qualsevol lector.' },
+            { id: 'r6', name: 'Clarificar', icon: 'lightbulb', instruction: 'Clarifica el text: reorganitza les idees en ordre lògic, explicita les connexions implícites entre conceptes i reformula les frases ambigües perquè el significat sigui inequívoc.' }
           ]
         },
         {
@@ -3878,6 +3926,11 @@
         }
       }
 
+      // Go back from recipes to chat (with landing if no messages)
+      function goBackFromRecipes() {
+        switchTab('chat');
+      }
+
       // Filter recipes by search
       function filterRecipes() {
         currentSearch = document.getElementById('recipesSearch').value.toLowerCase();
@@ -4005,7 +4058,29 @@
             hideThinking();
             document.getElementById('sendBtn').disabled = false;
 
-            // Handle Preview Mode response
+            // v10.2: Handle In-Document Preview
+            if (res.status === 'in_doc_preview') {
+              const previewCount = res.changes_count || res.preview_info?.count || 1;
+              addBubble('ai', res.ai_response, false);
+              addBubble('review-note', '<button class="inline-eye-btn" onclick="scrollToLastEdit(this)" title="Veure al document">' + icon('eye', 'i--sm i--accent') + '</button> Revisa els canvis al document.');
+              showInDocPreviewBar(previewCount);
+              if (res.credits !== undefined) {
+                updateCredits(res.credits);
+              }
+              return;
+            }
+
+            // Handle in_doc_preview with error
+            if (res.status === 'in_doc_preview_error') {
+              addBubble('ai', res.ai_response, false);
+              addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' ' + (res.preview_error || 'Error aplicant preview al document'));
+              if (res.credits !== undefined) {
+                updateCredits(res.credits);
+              }
+              return;
+            }
+
+            // Handle old Preview Mode response (legacy)
             if (res.status === 'preview' && res.changes && res.changes.length > 0) {
               showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
               if (res.credits !== undefined) {
@@ -4016,22 +4091,18 @@
 
             // Handle preview with 0 changes (fallback)
             if (res.status === 'preview' && (!res.changes || res.changes.length === 0)) {
-              addBubble('ai', res.ai_response, true);
-          addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.');
+              addBubble('ai', res.ai_response, false);
+              addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' No he pogut aplicar els canvis automàticament.');
               if (res.credits !== undefined) {
                 updateCredits(res.credits);
               }
               return;
             }
 
-            // Normal response handling
-            addBubble('ai', res.ai_response, res.mode === 'edit', res.last_edit_word);
+            // Normal response handling (chat mode, no edits)
+            addBubble('ai', res.ai_response, false);
             if (res.credits !== undefined) {
               updateCredits(res.credits);
-            }
-            if (res.mode === 'edit' && res.undo_snapshot) {
-              pendingUndo = res.undo_snapshot;
-              showUndoBar();
             }
             // v4.0: Confirm hash after successful edit
             if (res.mode === 'edit' && res.event_id) {

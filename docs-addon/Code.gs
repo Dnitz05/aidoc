@@ -1682,6 +1682,16 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
         });
         metrics.finalize();
 
+        // v10.2: Generar preview de la selecció per al badge del xat
+        let selectionPreview = null;
+        if (isSelection && contentPayload) {
+          // Extreure text net (sense IDs) dels primers 50 chars
+          const cleanText = contentPayload.replace(/\[\d+\]\s*/g, '').trim();
+          selectionPreview = cleanText.length > 50
+            ? cleanText.substring(0, 47) + '...'
+            : cleanText;
+        }
+
         return {
           ok: true,
           status: 'in_doc_preview',  // Nou status per frontend
@@ -1690,6 +1700,9 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           credits: json.credits_remaining,
           thought: aiData.thought,
           mode: 'edit',
+          // v10.2: Info de selecció real per corregir el badge
+          has_selection: isSelection,
+          selection_preview: selectionPreview,
           // v3.8: Info per la barra d'acció del sidebar
           preview_info: {
             count: previewResult.count,

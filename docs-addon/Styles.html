@@ -479,77 +479,83 @@
         color: var(--error);
       }
 
-      /* Edit Badge */
-      .edit-badge {
-        display: inline-flex;
+      /* v10.2: Fila de badges commit (Fet! + Desfer) */
+      .commit-badges-row {
+        display: flex;
         align-items: center;
-        gap: var(--space-xs);
-        font-family: var(--font-mono);
-        font-size: 10px;
-        font-weight: 500;
-        color: var(--success);
-        background: var(--success-muted);
-        padding: 2px 8px;
-        border-radius: var(--radius-sm);
-        margin-bottom: var(--space-sm);
-        border: 1px solid var(--success);
+        gap: 6px;
+        margin-bottom: 8px;
       }
 
-      .edit-badge::before {
-        content: '';
-      }
-
-      /* v10.2: Botó Desfer dins del badge */
-      .undo-badge-btn {
+      /* v10.2: Badge base - petit i compacte */
+      .commit-badge {
         display: inline-flex;
         align-items: center;
         gap: 3px;
-        background: transparent;
-        border: 1px solid var(--text-muted);
-        color: var(--text-secondary);
-        padding: 1px 6px;
-        border-radius: var(--radius-xs);
+        font-family: var(--font-mono);
         font-size: 9px;
-        font-weight: 500;
-        cursor: pointer;
-        margin-left: 6px;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 10px;
+        border: none;
+        cursor: default;
         transition: all 0.15s ease;
       }
 
-      .undo-badge-btn:hover {
+      /* Badge "Fet!" - verd */
+      .commit-badge.done-badge {
+        color: var(--success);
+        background: var(--success-muted);
+      }
+
+      .commit-badge.done-badge.undone {
+        color: var(--text-muted);
         background: var(--bg-tertiary);
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-
-      .undo-badge-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
-      /* v10.2: Badge desfet */
-      .undone-badge {
-        color: var(--accent);
-        background: var(--accent-muted);
-        border-color: var(--accent);
-      }
-
-      /* v10.2: Badge desactivat (quan hi ha nous canvis) */
-      .edit-badge.disabled .undo-badge-btn {
-        opacity: 0.4;
-        pointer-events: none;
         text-decoration: line-through;
+        opacity: 0.6;
+      }
+
+      /* Badge "Desfer" - actiu (blau) */
+      .commit-badge.undo-badge {
+        cursor: pointer;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+      }
+
+      .commit-badge.undo-badge.active {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .commit-badge.undo-badge.active:hover {
+        background: var(--accent-muted);
+      }
+
+      /* Badge "Desfer" - inactiu (gris, ratllat) */
+      .commit-badge.undo-badge.inactive {
+        opacity: 0.4;
+        cursor: not-allowed;
+        text-decoration: line-through;
+        pointer-events: none;
+      }
+
+      /* Badge "Desfet" - quan s'ha desfet correctament */
+      .commit-badge.undo-badge.done {
+        color: var(--success);
+        border-color: var(--success);
+        cursor: default;
       }
 
       /* v5.3: Selection Badge - mostra text seleccionat al xat */
       .selection-badge {
         display: flex;
         align-items: center;
-        gap: 4px;
-        font-size: 10px;
+        gap: 3px;
+        font-size: 9px;
         color: var(--text-muted);
         background: var(--bg-secondary);
-        padding: 3px 8px;
+        padding: 2px 6px 2px 4px;
         border-radius: var(--radius-sm);
         margin-bottom: 6px;
         border: 1px dashed var(--border);
@@ -560,6 +566,8 @@
       .selection-badge .i {
         flex-shrink: 0;
         color: var(--accent);
+        width: 10px;
+        height: 10px;
       }
 
       .selection-badge-text {
@@ -938,8 +946,8 @@
       /* Salutació */
       .landing-greeting {
         text-align: center;
-        margin-top: 40px;
-        margin-bottom: 20px;
+        margin-top: 16px;
+        margin-bottom: 16px;
       }
 
       .landing-logo {
@@ -2325,6 +2333,27 @@
         gap: var(--space-sm);
         margin-bottom: var(--space-md);
         align-items: center;
+      }
+
+      .recipes-back-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+      }
+
+      .recipes-back-btn:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+        border-color: var(--border-hover);
       }
 
       .recipes-search-wrapper {
@@ -5998,6 +6027,104 @@
         color: var(--accent);
         flex-shrink: 0;
         margin-right: 1px;
+        position: relative;
+        cursor: help;
+      }
+
+      /* v10.2: Tooltip informatiu per Abast - apareix per SOBRE */
+      .scope-tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 0;
+        display: none;
+        flex-direction: column-reverse;
+        align-items: flex-start;
+        z-index: 100;
+        pointer-events: none;
+        margin-bottom: 8px;
+      }
+
+      .scope-label:hover .scope-tooltip {
+        display: flex;
+      }
+
+      .scope-tooltip-line {
+        width: 1px;
+        height: 8px;
+        background: linear-gradient(to top, var(--accent), var(--border));
+        margin-left: 12px;
+      }
+
+      .scope-tooltip-bubble {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 6px 10px;
+        font-size: 9px;
+        font-weight: 400;
+        font-style: normal;
+        color: var(--text-secondary);
+        white-space: normal;
+        width: 140px;
+        line-height: 1.4;
+        text-align: left;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      [data-theme="dark"] .scope-tooltip-bubble {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+
+      /* v10.2: Tooltip informatiu per Mode (Edit/Xat) */
+      .mode-btn {
+        position: relative;
+      }
+
+      .mode-tooltip {
+        position: absolute;
+        bottom: 100%;
+        right: 0;
+        display: none;
+        flex-direction: column-reverse;
+        align-items: flex-end;
+        z-index: 100;
+        pointer-events: none;
+        margin-bottom: 8px;
+      }
+
+      .mode-btn:hover .mode-tooltip {
+        display: flex;
+        animation: tooltipFadeIn 0.2s ease-out 0.5s both;
+      }
+
+      @keyframes tooltipFadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .mode-tooltip-line {
+        width: 1px;
+        height: 8px;
+        background: linear-gradient(to top, var(--accent), var(--border));
+        margin-right: 12px;
+      }
+
+      .mode-tooltip-bubble {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 6px 10px;
+        font-size: 9px;
+        font-weight: 400;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        text-align: left;
+        line-height: 1.5;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      [data-theme="dark"] .mode-tooltip-bubble {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
       }
 
       .selection-scope .scope-text {
@@ -6583,6 +6710,18 @@
         display: none;
       }
 
+      /* v9.4: Header normal (no landing) - fons transparent i títol primer */
+      #chatPanel:not(.landing-active) .chat-header {
+        background: transparent;
+      }
+
+      #chatPanel:not(.landing-active) .chat-current-title {
+        order: -1;
+      }
+
+      #chatPanel:not(.landing-active) .chat-header-left .chat-history-btn {
+        order: 1;
+      }
 
       .chat-header-left {
         display: flex;
@@ -6643,7 +6782,8 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-size: 12px;
+        font-size: 13px;
+        font-weight: 500;
       }
 
       .chat-current-title:hover {
