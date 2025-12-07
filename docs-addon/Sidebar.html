@@ -3029,8 +3029,8 @@
         const bubble = document.createElement('div');
         bubble.className = 'msg ai';
 
-        // Renderitzar resposta principal amb markdown
-        let html = '<div class="md-content">' + renderMarkdown(aiResponse) + '</div>';
+        // Renderitzar resposta principal amb markdown (usar renderMarkdownHtml que retorna string)
+        let html = '<div class="md-content">' + renderMarkdownHtml(aiResponse) + '</div>';
 
         // Afegir secció de referències
         if (highlights && highlights.length > 0) {
@@ -3038,11 +3038,9 @@
 
           for (const hl of highlights) {
             const colorClass = 'ref-' + (hl.color || 'yellow');
-            const colorIcon = getColorIcon(hl.color);
             html += '<div class="reference-item ' + colorClass + '" ' +
               'onclick="scrollToDocReference(' + hl.para_id + ', \'' + hl.color + '\')" ' +
               'title="Clic per veure al document">' +
-              '<span class="ref-badge">' + colorIcon + '</span>' +
               '<span class="ref-content">' +
               '<span class="ref-snippet">"' + escapeHtmlSafe(hl.snippet || '...') + '"</span>' +
               '<span class="ref-reason">' + escapeHtmlSafe(hl.reason) + '</span>' +
@@ -3061,19 +3059,6 @@
         bubble.innerHTML = html;
         container.appendChild(bubble);
         container.scrollTop = container.scrollHeight;
-      }
-
-      /**
-       * Retorna emoji segons el color
-       */
-      function getColorIcon(color) {
-        const icons = {
-          yellow: '🟡',
-          orange: '🟠',
-          blue: '🔵',
-          purple: '🟣'
-        };
-        return icons[color] || '🟡';
       }
 
       /**

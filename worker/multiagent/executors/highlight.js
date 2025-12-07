@@ -377,89 +377,311 @@ function extractHighlightsFromText(text, documentContext) {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Valida i filtra highlights
+ * Valida, filtra i calcula posicions exactes per als highlights
+ * Gestiona múltiples ocurrències de la mateixa paraula al mateix paràgraf
+ * @param {Array} highlights - Highlights retornats per l'AI
+ * @param {Object} documentContext - Context del document
+ * @returns {Array} - Highlights validats amb start/end exactes
  */
 function validateHighlights(highlights, documentContext) {
   if (!Array.isArray(highlights)) return [];
 
   const validated = [];
 
+  // Seguiment de posicions ja usades per paràgraf: { paraId: [usedRanges] }
+  const usedPositions = new Map();
+
   for (const h of highlights) {
     // Validar paragraph_id
-    if (typeof h.paragraph_id !== 'number' ||
-        h.paragraph_id < 0 ||
-        h.paragraph_id >= documentContext.paragraphs.length) {
-      logWarn('Invalid highlight paragraph_id', { id: h.paragraph_id });
+    const paraId = h.paragraph_id ?? h.para_id;
+    if (typeof paraId !== 'number' ||
+        paraId < 0 ||
+        paraId >= documentContext.paragraphs.length) {
+      logWarn('Invalid highlight paragraph_id', { id: paraId });
       continue;
     }
 
-    // Validar text_to_highlight existeix al paràgraf
-    const paragraph = documentContext.paragraphs[h.paragraph_id];
+    // Obtenir text del paràgraf
+    const paragraph = documentContext.paragraphs[paraId];
     const paraText = paragraph.text || paragraph;
 
-    if (h.text_to_highlight && !paraText.includes(h.text_to_highlight)) {
-      // Intentar trobar coincidència parcial
-      const correctedText = findPartialMatch(h.text_to_highlight, paraText);
-      if (correctedText) {
-        h.text_to_highlight = correctedText;
-        h._meta = { corrected: true };
-      } else {
-        logWarn('Highlight text not found in paragraph', {
-          paragraph_id: h.paragraph_id,
-          text: h.text_to_highlight?.slice(0, 50),
-        });
-        // Marcar tot el paràgraf si no trobem el text
-        h.text_to_highlight = paraText.slice(0, 100);
-        h._meta = { full_paragraph: true };
-      }
+    // Obtenir posicions ja usades per aquest paràgraf
+    if (!usedPositions.has(paraId)) {
+      usedPositions.set(paraId, []);
     }
+    const usedRanges = usedPositions.get(paraId);
+
+    // Calcular posicions exactes, evitant posicions ja usades
+    const position = findExactPositionAvoidingUsed(h.text_to_highlight, paraText, usedRanges);
+
+    if (!position) {
+      logWarn('Highlight text not found - skipping', {
+        paragraph_id: paraId,
+        searched: h.text_to_highlight?.slice(0, 50),
+        paragraph_preview: paraText?.slice(0, 100),
+      });
+      continue;
+    }
+
+    // Marcar aquesta posició com a usada
+    usedRanges.push({ start: position.start, end: position.end });
 
     // Validar severity
-    if (!['error', 'suggestion', 'info'].includes(h.severity)) {
-      h.severity = 'info';
-    }
+    const severity = ['error', 'suggestion', 'info'].includes(h.severity)
+      ? h.severity
+      : 'info';
 
-    validated.push(h);
+    // Construir highlight amb format correcte (para_id, start, end)
+    validated.push({
+      para_id: paraId,
+      start: position.start,
+      end: position.end,
+      color: severityToColor(severity),
+      reason: h.comment || '',
+      severity,
+      matched_text: position.matched_text,
+      _meta: position._meta || {},
+    });
   }
 
   return validated;
 }
 
 /**
- * Busca coincidència parcial tolerant a espais
+ * Comprova si un rang es solapa amb algun dels rangs usats
  */
-function findPartialMatch(searchText, fullText) {
-  // Normalitzar espais
-  const normalizedSearch = searchText.replace(/\s+/g, ' ').trim();
-  const normalizedFull = fullText.replace(/\s+/g, ' ');
-
-  if (normalizedFull.includes(normalizedSearch)) {
-    // Trobar la posició al text original
-    const idx = normalizedFull.indexOf(normalizedSearch);
-    return fullText.slice(idx, idx + normalizedSearch.length);
-  }
-
-  // Buscar sense accents
-  const noAccentsSearch = removeAccents(normalizedSearch);
-  const noAccentsFull = removeAccents(normalizedFull);
-
-  if (noAccentsFull.includes(noAccentsSearch)) {
-    const idx = noAccentsFull.indexOf(noAccentsSearch);
-    // Retornar el text original amb accents
-    let count = 0;
-    let start = 0;
-    for (let i = 0; i < fullText.length && count < idx; i++) {
-      if (!/\s/.test(fullText[i]) || !/\s/.test(fullText[i - 1])) {
-        count++;
-        start = i;
-      }
+function rangeOverlapsUsed(start, end, usedRanges) {
+  for (const used of usedRanges) {
+    // Solapament: no (end <= used.start || start >= used.end)
+    if (!(end <= used.start || start >= used.end)) {
+      return true;
     }
-    return fullText.slice(start, start + searchText.length + 10);
+  }
+  return false;
+}
+
+/**
+ * Troba la posició exacta evitant posicions ja usades
+ */
+function findExactPositionAvoidingUsed(searchText, paragraphText, usedRanges) {
+  if (!searchText || !paragraphText) return null;
+
+  // Buscar TOTES les ocurrències i retornar la primera no usada
+  const allPositions = findAllPositions(searchText, paragraphText);
+
+  for (const pos of allPositions) {
+    if (!rangeOverlapsUsed(pos.start, pos.end, usedRanges)) {
+      return pos;
+    }
   }
 
   return null;
 }
 
+/**
+ * Troba TOTES les posicions d'un text dins d'un paràgraf
+ * @returns {Array} - Array de { start, end, matched_text, _meta }
+ */
+function findAllPositions(searchText, paragraphText) {
+  const positions = [];
+  if (!searchText || !paragraphText) return positions;
+
+  // ESTRATÈGIA 1: Cerca exacta - totes les ocurrències
+  let idx = 0;
+  while ((idx = paragraphText.indexOf(searchText, idx)) !== -1) {
+    positions.push({
+      start: idx,
+      end: idx + searchText.length,
+      matched_text: searchText,
+      _meta: { match_type: 'exact' }
+    });
+    idx += 1; // Continuar buscant (permet solapaments parcials)
+  }
+
+  if (positions.length > 0) return positions;
+
+  // ESTRATÈGIA 2: Case-insensitive - totes les ocurrències
+  const lowerSearch = searchText.toLowerCase();
+  const lowerPara = paragraphText.toLowerCase();
+  idx = 0;
+  while ((idx = lowerPara.indexOf(lowerSearch, idx)) !== -1) {
+    const matched = paragraphText.slice(idx, idx + searchText.length);
+    positions.push({
+      start: idx,
+      end: idx + searchText.length,
+      matched_text: matched,
+      _meta: { match_type: 'case_insensitive' }
+    });
+    idx += 1;
+  }
+
+  if (positions.length > 0) return positions;
+
+  // ESTRATÈGIA 3: Regex amb word boundaries per paraules soltes
+  // Útil per trobar "el" sense trobar "del", "cel", etc.
+  try {
+    const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wordRegex = new RegExp(`\\b${escapedSearch}\\b`, 'gi');
+    let match;
+    while ((match = wordRegex.exec(paragraphText)) !== null) {
+      positions.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        matched_text: match[0],
+        _meta: { match_type: 'word_boundary' }
+      });
+    }
+  } catch (e) {
+    // Ignorar errors de regex
+  }
+
+  return positions;
+}
+
+/**
+ * Troba la posició exacta d'un text dins d'un paràgraf
+ * Utilitza múltiples estratègies de cerca per màxima precisió
+ *
+ * @param {string} searchText - Text a buscar
+ * @param {string} paragraphText - Text del paràgraf
+ * @returns {Object|null} - { start, end, matched_text, _meta } o null si no es troba
+ */
+function findExactPosition(searchText, paragraphText) {
+  if (!searchText || !paragraphText) return null;
+
+  // ESTRATÈGIA 1: Cerca exacta
+  let idx = paragraphText.indexOf(searchText);
+  if (idx !== -1) {
+    return {
+      start: idx,
+      end: idx + searchText.length,
+      matched_text: searchText,
+      _meta: { match_type: 'exact' }
+    };
+  }
+
+  // ESTRATÈGIA 2: Cerca case-insensitive
+  const lowerSearch = searchText.toLowerCase();
+  const lowerPara = paragraphText.toLowerCase();
+  idx = lowerPara.indexOf(lowerSearch);
+  if (idx !== -1) {
+    const matched = paragraphText.slice(idx, idx + searchText.length);
+    return {
+      start: idx,
+      end: idx + searchText.length,
+      matched_text: matched,
+      _meta: { match_type: 'case_insensitive' }
+    };
+  }
+
+  // ESTRATÈGIA 3: Normalitzar espais (múltiples espais -> un)
+  const normalizedSearch = searchText.replace(/\s+/g, ' ').trim();
+  const normalizedPara = paragraphText.replace(/\s+/g, ' ');
+
+  // Crear mapa de posicions originals
+  const positionMap = createPositionMap(paragraphText);
+
+  idx = normalizedPara.toLowerCase().indexOf(normalizedSearch.toLowerCase());
+  if (idx !== -1) {
+    // Convertir posició normalitzada a posició original
+    const originalStart = positionMap[idx] ?? idx;
+    const originalEnd = positionMap[idx + normalizedSearch.length] ?? (idx + normalizedSearch.length);
+    const matched = paragraphText.slice(originalStart, originalEnd);
+    return {
+      start: originalStart,
+      end: originalEnd,
+      matched_text: matched,
+      _meta: { match_type: 'normalized_spaces' }
+    };
+  }
+
+  // ESTRATÈGIA 4: Sense accents
+  const noAccentsSearch = removeAccents(normalizedSearch.toLowerCase());
+  const noAccentsPara = removeAccents(normalizedPara.toLowerCase());
+  idx = noAccentsPara.indexOf(noAccentsSearch);
+  if (idx !== -1) {
+    const originalStart = positionMap[idx] ?? idx;
+    const originalEnd = positionMap[idx + noAccentsSearch.length] ?? (idx + noAccentsSearch.length);
+    const matched = paragraphText.slice(originalStart, originalEnd);
+    return {
+      start: originalStart,
+      end: originalEnd,
+      matched_text: matched,
+      _meta: { match_type: 'no_accents' }
+    };
+  }
+
+  // ESTRATÈGIA 5: Cerca fuzzy per paraules clau (última opció)
+  const words = searchText.split(/\s+/).filter(w => w.length >= 3);
+  if (words.length > 0) {
+    // Buscar la primera paraula significativa
+    const mainWord = words.sort((a, b) => b.length - a.length)[0]; // Paraula més llarga
+    idx = paragraphText.toLowerCase().indexOf(mainWord.toLowerCase());
+    if (idx !== -1) {
+      // Expandir per incloure context
+      const contextStart = Math.max(0, idx - 5);
+      const contextEnd = Math.min(paragraphText.length, idx + searchText.length + 5);
+      const matched = paragraphText.slice(contextStart, contextEnd).trim();
+
+      // Ajustar start/end al text trobat
+      const finalStart = paragraphText.indexOf(matched);
+      return {
+        start: finalStart,
+        end: finalStart + matched.length,
+        matched_text: matched,
+        _meta: { match_type: 'fuzzy_keyword', keyword: mainWord }
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Crea un mapa de posicions del text normalitzat al text original
+ */
+function createPositionMap(originalText) {
+  const map = [];
+  let originalIdx = 0;
+  let normalizedIdx = 0;
+  let lastWasSpace = false;
+
+  for (let i = 0; i < originalText.length; i++) {
+    const char = originalText[i];
+    if (/\s/.test(char)) {
+      if (!lastWasSpace) {
+        map[normalizedIdx] = originalIdx;
+        normalizedIdx++;
+        lastWasSpace = true;
+      }
+    } else {
+      map[normalizedIdx] = originalIdx;
+      normalizedIdx++;
+      lastWasSpace = false;
+    }
+    originalIdx++;
+  }
+  map[normalizedIdx] = originalIdx; // Final position
+
+  return map;
+}
+
+/**
+ * Converteix severity a nom de color (compatible amb REFERENCE_COLORS del frontend)
+ * Frontend colors: yellow (atenció), orange (problemes), blue (recomanacions), purple (clarificacions)
+ */
+function severityToColor(severity) {
+  const colors = {
+    error: 'orange',       // Problemes/errors → taronja
+    suggestion: 'blue',    // Recomanacions → blau
+    info: 'purple',        // Informació/clarificacions → lila
+  };
+  return colors[severity] || 'yellow';
+}
+
+/**
+ * Elimina accents d'un string (per cerca tolerant)
+ */
 function removeAccents(str) {
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }

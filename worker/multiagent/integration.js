@@ -224,17 +224,25 @@ function convertModeToLegacy(mode) {
 
 /**
  * Converteix highlights al format legacy
+ * Suporta tant el format antic com el nou format de l'executor v8.3
  */
 function convertHighlightsToLegacy(highlights) {
   if (!highlights || !Array.isArray(highlights)) return [];
 
   return highlights.map(h => ({
-    para_id: h.paragraph_id,
-    color: severityToColor(h.severity),
-    reason: h.comment || h.reason || '',
-    snippet: h.text_to_highlight || '',
-    start: h.start_offset,
-    end: h.end_offset,
+    // para_id: acceptar ambdós formats
+    para_id: h.para_id ?? h.paragraph_id,
+    // color: usar directament si ja és string, sinó convertir des de severity
+    color: (typeof h.color === 'string' && !h.color.startsWith('#'))
+      ? h.color
+      : severityToColor(h.severity),
+    // reason: acceptar múltiples camps
+    reason: h.reason || h.comment || '',
+    // snippet: acceptar matched_text o text_to_highlight
+    snippet: h.matched_text || h.text_to_highlight || '',
+    // start/end: acceptar formats nous i antics
+    start: h.start ?? h.start_offset,
+    end: h.end ?? h.end_offset,
   }));
 }
 
