@@ -330,6 +330,11 @@ async function callGeminiHighlight(systemPrompt, userPrompt, apiKey, signal) {
  * Parseja la resposta de Gemini
  */
 function parseHighlightResponse(responseText, documentContext) {
+  logInfo('🔍 [DEBUG] parseHighlightResponse ENTRADA', {
+    responseText_length: responseText?.length,
+    responseText_preview: responseText?.slice(0, 300)
+  });
+
   // Buscar JSON a la resposta
   const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
   let jsonStr = jsonMatch ? jsonMatch[1] : responseText;
@@ -345,12 +350,26 @@ function parseHighlightResponse(responseText, documentContext) {
 
   try {
     const parsed = JSON.parse(jsonStr);
+
+    logInfo('🔍 [DEBUG] parseHighlightResponse ÈXIT', {
+      highlights_count: parsed.highlights?.length || 0,
+      highlights_detail: parsed.highlights?.map(h => ({
+        text: h.text_to_highlight,
+        para_id: h.paragraph_id,
+        severity: h.severity
+      })),
+      summary: parsed.summary?.slice(0, 100)
+    });
+
     return {
       highlights: parsed.highlights || [],
       summary: parsed.summary || '',
     };
   } catch (error) {
-    logWarn('Failed to parse highlight response as JSON', { error: error.message });
+    logWarn('🔍 [DEBUG] parseHighlightResponse ERROR JSON', {
+      error: error.message,
+      jsonStr_preview: jsonStr?.slice(0, 200)
+    });
     // Intentar extreure highlights manualment
     return extractHighlightsFromText(responseText, documentContext);
   }
@@ -398,26 +417,55 @@ function extractHighlightsFromText(text, documentContext) {
  * @returns {Array} - Highlights validats amb start/end exactes
  */
 function validateHighlights(highlights, documentContext) {
-  if (!Array.isArray(highlights)) return [];
+  // DEBUG: Log entrada
+  logInfo('🔍 [DEBUG] validateHighlights ENTRADA', {
+    highlights_rebuts: highlights?.length || 0,
+    es_array: Array.isArray(highlights),
+    primers_highlights: highlights?.slice(0, 3).map(h => ({
+      text: h.text_to_highlight,
+      para: h.paragraph_id
+    }))
+  });
+
+  if (!Array.isArray(highlights)) {
+    logWarn('🔍 [DEBUG] highlights NO és array!', { tipus: typeof highlights });
+    return [];
+  }
 
   const validated = [];
 
   // Seguiment de posicions ja usades per paràgraf: { paraId: [usedRanges] }
   const usedPositions = new Map();
 
+  let index = 0;
   for (const h of highlights) {
+    index++;
+    logInfo(`🔍 [DEBUG] Processant highlight ${index}/${highlights.length}`, {
+      text_to_highlight: h.text_to_highlight,
+      paragraph_id: h.paragraph_id,
+      comment: h.comment?.slice(0, 50)
+    });
+
     // Validar paragraph_id
     const paraId = h.paragraph_id ?? h.para_id;
     if (typeof paraId !== 'number' ||
         paraId < 0 ||
         paraId >= documentContext.paragraphs.length) {
-      logWarn('Invalid highlight paragraph_id', { id: paraId });
+      logWarn(`🔍 [DEBUG] ❌ Highlight ${index}: paragraph_id INVÀLID`, {
+        id: paraId,
+        total_paragraphs: documentContext.paragraphs.length
+      });
       continue;
     }
 
     // Obtenir text del paràgraf
     const paragraph = documentContext.paragraphs[paraId];
     const paraText = paragraph.text || paragraph;
+
+    logDebug(`🔍 [DEBUG] Highlight ${index}: paràgraf obtingut`, {
+      paraText_length: paraText?.length,
+      paraText_preview: paraText?.slice(0, 80)
+    });
 
     // Obtenir posicions ja usades per aquest paràgraf
     if (!usedPositions.has(paraId)) {
@@ -429,13 +477,21 @@ function validateHighlights(highlights, documentContext) {
     const position = findExactPositionAvoidingUsed(h.text_to_highlight, paraText, usedRanges);
 
     if (!position) {
-      logWarn('Highlight text not found - skipping', {
+      logWarn(`🔍 [DEBUG] ❌ Highlight ${index}: TEXT NO TROBAT`, {
         paragraph_id: paraId,
-        searched: h.text_to_highlight?.slice(0, 50),
-        paragraph_preview: paraText?.slice(0, 100),
+        searched: h.text_to_highlight,
+        paragraph_text: paraText?.slice(0, 150),
+        usedRanges_count: usedRanges.length,
+        usedRanges: usedRanges
       });
       continue;
     }
+
+    logInfo(`🔍 [DEBUG] ✅ Highlight ${index}: TROBAT`, {
+      text: h.text_to_highlight,
+      position: position,
+      match_type: position._meta?.match_type
+    });
 
     // Marcar aquesta posició com a usada
     usedRanges.push({ start: position.start, end: position.end });
@@ -458,6 +514,19 @@ function validateHighlights(highlights, documentContext) {
     });
   }
 
+  // DEBUG: Log sortida
+  logInfo('🔍 [DEBUG] validateHighlights SORTIDA', {
+    highlights_entrada: highlights.length,
+    highlights_validats: validated.length,
+    highlights_descartats: highlights.length - validated.length,
+    validated_preview: validated.slice(0, 3).map(v => ({
+      text: v.matched_text,
+      start: v.start,
+      end: v.end,
+      para: v.para_id
+    }))
+  });
+
   return validated;
 }
 
@@ -478,13 +547,32 @@ function rangeOverlapsUsed(start, end, usedRanges) {
  * Troba la posició exacta evitant posicions ja usades
  */
 function findExactPositionAvoidingUsed(searchText, paragraphText, usedRanges) {
-  if (!searchText || !paragraphText) return null;
+  if (!searchText || !paragraphText) {
+    logDebug('🔍 [DEBUG] findExactPositionAvoidingUsed: input buit', {
+      hasSearch: !!searchText,
+      hasPara: !!paragraphText
+    });
+    return null;
+  }
 
   // Buscar TOTES les ocurrències i retornar la primera no usada
   const allPositions = findAllPositions(searchText, paragraphText);
 
+  logDebug('🔍 [DEBUG] findExactPositionAvoidingUsed', {
+    searchText: searchText,
+    allPositions_count: allPositions.length,
+    allPositions: allPositions.map(p => ({ start: p.start, end: p.end, type: p._meta?.match_type })),
+    usedRanges: usedRanges
+  });
+
   for (const pos of allPositions) {
-    if (!rangeOverlapsUsed(pos.start, pos.end, usedRanges)) {
+    const overlaps = rangeOverlapsUsed(pos.start, pos.end, usedRanges);
+    logDebug('🔍 [DEBUG] Checking position', {
+      pos_start: pos.start,
+      pos_end: pos.end,
+      overlaps: overlaps
+    });
+    if (!overlaps) {
       return pos;
     }
   }
