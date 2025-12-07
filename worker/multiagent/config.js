@@ -55,12 +55,12 @@ const FEATURE_FLAGS = {
 // ═══════════════════════════════════════════════════════════════
 
 const TIMEOUTS = {
-  classifier: 5000,        // 5s màxim per classificar (flash-lite, ràpid)
+  classifier: 12000,       // 12s màxim per classificar (flash amb thinking)
   executor_fast: 8000,     // 8s per highlight (flash-lite, ràpid)
-  executor_thinking: 20000,// 20s per chat/update/rewrite (flash amb thinking)
-  executor: 20000,         // Default: assumir thinking
+  executor_thinking: 15000,// 15s per chat/update/rewrite (flash amb thinking)
+  executor: 15000,         // Default: assumir thinking
   total_pipeline: 28000,   // 28s màxim total (deixa marge per GAS 30s)
-  api_call: 22000,         // 22s timeout al fetch
+  api_call: 18000,         // 18s timeout al fetch
   cache_computing: 30000,  // 30s timeout per cache COMPUTING state
 };
 
@@ -110,8 +110,8 @@ const CACHE = {
 
 const API = {
   gemini: {
-    // Model pel classifier (ràpid, sense thinking)
-    classifier_model: 'gemini-2.5-flash-lite',
+    // Model pel classifier (amb thinking per entendre bé l'intent)
+    classifier_model: 'gemini-2.5-flash',
     // Models per executors (separats per qualitat vs velocitat)
     model_highlight: 'gemini-2.5-flash-lite',    // Ràpid: només busca/marca
     model_update: 'gemini-2.5-flash',            // Thinking: qualitat en modificar
