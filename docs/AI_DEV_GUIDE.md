@@ -13,6 +13,12 @@ Ets l'**Executor / Desenvolupador Senior**.
 - **DB**: Supabase (PostgreSQL + RLS).
 - **AI**: Google Gemini API (via REST).
 
+### ⚠️ OBLIGATORI: Model Gemini
+**SEMPRE usar `gemini-2.5-flash`** per a totes les crides a l'API de Gemini:
+- Classifier: `gemini-2.5-flash`
+- Executor: `gemini-2.5-flash`
+- NO usar models antics (gemini-1.5-pro, gemini-2.0-flash, etc.)
+
 ---
 
 ## 2. Protocol de Treball

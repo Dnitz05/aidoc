@@ -38,11 +38,14 @@ Substitució del sistema de classificació d'intents basat en **regex** per una 
 
 | Decisió | Opció Triada | Raó |
 |---------|--------------|-----|
+| **Model LLM** | **gemini-2.5-flash (OBLIGATORI)** | **Millor qualitat, obligatori per tot** |
 | Model Embeddings | Gemini text-embedding-004 | Un sol proveïdor, excel·lent multilingüe (CA/ES) |
 | Storage Cache L2 | Cloudflare Vectorize + KV | Natiu CF, cerca vectorial ràpida |
 | Streaming vs Buffer | Buffering (v1) | Simplicitat, timeouts protegeixen |
 | Fine-tuning | No, Prompt Engineering | Menys manteniment, més flexible |
 | SDK Gemini | fetch directe (REST) | Control total timeouts, bundle size mínim |
+
+> ⚠️ **IMPORTANT**: Sempre usar `gemini-2.5-flash` per classifier i executor. NO usar models antics.
 
 ---
 
