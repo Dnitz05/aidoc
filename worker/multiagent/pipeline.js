@@ -123,6 +123,10 @@ async function processInstruction(request, env) {
 
       // Si és pending_resolved, continuar amb l'intent merged
       if (fastPathResult.type === 'pending_resolved' && fastPathResult.mergedIntent) {
+        // v12.1: Propagar instrucció original al merged intent
+        fastPathResult.mergedIntent.original_instruction = sanitizedInput.original;
+        fastPathResult.mergedIntent.language = sanitizedInput.language;
+
         // Continuar al routing amb l'intent merged
         const result = await executeWithTimeout(
           async (signal) => routeAndExecute(
@@ -179,6 +183,10 @@ async function processInstruction(request, env) {
 
     // getCachedOrClassify retorna { intent, cacheHit, cacheLayer }
     const { intent, cacheHit, cacheLayer } = classifyResult.result;
+
+    // v12.1: CRÍTIC - Propagar la instrucció original al intent per als executors
+    intent.original_instruction = sanitizedInput.original;
+    intent.language = sanitizedInput.language;
 
     logInfo('Intent classified', {
       mode: intent.mode,
