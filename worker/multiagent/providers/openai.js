@@ -6,7 +6,7 @@ import { BaseProvider } from './base.js';
 
 export class OpenAIProvider extends BaseProvider {
   static PROVIDER_ID = 'openai';
-  static DEFAULT_MODEL = 'gpt-4o-mini';
+  static DEFAULT_MODEL = 'gpt-4.1-mini';
   static BASE_URL = 'https://api.openai.com/v1';
 
   /**

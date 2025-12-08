@@ -29,17 +29,20 @@ const PROVIDERS = {
     defaultModel: 'gemini-2.0-flash',
     models: {
       'gemini-2.0-flash': 'Gemini 2.0 Flash (Recomanat)',
-      'gemini-1.5-pro': 'Gemini 1.5 Pro',
-      'gemini-1.5-flash': 'Gemini 1.5 Flash'
+      'gemini-2.0-flash-thinking-exp': 'Gemini 2.0 Flash Thinking',
+      'gemini-1.5-pro-latest': 'Gemini 1.5 Pro',
+      'gemini-1.5-flash-latest': 'Gemini 1.5 Flash'
     }
   },
   openai: {
     name: 'OpenAI',
-    defaultModel: 'gpt-4o-mini',
+    defaultModel: 'gpt-4.1-mini',
     models: {
-      'gpt-4o': 'GPT-4o (Més potent)',
-      'gpt-4o-mini': 'GPT-4o Mini (Recomanat)',
-      'gpt-4-turbo': 'GPT-4 Turbo'
+      'gpt-4.1': 'GPT-4.1 (Més potent)',
+      'gpt-4.1-mini': 'GPT-4.1 Mini (Recomanat)',
+      'gpt-4o': 'GPT-4o',
+      'o1': 'o1 (Raonament avançat)',
+      'o1-mini': 'o1 Mini (Raonament ràpid)'
     }
   },
   claude: {
@@ -47,7 +50,8 @@ const PROVIDERS = {
     defaultModel: 'claude-sonnet-4-20250514',
     models: {
       'claude-sonnet-4-20250514': 'Claude Sonnet 4 (Recomanat)',
-      'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
+      'claude-opus-4-20250514': 'Claude Opus 4 (Més potent)',
+      'claude-3-7-sonnet-20250219': 'Claude 3.7 Sonnet',
       'claude-3-5-haiku-20241022': 'Claude 3.5 Haiku (Ràpid)'
     }
   },
@@ -55,9 +59,10 @@ const PROVIDERS = {
     name: 'Mistral AI',
     defaultModel: 'mistral-small-latest',
     models: {
-      'mistral-large-latest': 'Mistral Large',
+      'mistral-large-latest': 'Mistral Large 2',
       'mistral-small-latest': 'Mistral Small (Recomanat)',
-      'codestral-latest': 'Codestral (Codi)'
+      'codestral-latest': 'Codestral (Codi)',
+      'pixtral-large-latest': 'Pixtral Large (Multimodal)'
     }
   },
   groq: {
@@ -65,6 +70,7 @@ const PROVIDERS = {
     defaultModel: 'llama-3.3-70b-versatile',
     models: {
       'llama-3.3-70b-versatile': 'Llama 3.3 70B (Recomanat)',
+      'llama-3.2-90b-vision-preview': 'Llama 3.2 90B Vision',
       'llama-3.1-8b-instant': 'Llama 3.1 8B (Ultraràpid)',
       'mixtral-8x7b-32768': 'Mixtral 8x7B'
     }
