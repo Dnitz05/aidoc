@@ -5903,7 +5903,8 @@
               } else if (currentType === 'ins') {
                 html += '<ins class="diff-ins">' + escapeHtml(buffer) + '</ins>';
               } else {
-                html += escapeHtml(buffer);
+                // Text inalterat - verd clar
+                html += '<span class="diff-context">' + escapeHtml(buffer) + '</span>';
               }
               buffer = '';
             }
@@ -5919,7 +5920,8 @@
           } else if (currentType === 'ins') {
             html += '<ins class="diff-ins">' + escapeHtml(buffer) + '</ins>';
           } else {
-            html += escapeHtml(buffer);
+            // Text inalterat - verd clar
+            html += '<span class="diff-context">' + escapeHtml(buffer) + '</span>';
           }
         }
 
