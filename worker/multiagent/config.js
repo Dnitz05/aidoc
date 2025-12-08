@@ -55,12 +55,12 @@ const FEATURE_FLAGS = {
 // ═══════════════════════════════════════════════════════════════
 
 const TIMEOUTS = {
-  classifier: 12000,       // 12s màxim per classificar (flash amb thinking)
-  executor_fast: 8000,     // 8s per highlight (flash-lite, ràpid)
-  executor_thinking: 15000,// 15s per chat/update/rewrite (flash amb thinking)
-  executor: 15000,         // Default: assumir thinking
-  total_pipeline: 28000,   // 28s màxim total (deixa marge per GAS 30s)
-  api_call: 18000,         // 18s timeout al fetch
+  classifier: 20000,       // 20s màxim per classificar (flash amb thinking: ~10s thinking + resposta)
+  executor_fast: 10000,    // 10s per highlight (flash-lite, ràpid)
+  executor_thinking: 25000,// 25s per chat/update/rewrite (flash amb thinking)
+  executor: 25000,         // Default: assumir thinking
+  total_pipeline: 50000,   // 50s màxim total (GAS permet fins 6 min, però usuari espera menys)
+  api_call: 30000,         // 30s timeout al fetch
   cache_computing: 30000,  // 30s timeout per cache COMPUTING state
 };
 
