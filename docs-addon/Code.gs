@@ -666,11 +666,14 @@ function revertLastEdit() {
 
 /**
  * Restaura el text original d'un paràgraf específic (Optimistic UI Undo)
+ * v12.0: Suporta restauració de format complet via formatSnapshot
  * @param {string} targetId - L'ID del paràgraf a restaurar
  * @param {string} originalText - El text original a restaurar
+ * @param {number} bodyIndex - Índex al body (opcional, més fiable)
+ * @param {Object} formatSnapshot - Snapshot de format complet (opcional)
  * @returns {Object} { status: 'restored' } o { status: 'error', error: string }
  */
-function restoreText(targetId, originalText, bodyIndex) {
+function restoreText(targetId, originalText, bodyIndex, formatSnapshot) {
   try {
     if (targetId === null || targetId === undefined) {
       return { status: 'error', error: 'No hi ha targetId' };
@@ -707,8 +710,19 @@ function restoreText(targetId, originalText, bodyIndex) {
       return { status: 'error', error: 'No s\'ha trobat el paràgraf' };
     }
 
-    // Restaurar el text original
-    targetElement.asText().setText(originalText);
+    // v12.0: Restaurar amb format complet si tenim snapshot
+    if (formatSnapshot && formatSnapshot.textFormat) {
+      const success = restoreFromSnapshot(targetElement, formatSnapshot);
+      if (success) {
+        console.log('[RestoreText] v12.0: Format complet restaurat');
+      } else {
+        // Fallback si falla
+        targetElement.asText().setText(originalText);
+      }
+    } else {
+      // Comportament antic: només restaurar text (perd format)
+      targetElement.asText().setText(originalText);
+    }
 
     // Actualitzar lastEdit per mantenir coherència
     const lastEdit = loadLastEdit();
@@ -1638,45 +1652,19 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           };
         }
 
-        // v3.8: Aplicar preview VISUAL al document (Track Changes)
-        // v5.3: Passar mapIdToElement per mantenir consistència amb seleccions
-        const previewResult = applyInDocumentPreview(changes, mapIdToElement);
-
-        if (!previewResult.ok) {
-          // Si falla el preview in-doc, retornem error
-          logDiagnostic('ERROR', {
-            issue: 'IN_DOC_PREVIEW_FAILED',
-            error: previewResult.error
-          });
-          return {
-            ok: false,
-            error: previewResult.error || "Error aplicant preview"
-          };
-        }
-
-        // v9.2: Guardar lastEdit per l'ull de "Revisa els canvis"
-        if (previewResult.previews && previewResult.previews.length > 0) {
-          const firstPreview = previewResult.previews[0];
-          saveLastEdit({
-            targetId: firstPreview.targetId,
-            originalText: firstPreview.originalText,
-            currentText: firstPreview.newText,
-            bodyIndex: firstPreview.bodyIndex
-          });
-        }
-
-        // Log resposta PREVIEW IN-DOCUMENT
+        // v11.0: Unified Annotations - NO aplicar al document, retornar per accept/reject individual
+        // Log resposta PREVIEW
         const responseInfo = {
           mode: 'UPDATE_BY_ID',
-          sub_mode: 'IN_DOC_PREVIEW',
-          changes_count: previewResult.count,
+          sub_mode: 'UNIFIED_PREVIEW',
+          changes_count: changes.length,
           credits_remaining: json.credits_remaining
         };
         metrics.setResponseInfo(responseInfo);
         logDiagnostic('RESPONSE', {
           mode: 'UPDATE_BY_ID',
-          sub_mode: 'IN_DOC_PREVIEW',
-          changes: previewResult.count,
+          sub_mode: 'UNIFIED_PREVIEW',
+          changes: changes.length,
           doc_was_empty: isDocumentEmpty,
           user_wanted: userMode
         });
@@ -1685,33 +1673,24 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
         // v10.2: Generar preview de la selecció per al badge del xat
         let selectionPreview = null;
         if (isSelection && contentPayload) {
-          // Extreure text net (sense IDs) dels primers 50 chars
           const cleanText = contentPayload.replace(/\[\d+\]\s*/g, '').trim();
           selectionPreview = cleanText.length > 50
             ? cleanText.substring(0, 47) + '...'
             : cleanText;
         }
 
+        // v11.0: Retornar status 'preview' amb array de canvis complet
+        // El sidebar mostrarà cada canvi amb botons Accept/Reject individuals
         return {
           ok: true,
-          status: 'in_doc_preview',  // Nou status per frontend
-          changes_count: previewResult.count,
+          status: 'preview',  // v11.0: Unified Annotations
+          changes: changes,   // Array complet per accept/reject individual
           ai_response: aiData.change_summary,
           credits: json.credits_remaining,
           thought: aiData.thought,
           mode: 'edit',
-          // v10.2: Info de selecció real per corregir el badge
           has_selection: isSelection,
           selection_preview: selectionPreview,
-          // v3.8: Info per la barra d'acció del sidebar
-          preview_info: {
-            count: previewResult.count,
-            previews: previewResult.previews.map(p => ({
-              targetId: p.targetId,
-              originalPreview: p.originalText.substring(0, 50) + (p.originalText.length > 50 ? '...' : ''),
-              newPreview: p.newText.substring(0, 50) + (p.newText.length > 50 ? '...' : '')
-            }))
-          },
           _diag: {
             doc_chars: contentPayload.length,
             doc_empty: isDocumentEmpty,
@@ -1755,17 +1734,30 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           const currentDocText = targetElement.asText().getText();
           // v10.1: Capturar heading original ABANS de modificar
           const originalHeading = getElementHeading(targetElement);
+          // v12.0: Capturar format complet per undo
+          const formatSnapshot = createFormatSnapshot(targetElement);
 
-          // v2.6 Snapshot: Capturar ABANS de modificar
+          // v2.6 Snapshot: Capturar ABANS de modificar (v12.0: inclou format)
           undoSnapshot = {
             targetId: id,
             originalText: currentDocText,
             originalHeading: originalHeading,  // v10.1
-            bodyIndex: getBodyIndex(targetElement)  // v6.6: Per undo més fiable
+            bodyIndex: getBodyIndex(targetElement),  // v6.6: Per undo més fiable
+            formatSnapshot: formatSnapshot  // v12.0: Per restaurar format
           };
 
-          // v3.7: Aplicar edició amb validació
-          updateParagraphPreservingAttributes(targetElement, newText);
+          // v12.0: Aplicar edició amb preservació de format intel·ligent
+          const formatPreserved = applyChangePreservingFormat(
+            targetElement,
+            currentDocText,
+            newText,
+            null  // No tenim word_changes en aquest flux
+          );
+
+          // Fallback a l'antic mètode si el nou falla
+          if (!formatPreserved) {
+            updateParagraphPreservingAttributes(targetElement, newText);
+          }
           editsApplied++;
 
           // v3.7: Validar que l'edició s'ha aplicat correctament
@@ -1873,31 +1865,47 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
       }
 
       // v10.3: Capturar undo snapshot ABANS d'aplicar REWRITE
+      // v12.0: Incloure format snapshot per a seleccions
+      let formatSnapshot = null;
+      if (isSelection && elementsToProcess.length > 0) {
+        formatSnapshot = createFormatSnapshot(elementsToProcess[0]);
+      }
+
       undoSnapshot = {
         type: 'rewrite',
         originalText: originalContent,
-        isSelection: isSelection
+        isSelection: isSelection,
+        formatSnapshot: formatSnapshot  // v12.0
       };
 
       // Aplicar REWRITE
       if (isSelection && elementsToProcess.length > 0) {
-        elementsToProcess[0].asText().setText(proposedContent);
+        // v12.0: Usar rewritePreservingFormat per preservar format dominant
+        const success = rewritePreservingFormat(elementsToProcess[0], proposedContent);
+        if (!success) {
+          // Fallback
+          elementsToProcess[0].asText().setText(proposedContent);
+        }
       } else {
+        // Per documents complets, renderFullDocument és l'única opció
+        // ja que reconstrueix l'estructura completa
         renderFullDocument(body, aiData.blocks);
       }
 
-      // Guardar lastEdit per poder mostrar amb l'ull
+      // Guardar lastEdit per poder mostrar amb l'ull (v12.0: inclou formatSnapshot)
       saveLastEdit({
         type: 'rewrite',
         originalText: originalContent,
         currentText: proposedContent,
-        isSelection: isSelection
+        isSelection: isSelection,
+        formatSnapshot: formatSnapshot  // v12.0
       });
 
       logDiagnostic('REWRITE_APPLIED', {
         original_length: originalContent.length,
         new_length: proposedContent.length,
-        is_selection: isSelection
+        is_selection: isSelection,
+        format_preserved: true  // v12.0
       });
 
     } else {
@@ -1911,7 +1919,12 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
       // v10.3.1: Guarda per evitar error si aiData.blocks és undefined
       if (aiData.blocks && Array.isArray(aiData.blocks)) {
         if (isSelection && elementsToProcess.length > 0) {
-           elementsToProcess[0].asText().setText(aiData.blocks.map(b=>b.text).join('\n'));
+           // v12.0: Usar rewritePreservingFormat també al fallback
+           const proposedText = aiData.blocks.map(b => b.text).join('\n');
+           const success = rewritePreservingFormat(elementsToProcess[0], proposedText);
+           if (!success) {
+             elementsToProcess[0].asText().setText(proposedText);
+           }
         } else {
            renderFullDocument(body, aiData.blocks);
         }
@@ -2056,17 +2069,30 @@ function applyPendingChanges(changes, expectedSnapshot) {
         const currentDocText = targetElement.asText().getText();
         // v10.1: Capturar heading original ABANS de modificar
         const originalHeading = getElementHeading(targetElement);
+        // v12.0: Capturar format complet per undo
+        const formatSnapshot = createFormatSnapshot(targetElement);
 
-        // Guardar snapshot per undo
+        // Guardar snapshot per undo (v12.0: inclou format complet)
         undoSnapshots.push({
           targetId: change.targetId,
           originalText: currentDocText,
           originalHeading: originalHeading,  // v10.1
-          bodyIndex: getBodyIndex(targetElement)  // v6.6: Per undo més fiable
+          bodyIndex: getBodyIndex(targetElement),  // v6.6: Per undo més fiable
+          formatSnapshot: formatSnapshot  // v12.0: Per restaurar format
         });
 
-        // Aplicar el canvi
-        updateParagraphPreservingAttributes(targetElement, change.proposedText);
+        // v12.0: Aplicar el canvi amb preservació de format intel·ligent
+        const formatPreserved = applyChangePreservingFormat(
+          targetElement,
+          currentDocText,
+          change.proposedText,
+          change.word_changes  // Si el backend envia word_changes
+        );
+
+        // Fallback a l'antic mètode si el nou falla
+        if (!formatPreserved) {
+          updateParagraphPreservingAttributes(targetElement, change.proposedText);
+        }
         appliedCount++;
 
         // Actualitzar lastEdit memory (per al primer canvi)
@@ -2099,6 +2125,103 @@ function applyPendingChanges(changes, expectedSnapshot) {
       ok: true,
       applied: appliedCount,
       undoSnapshots: undoSnapshots
+    };
+
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+// --- v11.0: APPLY SINGLE CHANGE (Individual change acceptance) ---
+/**
+ * Aplica un sol canvi individual
+ * @param {Object} change - {targetId, originalText, proposedText}
+ * @returns {Object} {ok, undoSnapshot, error}
+ */
+function applySingleChange(change) {
+  try {
+    if (!change || change.targetId === undefined) {
+      return { ok: false, error: "Canvi invàlid" };
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+
+    // Obtenir elements editables
+    const elementsToProcess = getEditableElements(body);
+
+    // Crear mapa ID -> Element
+    let mapIdToElement = {};
+    let currentIndex = 0;
+    for (const el of elementsToProcess) {
+      const text = el.asText().getText();
+      if (text.trim().length > 0) {
+        mapIdToElement[currentIndex] = el;
+        currentIndex++;
+      }
+    }
+
+    const targetId = parseInt(change.targetId, 10);
+    const targetElement = mapIdToElement[targetId];
+
+    if (!targetElement) {
+      return { ok: false, error: "Paràgraf no trobat: " + targetId };
+    }
+
+    const currentDocText = targetElement.asText().getText();
+
+    // Verificar que el text original coincideix (protecció race condition)
+    if (change.originalText && currentDocText !== change.originalText) {
+      return {
+        ok: false,
+        error: "El document ha canviat. Actualitza i torna a provar.",
+        mismatch: true
+      };
+    }
+
+    // Capturar heading original
+    const originalHeading = getElementHeading(targetElement);
+    // v12.0: Capturar format complet per undo
+    const formatSnapshot = createFormatSnapshot(targetElement);
+
+    // Guardar snapshot per undo (v12.0: inclou format complet)
+    const undoSnapshot = {
+      targetId: change.targetId,
+      originalText: currentDocText,
+      originalHeading: originalHeading,
+      bodyIndex: getBodyIndex(targetElement),
+      formatSnapshot: formatSnapshot  // v12.0: Per restaurar format
+    };
+
+    // v12.0: Aplicar el canvi amb preservació de format intel·ligent
+    const formatPreserved = applyChangePreservingFormat(
+      targetElement,
+      currentDocText,
+      change.proposedText,
+      change.word_changes  // Si el backend envia word_changes
+    );
+
+    // Fallback a l'antic mètode si el nou falla
+    if (!formatPreserved) {
+      updateParagraphPreservingAttributes(targetElement, change.proposedText);
+    }
+
+    // Actualitzar lastEdit memory
+    saveLastEdit({
+      targetId: change.targetId,
+      originalText: currentDocText,
+      originalHeading: originalHeading,
+      currentText: change.proposedText,
+      bodyIndex: getBodyIndex(targetElement)
+    });
+
+    // Invalidar cache
+    invalidateCaptureCache();
+
+    return {
+      ok: true,
+      applied: 1,
+      undoSnapshot: undoSnapshot
     };
 
   } catch (e) {
@@ -2723,6 +2846,752 @@ function getElementHeading(element) {
     }
   } catch (e) {}
   return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FORMAT PRESERVER MODULE v12.0
+// Garanteix preservació de format en totes les operacions de text.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Captura TOTS els atributs de format d'un rang de text
+ * @param {Text} textObj - Objecte Text (element.editAsText())
+ * @param {number} startIndex - Índex inicial
+ * @param {number} endIndex - Índex final
+ * @returns {Array<Object>} - Array d'atributs per cada caràcter
+ */
+function captureFormatAttributes(textObj, startIndex, endIndex) {
+  const attrs = [];
+  const textLength = textObj.getText().length;
+
+  // Validar índexs
+  startIndex = Math.max(0, startIndex);
+  endIndex = Math.min(endIndex, textLength - 1);
+
+  for (let i = startIndex; i <= endIndex; i++) {
+    try {
+      attrs.push({
+        position: i - startIndex, // Posició relativa
+        bold: safeGetAttribute(textObj, 'isBold', i),
+        italic: safeGetAttribute(textObj, 'isItalic', i),
+        underline: safeGetAttribute(textObj, 'isUnderline', i),
+        strikethrough: safeGetAttribute(textObj, 'isStrikethrough', i),
+        fontSize: safeGetAttribute(textObj, 'getFontSize', i),
+        fontFamily: safeGetAttribute(textObj, 'getFontFamily', i),
+        foregroundColor: safeGetAttribute(textObj, 'getForegroundColor', i),
+        backgroundColor: safeGetAttribute(textObj, 'getBackgroundColor', i),
+        linkUrl: safeGetAttribute(textObj, 'getLinkUrl', i)
+      });
+    } catch (e) {
+      // Caràcter especial o error - usar atributs neutres
+      attrs.push({ position: i - startIndex, bold: null, italic: null });
+    }
+  }
+  return attrs;
+}
+
+/**
+ * Helper per obtenir atributs de forma segura
+ */
+function safeGetAttribute(textObj, methodName, index) {
+  try {
+    if (textObj[methodName]) {
+      return textObj[methodName](index);
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
+ * Aplica atributs capturats a un rang de text
+ * @param {Text} textObj - Objecte Text
+ * @param {number} startIndex - On començar a aplicar
+ * @param {Array<Object>} attrs - Atributs a aplicar
+ */
+function applyFormatAttributes(textObj, startIndex, attrs) {
+  const textLength = textObj.getText().length;
+
+  attrs.forEach((attr, offset) => {
+    const i = startIndex + offset;
+    if (i >= textLength) return;
+
+    try {
+      if (attr.bold !== null) textObj.setBold(i, i, attr.bold);
+      if (attr.italic !== null) textObj.setItalic(i, i, attr.italic);
+      if (attr.underline !== null) textObj.setUnderline(i, i, attr.underline);
+      if (attr.strikethrough !== null) textObj.setStrikethrough(i, i, attr.strikethrough);
+      if (attr.fontSize) textObj.setFontSize(i, i, attr.fontSize);
+      if (attr.fontFamily) textObj.setFontFamily(i, i, attr.fontFamily);
+      if (attr.foregroundColor) textObj.setForegroundColor(i, i, attr.foregroundColor);
+      if (attr.backgroundColor) textObj.setBackgroundColor(i, i, attr.backgroundColor);
+      if (attr.linkUrl) textObj.setLinkUrl(i, i, attr.linkUrl);
+    } catch (e) {
+      // Ignorar errors per caràcters especials
+    }
+  });
+}
+
+/**
+ * Aplica un format uniforme a un rang de text
+ * @param {Text} textObj - Objecte Text
+ * @param {number} startIndex - Índex inicial
+ * @param {number} endIndex - Índex final
+ * @param {Object} formatRef - Format de referència a aplicar
+ */
+function applyUniformFormat(textObj, startIndex, endIndex, formatRef) {
+  if (!formatRef || startIndex > endIndex) return;
+
+  const textLength = textObj.getText().length;
+  endIndex = Math.min(endIndex, textLength - 1);
+
+  try {
+    if (formatRef.bold !== null) textObj.setBold(startIndex, endIndex, formatRef.bold);
+    if (formatRef.italic !== null) textObj.setItalic(startIndex, endIndex, formatRef.italic);
+    if (formatRef.underline !== null) textObj.setUnderline(startIndex, endIndex, formatRef.underline);
+    if (formatRef.strikethrough !== null) textObj.setStrikethrough(startIndex, endIndex, formatRef.strikethrough);
+    if (formatRef.fontSize) textObj.setFontSize(startIndex, endIndex, formatRef.fontSize);
+    if (formatRef.fontFamily) textObj.setFontFamily(startIndex, endIndex, formatRef.fontFamily);
+    if (formatRef.foregroundColor) textObj.setForegroundColor(startIndex, endIndex, formatRef.foregroundColor);
+    if (formatRef.backgroundColor) textObj.setBackgroundColor(startIndex, endIndex, formatRef.backgroundColor);
+    // No apliquem linkUrl uniformement (seria incorrecte)
+  } catch (e) {
+    // Error aplicant format uniforme
+    console.log('[FormatPreserver] Error applying uniform format:', e.message);
+  }
+}
+
+/**
+ * Determina el format dominant (més freqüent) d'un array d'atributs
+ * @param {Array<Object>} formatArray - Array d'atributs capturats
+ * @returns {Object} - Format dominant
+ */
+function getDominantFormat(formatArray) {
+  if (!formatArray || formatArray.length === 0) {
+    return { bold: false, italic: false, underline: false, strikethrough: false };
+  }
+
+  // Comptar freqüència de cada atribut
+  const counts = {
+    bold: { true: 0, false: 0 },
+    italic: { true: 0, false: 0 },
+    underline: { true: 0, false: 0 },
+    strikethrough: { true: 0, false: 0 }
+  };
+
+  const fontSizes = {};
+  const fontFamilies = {};
+  const foregroundColors = {};
+
+  formatArray.forEach(attr => {
+    if (attr.bold !== null) counts.bold[attr.bold]++;
+    if (attr.italic !== null) counts.italic[attr.italic]++;
+    if (attr.underline !== null) counts.underline[attr.underline]++;
+    if (attr.strikethrough !== null) counts.strikethrough[attr.strikethrough]++;
+
+    if (attr.fontSize) fontSizes[attr.fontSize] = (fontSizes[attr.fontSize] || 0) + 1;
+    if (attr.fontFamily) fontFamilies[attr.fontFamily] = (fontFamilies[attr.fontFamily] || 0) + 1;
+    if (attr.foregroundColor) foregroundColors[attr.foregroundColor] = (foregroundColors[attr.foregroundColor] || 0) + 1;
+  });
+
+  // Trobar el més freqüent de cada tipus
+  const getMostFrequent = (obj) => {
+    let max = 0, result = null;
+    for (const [key, count] of Object.entries(obj)) {
+      if (count > max) { max = count; result = key; }
+    }
+    return result;
+  };
+
+  return {
+    bold: counts.bold.true > counts.bold.false,
+    italic: counts.italic.true > counts.italic.false,
+    underline: counts.underline.true > counts.underline.false,
+    strikethrough: counts.strikethrough.true > counts.strikethrough.false,
+    fontSize: getMostFrequent(fontSizes),
+    fontFamily: getMostFrequent(fontFamilies),
+    foregroundColor: getMostFrequent(foregroundColors),
+    backgroundColor: null // Normalment no volem propagar backgroundColor
+  };
+}
+
+/**
+ * ESTRATÈGIA A: Substitució de paraula simple (per FIX mode)
+ * Usa replaceText natiu que preserva format circumdant
+ * @param {Element} element - Element del document
+ * @param {string} oldWord - Paraula a substituir
+ * @param {string} newWord - Paraula nova
+ * @returns {boolean} - Èxit
+ */
+function replaceWordPreservingFormat(element, oldWord, newWord) {
+  try {
+    const textObj = element.editAsText();
+    const fullText = textObj.getText();
+    const index = fullText.indexOf(oldWord);
+
+    if (index === -1) return false;
+
+    // replaceText de Google Apps Script preserva el format del text circumdant
+    // El text nou heretarà el format del primer caràcter de la coincidència
+    const escaped = escapeRegexForReplace(oldWord);
+    textObj.replaceText(escaped, newWord);
+
+    return true;
+  } catch (e) {
+    console.log('[FormatPreserver] replaceWord error:', e.message);
+    return false;
+  }
+}
+
+/**
+ * Escapa caràcters especials per regex
+ */
+function escapeRegexForReplace(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * ESTRATÈGIA B: Reemplaçar un rang preservant format
+ * Per modificacions de fragments (IMPROVE)
+ * @param {Element} element - Element del document
+ * @param {number} startIdx - Índex inicial
+ * @param {number} endIdx - Índex final
+ * @param {string} newText - Text nou
+ * @returns {boolean} - Èxit
+ */
+function replaceRangePreservingFormat(element, startIdx, endIdx, newText) {
+  try {
+    const textObj = element.editAsText();
+
+    // 1. Capturar format del punt d'inici (servirà de referència)
+    const formatRef = captureFormatAttributes(textObj, startIdx, startIdx)[0];
+
+    // 2. Eliminar text antic
+    textObj.deleteText(startIdx, endIdx);
+
+    // 3. Inserir text nou
+    textObj.insertText(startIdx, newText);
+
+    // 4. Aplicar format capturat al text nou
+    const newEndIdx = startIdx + newText.length - 1;
+    if (newText.length > 0 && formatRef) {
+      applyUniformFormat(textObj, startIdx, newEndIdx, formatRef);
+    }
+
+    return true;
+  } catch (e) {
+    console.log('[FormatPreserver] replaceRange error:', e.message);
+    return false;
+  }
+}
+
+/**
+ * ESTRATÈGIA C: Reescriptura completa preservant estil dominant
+ * Per REWRITE mode
+ * @param {Element} element - Element del document
+ * @param {string} newText - Text completament nou
+ * @returns {boolean} - Èxit
+ */
+function rewritePreservingFormat(element, newText) {
+  try {
+    const textObj = element.editAsText();
+    const oldText = textObj.getText();
+
+    // 1. Capturar format complet del paràgraf existent
+    let dominantFormat = { bold: false, italic: false };
+    if (oldText.length > 0) {
+      const fullFormat = captureFormatAttributes(textObj, 0, oldText.length - 1);
+      dominantFormat = getDominantFormat(fullFormat);
+    }
+
+    // 2. Capturar atributs de paràgraf
+    const paragraphAttrs = captureParagraphAttributes(element);
+
+    // 3. Reemplaçar el text
+    textObj.setText(newText);
+
+    // 4. Aplicar format dominant a tot el text nou
+    if (newText.length > 0) {
+      applyUniformFormat(textObj, 0, newText.length - 1, dominantFormat);
+    }
+
+    // 5. Restaurar atributs de paràgraf
+    restoreParagraphAttributes(element, paragraphAttrs);
+
+    return true;
+  } catch (e) {
+    console.log('[FormatPreserver] rewrite error:', e.message);
+    return false;
+  }
+}
+
+/**
+ * Captura atributs de paràgraf (heading, alignment, spacing, indentation)
+ * @param {Element} element - Element paràgraf
+ * @returns {Object} - Atributs capturats
+ */
+function captureParagraphAttributes(element) {
+  const attrs = {};
+
+  try {
+    if (element.getHeading) attrs.heading = element.getHeading();
+    if (element.getAlignment) attrs.alignment = element.getAlignment();
+    if (element.getLineSpacing) attrs.lineSpacing = element.getLineSpacing();
+    if (element.getSpacingBefore) attrs.spaceBefore = element.getSpacingBefore();
+    if (element.getSpacingAfter) attrs.spaceAfter = element.getSpacingAfter();
+    if (element.getIndentStart) attrs.indentStart = element.getIndentStart();
+    if (element.getIndentEnd) attrs.indentEnd = element.getIndentEnd();
+    if (element.getIndentFirstLine) attrs.indentFirstLine = element.getIndentFirstLine();
+  } catch (e) {}
+
+  return attrs;
+}
+
+/**
+ * Restaura atributs de paràgraf
+ * @param {Element} element - Element paràgraf
+ * @param {Object} attrs - Atributs a restaurar
+ */
+function restoreParagraphAttributes(element, attrs) {
+  if (!attrs) return;
+
+  try {
+    if (attrs.heading !== undefined && element.setHeading) element.setHeading(attrs.heading);
+    if (attrs.alignment !== undefined && element.setAlignment) element.setAlignment(attrs.alignment);
+    if (attrs.lineSpacing !== undefined && element.setLineSpacing) element.setLineSpacing(attrs.lineSpacing);
+    if (attrs.spaceBefore !== undefined && element.setSpacingBefore) element.setSpacingBefore(attrs.spaceBefore);
+    if (attrs.spaceAfter !== undefined && element.setSpacingAfter) element.setSpacingAfter(attrs.spaceAfter);
+    if (attrs.indentStart !== undefined && element.setIndentStart) element.setIndentStart(attrs.indentStart);
+    if (attrs.indentEnd !== undefined && element.setIndentEnd) element.setIndentEnd(attrs.indentEnd);
+    if (attrs.indentFirstLine !== undefined && element.setIndentFirstLine) element.setIndentFirstLine(attrs.indentFirstLine);
+  } catch (e) {
+    console.log('[FormatPreserver] restoreParagraph error:', e.message);
+  }
+}
+
+/**
+ * Crea un snapshot complet del format d'un element (per UNDO)
+ * @param {Element} element - Element a capturar
+ * @returns {Object} - Snapshot complet
+ */
+function createFormatSnapshot(element) {
+  try {
+    const textObj = element.editAsText();
+    const text = textObj.getText();
+
+    return {
+      text: text,
+      textFormat: text.length > 0 ? captureFormatAttributes(textObj, 0, text.length - 1) : [],
+      paragraphAttrs: captureParagraphAttributes(element)
+    };
+  } catch (e) {
+    console.log('[FormatPreserver] createSnapshot error:', e.message);
+    return null;
+  }
+}
+
+/**
+ * Restaura un element des d'un snapshot (per UNDO)
+ * @param {Element} element - Element a restaurar
+ * @param {Object} snapshot - Snapshot a aplicar
+ * @returns {boolean} - Èxit
+ */
+function restoreFromSnapshot(element, snapshot) {
+  if (!snapshot || !snapshot.text) return false;
+
+  try {
+    const textObj = element.editAsText();
+
+    // 1. Restaurar text
+    textObj.setText(snapshot.text);
+
+    // 2. Restaurar format del text
+    if (snapshot.textFormat && snapshot.textFormat.length > 0) {
+      applyFormatAttributes(textObj, 0, snapshot.textFormat);
+    }
+
+    // 3. Restaurar atributs de paràgraf
+    if (snapshot.paragraphAttrs) {
+      restoreParagraphAttributes(element, snapshot.paragraphAttrs);
+    }
+
+    return true;
+  } catch (e) {
+    console.log('[FormatPreserver] restore error:', e.message);
+    return false;
+  }
+}
+
+/**
+ * ESTRATÈGIA D: Detecció intel·ligent i aplicació de canvis
+ * Analitza el diff i escull l'estratègia òptima
+ * @param {Element} element - Element del document
+ * @param {string} originalText - Text original
+ * @param {string} newText - Text nou proposat
+ * @param {Array} wordChanges - [opcional] Canvis de paraules específics [{old, new}]
+ * @returns {boolean} - Èxit
+ */
+function applyChangePreservingFormat(element, originalText, newText, wordChanges) {
+  try {
+    // Si tenim word_changes del backend, usar-los directament
+    if (wordChanges && Array.isArray(wordChanges) && wordChanges.length > 0) {
+      return applyWordChanges(element, wordChanges);
+    }
+
+    // Detectar el tipus de canvi automàticament
+    const changeAnalysis = analyzeTextChange(originalText, newText);
+
+    console.log('[FormatPreserver] Change analysis:', JSON.stringify(changeAnalysis));
+
+    switch (changeAnalysis.type) {
+      case 'SINGLE_WORD':
+        // Canvi d'una sola paraula (típic de FIX)
+        return replaceWordPreservingFormat(element, changeAnalysis.oldWord, changeAnalysis.newWord);
+
+      case 'MULTIPLE_WORDS':
+        // Múltiples canvis de paraules
+        return applyWordChanges(element, changeAnalysis.wordChanges);
+
+      case 'INSERTION':
+        // Text afegit (típic de EXPAND)
+        return applyInsertionPreservingFormat(element, changeAnalysis.insertPosition, changeAnalysis.insertedText);
+
+      case 'MINOR_EDIT':
+        // Canvis menors (<30% del text)
+        return applyMinorEditsPreservingFormat(element, originalText, newText);
+
+      case 'MAJOR_REWRITE':
+      default:
+        // Reescriptura significant - usar format dominant
+        return rewritePreservingFormat(element, newText);
+    }
+  } catch (e) {
+    console.log('[FormatPreserver] applyChange error:', e.message);
+    // Fallback al mètode existent
+    return false;
+  }
+}
+
+/**
+ * Analitza el canvi entre dos textos per determinar l'estratègia òptima
+ */
+function analyzeTextChange(oldText, newText) {
+  if (!oldText || !newText) {
+    return { type: 'MAJOR_REWRITE' };
+  }
+
+  // Normalitzar espais
+  const oldNorm = oldText.trim();
+  const newNorm = newText.trim();
+
+  // Detectar canvi de paraula simple
+  const singleWordChange = detectSingleWordChange(oldNorm, newNorm);
+  if (singleWordChange) {
+    return {
+      type: 'SINGLE_WORD',
+      oldWord: singleWordChange.old,
+      newWord: singleWordChange.new
+    };
+  }
+
+  // Detectar múltiples canvis de paraules
+  const multiWordChanges = detectMultipleWordChanges(oldNorm, newNorm);
+  if (multiWordChanges && multiWordChanges.length > 0 && multiWordChanges.length <= 5) {
+    return {
+      type: 'MULTIPLE_WORDS',
+      wordChanges: multiWordChanges
+    };
+  }
+
+  // Detectar inserció (text original està contingut al nou)
+  const insertionCheck = detectInsertion(oldNorm, newNorm);
+  if (insertionCheck) {
+    return {
+      type: 'INSERTION',
+      insertPosition: insertionCheck.position,
+      insertedText: insertionCheck.text
+    };
+  }
+
+  // Calcular percentatge de canvi
+  const changeRatio = calculateChangeRatio(oldNorm, newNorm);
+  if (changeRatio < 0.3) {
+    return { type: 'MINOR_EDIT' };
+  }
+
+  return { type: 'MAJOR_REWRITE' };
+}
+
+/**
+ * Detecta si el canvi és d'una sola paraula
+ */
+function detectSingleWordChange(oldText, newText) {
+  const oldWords = oldText.split(/\s+/);
+  const newWords = newText.split(/\s+/);
+
+  // Si la diferència de paraules és més d'1, no és canvi simple
+  if (Math.abs(oldWords.length - newWords.length) > 1) {
+    return null;
+  }
+
+  // Trobar diferències
+  let diffCount = 0;
+  let oldWord = null;
+  let newWord = null;
+
+  const maxLen = Math.max(oldWords.length, newWords.length);
+  let oldIdx = 0;
+  let newIdx = 0;
+
+  while (oldIdx < oldWords.length || newIdx < newWords.length) {
+    if (oldIdx >= oldWords.length) {
+      // Inserció al final
+      diffCount++;
+      newIdx++;
+    } else if (newIdx >= newWords.length) {
+      // Eliminació al final
+      diffCount++;
+      oldIdx++;
+    } else if (oldWords[oldIdx] === newWords[newIdx]) {
+      // Paraules iguals
+      oldIdx++;
+      newIdx++;
+    } else {
+      // Diferència trobada
+      diffCount++;
+      oldWord = oldWords[oldIdx];
+      newWord = newWords[newIdx];
+      oldIdx++;
+      newIdx++;
+    }
+  }
+
+  if (diffCount === 1 && oldWord && newWord) {
+    return { old: oldWord, new: newWord };
+  }
+
+  return null;
+}
+
+/**
+ * Detecta múltiples canvis de paraules
+ */
+function detectMultipleWordChanges(oldText, newText) {
+  const changes = [];
+
+  // Tokenitzar preservant posicions
+  const oldTokens = tokenizeWithPositions(oldText);
+  const newTokens = tokenizeWithPositions(newText);
+
+  // Comparar token a token
+  let newIdx = 0;
+  for (let i = 0; i < oldTokens.length && changes.length <= 5; i++) {
+    const oldToken = oldTokens[i];
+
+    // Buscar coincidència al nou text
+    let found = false;
+    for (let j = newIdx; j < newTokens.length; j++) {
+      if (newTokens[j].word === oldToken.word) {
+        // Si hem saltat paraules, pot ser inserció - massa complex
+        if (j > newIdx + 1) {
+          return null; // Retornar null per usar altre estratègia
+        }
+        if (j === newIdx + 1 && newTokens[newIdx].word !== oldToken.word) {
+          // Una paraula canviada
+          changes.push({
+            old: oldToken.word,
+            new: newTokens[newIdx].word
+          });
+        }
+        newIdx = j + 1;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found && newIdx < newTokens.length) {
+      // Paraula canviada o eliminada
+      if (oldTokens.length === newTokens.length) {
+        changes.push({
+          old: oldToken.word,
+          new: newTokens[i] ? newTokens[i].word : ''
+        });
+        newIdx = i + 1;
+      } else {
+        return null; // Estructura massa diferent
+      }
+    }
+  }
+
+  return changes;
+}
+
+/**
+ * Tokenitza text preservant posicions
+ */
+function tokenizeWithPositions(text) {
+  const tokens = [];
+  const regex = /\S+/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    tokens.push({
+      word: match[0],
+      start: match.index,
+      end: match.index + match[0].length
+    });
+  }
+  return tokens;
+}
+
+/**
+ * Detecta si el canvi és una inserció
+ */
+function detectInsertion(oldText, newText) {
+  // El text nou ha de ser més llarg
+  if (newText.length <= oldText.length) {
+    return null;
+  }
+
+  // Comprovar si el text original és prefix
+  if (newText.startsWith(oldText)) {
+    return {
+      position: oldText.length,
+      text: newText.substring(oldText.length)
+    };
+  }
+
+  // Comprovar si el text original és sufix
+  if (newText.endsWith(oldText)) {
+    return {
+      position: 0,
+      text: newText.substring(0, newText.length - oldText.length)
+    };
+  }
+
+  // Comprovar si el text original està contingut
+  const idx = newText.indexOf(oldText);
+  if (idx > 0) {
+    // Inserció al principi
+    return {
+      position: 0,
+      text: newText.substring(0, idx)
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Calcula el ràtio de canvi entre dos textos
+ */
+function calculateChangeRatio(oldText, newText) {
+  // Simple Levenshtein-like estimation
+  const maxLen = Math.max(oldText.length, newText.length);
+  if (maxLen === 0) return 0;
+
+  let matches = 0;
+  const minLen = Math.min(oldText.length, newText.length);
+
+  for (let i = 0; i < minLen; i++) {
+    if (oldText[i] === newText[i]) matches++;
+  }
+
+  return 1 - (matches / maxLen);
+}
+
+/**
+ * Aplica múltiples canvis de paraules
+ */
+function applyWordChanges(element, wordChanges) {
+  let success = true;
+  for (const change of wordChanges) {
+    if (change.old && change.new) {
+      const result = replaceWordPreservingFormat(element, change.old, change.new);
+      if (!result) {
+        console.log('[FormatPreserver] Word change failed:', change.old, '->', change.new);
+        success = false;
+      }
+    }
+  }
+  return success;
+}
+
+/**
+ * Aplica una inserció preservant format
+ */
+function applyInsertionPreservingFormat(element, position, text) {
+  try {
+    const textObj = element.editAsText();
+
+    // Capturar format del punt d'inserció (o del caràcter anterior)
+    const refPos = position > 0 ? position - 1 : 0;
+    const formatRef = captureFormatAttributes(textObj, refPos, refPos)[0];
+
+    // Inserir text
+    textObj.insertText(position, text);
+
+    // Aplicar format capturat
+    if (text.length > 0 && formatRef) {
+      applyUniformFormat(textObj, position, position + text.length - 1, formatRef);
+    }
+
+    return true;
+  } catch (e) {
+    console.log('[FormatPreserver] insertion error:', e.message);
+    return false;
+  }
+}
+
+/**
+ * Aplica edicions menors preservant format
+ * Usa diff per trobar els canvis mínims
+ */
+function applyMinorEditsPreservingFormat(element, oldText, newText) {
+  try {
+    const textObj = element.editAsText();
+    const currentText = textObj.getText();
+
+    // Trobar el primer i últim caràcter diferent
+    let start = 0;
+    while (start < oldText.length && start < newText.length && oldText[start] === newText[start]) {
+      start++;
+    }
+
+    let endOld = oldText.length - 1;
+    let endNew = newText.length - 1;
+    while (endOld > start && endNew > start && oldText[endOld] === newText[endNew]) {
+      endOld--;
+      endNew--;
+    }
+
+    // Extreure la part canviada
+    const oldPart = oldText.substring(start, endOld + 1);
+    const newPart = newText.substring(start, endNew + 1);
+
+    // Capturar format del punt d'inici
+    const formatRef = start < currentText.length
+      ? captureFormatAttributes(textObj, start, start)[0]
+      : null;
+
+    // Eliminar la part antiga
+    if (oldPart.length > 0 && endOld >= start) {
+      textObj.deleteText(start, endOld);
+    }
+
+    // Inserir la part nova
+    if (newPart.length > 0) {
+      textObj.insertText(start, newPart);
+
+      // Aplicar format
+      if (formatRef) {
+        applyUniformFormat(textObj, start, start + newPart.length - 1, formatRef);
+      }
+    }
+
+    return true;
+  } catch (e) {
+    console.log('[FormatPreserver] minorEdits error:', e.message);
+    return false;
+  }
 }
 
 // --- RENDERING HELPERS ---

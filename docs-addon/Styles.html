@@ -920,6 +920,222 @@
       .reference-item:nth-child(5) { animation-delay: 0.2s; }
 
       /* ═══════════════════════════════════════════════════════════
+         ANNOTATION SYSTEM v11.0 - Unified Highlights + Changes
+         ═══════════════════════════════════════════════════════════ */
+
+      /* Llista d'anotacions */
+      .annotation-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      /* Base d'anotació */
+      .annotation-item {
+        display: flex;
+        flex-direction: column;
+        padding: 10px 12px;
+        border-radius: var(--radius-md);
+        transition: all 0.2s ease;
+        animation: refSlideIn 0.2s ease forwards;
+      }
+
+      /* Canvi pendent */
+      .annotation-item.change-item[data-status="pending"] {
+        background: rgba(59, 130, 246, 0.08);
+        border-left: 3px solid var(--accent);
+      }
+
+      /* Canvi acceptat */
+      .annotation-item.change-item[data-status="accepted"] {
+        background: rgba(34, 197, 94, 0.08);
+        border-left: 3px solid #22c55e;
+        opacity: 0.7;
+      }
+
+      .annotation-item.change-item[data-status="accepted"] .annotation-actions {
+        display: none;
+      }
+
+      .annotation-item.change-item[data-status="accepted"] .annotation-status {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #22c55e;
+        font-size: 11px;
+        margin-top: 6px;
+      }
+
+      /* Canvi rebutjat */
+      .annotation-item.change-item[data-status="rejected"] {
+        background: rgba(239, 68, 68, 0.05);
+        border-left: 3px solid rgba(239, 68, 68, 0.3);
+        opacity: 0.5;
+      }
+
+      .annotation-item.change-item[data-status="rejected"] .annotation-diff {
+        text-decoration: line-through;
+        opacity: 0.6;
+      }
+
+      .annotation-item.change-item[data-status="rejected"] .annotation-actions {
+        display: none;
+      }
+
+      .annotation-item.change-item[data-status="rejected"] .annotation-status {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--text-muted);
+        font-size: 11px;
+        margin-top: 6px;
+      }
+
+      /* Capçalera anotació */
+      .annotation-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+
+      .annotation-location {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--accent);
+        background: rgba(59, 130, 246, 0.1);
+        padding: 2px 6px;
+        border-radius: var(--radius-xs);
+      }
+
+      .annotation-reason {
+        font-size: 11px;
+        color: var(--text-secondary);
+        flex: 1;
+      }
+
+      /* Diff dins anotació */
+      .annotation-diff {
+        font-size: 12px;
+        line-height: 1.5;
+        padding: 8px;
+        background: var(--bg-secondary);
+        border-radius: var(--radius-sm);
+        word-break: break-word;
+      }
+
+      /* Accions individuals */
+      .annotation-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .annotation-status {
+        display: none;
+      }
+
+      .btn-accept, .btn-reject {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 12px;
+        border-radius: var(--radius-sm);
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s ease;
+      }
+
+      .btn-accept {
+        background: rgba(34, 197, 94, 0.12);
+        color: #22c55e;
+      }
+
+      .btn-accept:hover {
+        background: rgba(34, 197, 94, 0.22);
+      }
+
+      .btn-reject {
+        background: rgba(239, 68, 68, 0.08);
+        color: #ef4444;
+      }
+
+      .btn-reject:hover {
+        background: rgba(239, 68, 68, 0.18);
+      }
+
+      /* Barra d'accions bulk */
+      .annotation-bulk-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        margin-top: 10px;
+        background: var(--bg-secondary);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+      }
+
+      .bulk-info {
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+
+      .bulk-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .btn-accept-all, .btn-discard-all {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 12px;
+        border-radius: var(--radius-sm);
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s ease;
+      }
+
+      .btn-accept-all {
+        background: var(--accent);
+        color: white;
+      }
+
+      .btn-accept-all:hover {
+        background: var(--accent-hover);
+      }
+
+      .btn-discard-all {
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+      }
+
+      .btn-discard-all:hover {
+        color: var(--error);
+        border-color: var(--error);
+      }
+
+      /* Dark mode adjustments */
+      [data-theme="dark"] .annotation-item.change-item[data-status="pending"] {
+        background: rgba(59, 130, 246, 0.12);
+      }
+
+      [data-theme="dark"] .annotation-item.change-item[data-status="accepted"] {
+        background: rgba(34, 197, 94, 0.12);
+      }
+
+      [data-theme="dark"] .annotation-diff {
+        background: var(--bg-tertiary);
+      }
+
+      /* ═══════════════════════════════════════════════════════════
          CHAT LANDING v7.1
          ═══════════════════════════════════════════════════════════ */
 
@@ -1489,10 +1705,6 @@
         font-size: 13px;
         line-height: 1.6;
         color: var(--text-primary);
-        background: var(--bg-primary);
-        padding: var(--space-sm);
-        border-radius: var(--radius-sm);
-        border: 1px solid var(--border);
       }
 
       /* Diff colors */

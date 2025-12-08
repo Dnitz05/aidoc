@@ -940,6 +940,10 @@
       let pendingPreviewChanges = null; // v3.2: Canvis pendents d'aprovar
       let pendingDocSnapshot = null;    // v3.3: Snapshot per detectar race conditions
       const previewModeEnabled = true;  // v10.2: Sempre activat (preview obligatori)
+
+      // v11.0: Annotation System - Unified Highlights + Changes
+      let pendingAnnotations = [];      // Array d'anotacions {id, type, para_id, status, ...}
+      let annotationDocSnapshot = null; // Snapshot per verificar canvis
       let cachedTimelineData = null;    // v4.1: Pre-loaded timeline data
 
       // v5.3: Selection polling
@@ -1563,7 +1567,7 @@
               undoBtn.innerHTML = icon('undo', 'i--xs') + ' Desfer';
             }
           })
-          .restoreText(pendingUndo.targetId, pendingUndo.originalText, pendingUndo.bodyIndex);
+          .restoreText(pendingUndo.targetId, pendingUndo.originalText, pendingUndo.bodyIndex, pendingUndo.formatSnapshot);
       }
 
       function cancelInDocPreview() {
@@ -2101,13 +2105,22 @@
           processAutoBan(res.auto_ban);
         }
 
-        // v3.2: Handle Preview Mode response
+        // v11.0: Handle Preview Mode response with Unified Annotations
         if (res.status === 'preview' && res.changes && res.changes.length > 0) {
-          // DEBUG TEMPORAL: Mostrar info del document
-          if (res._debug_doc_chars !== undefined) {
-            addBubble('system', icon('file', 'i--accent') + ' Doc: ' + res._debug_doc_chars + ' chars | Preview: "' + (res._debug_doc_preview || '').substring(0, 50) + '..."');
-          }
-          showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
+          // Convertir changes a annotations per la nova UI unificada
+          const annotations = res.changes.map(function(c, i) {
+            return {
+              id: 'change-' + i,
+              type: 'change',
+              para_id: parseInt(c.targetId),
+              originalText: c.originalText,
+              proposedText: c.proposedText,
+              reason: c.reason || 'Canvi proposat',
+              status: 'pending'
+            };
+          });
+
+          addBubbleWithAnnotations(res.ai_response, annotations, res.doc_snapshot);
           if (res.credits !== undefined) {
             updateCredits(res.credits);
           }
@@ -2690,6 +2703,9 @@
         // v10.2: Desactivar botó Desfer de canvis anteriors
         disablePendingUndo();
 
+        // v11.1: Auto-netejar marcatges anteriors (silent)
+        clearAllHighlights(true);
+
         // v7.1: Amagar landing quan s'envia missatge
         hideChatLanding();
 
@@ -3050,10 +3066,7 @@
           }
 
           html += '</div>';
-
-          // Botó per netejar tots els highlights
-          html += '<button class="clear-highlights-btn" onclick="clearAllHighlights()">' +
-            icon('x', 'i--sm') + ' Netejar marcatges</button>';
+          // v11.1: Botó eliminat - auto-clear quan s'envia nou missatge
         }
 
         bubble.innerHTML = html;
@@ -3112,12 +3125,15 @@
 
       /**
        * Netejar tots els highlights del document
+       * @param {boolean} silent - Si true, no mostra toast (per auto-clear)
        */
-      function clearAllHighlights() {
+      function clearAllHighlights(silent) {
         google.script.run
           .withSuccessHandler(function(result) {
             if (result && result.success) {
-              showToast('Marcatges netejats (' + result.cleared + ')', 'success');
+              if (!silent && result.cleared > 0) {
+                showToast('Marcatges netejats (' + result.cleared + ')', 'success');
+              }
               // Treure visual de refs
               document.querySelectorAll('.reference-item').forEach(function(el) {
                 el.classList.add('cleared');
@@ -3125,9 +3141,260 @@
             }
           })
           .withFailureHandler(function(err) {
-            showToast('Error netejant: ' + err.message, 'error');
+            if (!silent) {
+              showToast('Error netejant: ' + err.message, 'error');
+            }
           })
           .clearReferenceHighlights();
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // v11.0: ANNOTATION SYSTEM - Unified Highlights + Changes
+      // ═══════════════════════════════════════════════════════════
+
+      /**
+       * Renderitza una resposta amb anotacions (unifica highlights i changes)
+       * @param {string} aiResponse - Text de resposta de l'AI
+       * @param {Array} annotations - Array d'anotacions
+       * @param {string} docSnapshot - Snapshot del document (opcional)
+       */
+      function addBubbleWithAnnotations(aiResponse, annotations, docSnapshot) {
+        const container = document.getElementById('chatHistory');
+        const bubble = document.createElement('div');
+        bubble.className = 'msg ai';
+
+        // Guardar dades per accions posteriors
+        pendingAnnotations = annotations;
+        annotationDocSnapshot = docSnapshot || null;
+
+        // Resposta principal amb markdown
+        let html = '<div class="md-content">' + renderMarkdownHtml(aiResponse) + '</div>';
+
+        // Afegir llista d'anotacions
+        if (annotations && annotations.length > 0) {
+          html += '<div class="annotation-list">';
+
+          for (const ann of annotations) {
+            if (ann.type === 'change') {
+              html += renderChangeAnnotation(ann);
+            } else {
+              // Highlight (informatiu)
+              html += renderHighlightAnnotation(ann);
+            }
+          }
+
+          html += '</div>';
+
+          // Barra d'accions bulk si hi ha canvis pendents
+          const pendingChanges = annotations.filter(a => a.type === 'change' && a.status === 'pending');
+          if (pendingChanges.length > 0) {
+            html += '<div class="annotation-bulk-actions">';
+            html += '<span class="bulk-info">' + pendingChanges.length + ' canvi' + (pendingChanges.length !== 1 ? 's' : '') + ' pendent' + (pendingChanges.length !== 1 ? 's' : '') + '</span>';
+            html += '<div class="bulk-buttons">';
+            html += '<button class="btn-discard-all" onclick="discardAllAnnotations()">' + icon('x', 'i--sm') + ' Descartar</button>';
+            html += '<button class="btn-accept-all" onclick="acceptAllAnnotations()">' + icon('check', 'i--sm') + ' Acceptar tots</button>';
+            html += '</div>';
+            html += '</div>';
+          }
+        }
+
+        bubble.innerHTML = html;
+        container.appendChild(bubble);
+        container.scrollTop = container.scrollHeight;
+      }
+
+      /**
+       * Renderitza una anotació de canvi (amb botons Accept/Reject)
+       */
+      function renderChangeAnnotation(ann) {
+        const diffHtml = ann.diffHtml || computeDiffHtml(ann.originalText || '', ann.proposedText || '');
+        const statusClass = 'data-status="' + (ann.status || 'pending') + '"';
+
+        let html = '<div class="annotation-item change-item" data-id="' + ann.id + '" ' + statusClass + '>';
+        html += '<div class="annotation-header">';
+        html += '<span class="annotation-location">§' + (parseInt(ann.para_id) + 1) + '</span>';
+        html += '<span class="annotation-reason">' + escapeHtmlSafe(ann.reason || 'Canvi proposat') + '</span>';
+        html += '</div>';
+        html += '<div class="annotation-diff">' + diffHtml + '</div>';
+
+        // Botons d'acció (es mostren segons status via CSS)
+        html += '<div class="annotation-actions">';
+        html += '<button class="btn-accept" onclick="acceptSingleAnnotation(\'' + ann.id + '\')">' + icon('check', 'i--sm') + ' Acceptar</button>';
+        html += '<button class="btn-reject" onclick="rejectSingleAnnotation(\'' + ann.id + '\')">' + icon('x', 'i--sm') + ' Rebutjar</button>';
+        html += '</div>';
+
+        // Status (es mostra quan està accepted/rejected)
+        html += '<div class="annotation-status">';
+        if (ann.status === 'accepted') {
+          html += icon('checkCircle', 'i--sm') + ' Aplicat';
+        } else if (ann.status === 'rejected') {
+          html += icon('xCircle', 'i--sm') + ' Descartat';
+        }
+        html += '</div>';
+
+        html += '</div>';
+        return html;
+      }
+
+      /**
+       * Renderitza una anotació de highlight (informativa, clicable)
+       */
+      function renderHighlightAnnotation(ann) {
+        const colorClass = 'ref-' + (ann.color || 'yellow');
+        let html = '<div class="annotation-item highlight-item reference-item ' + colorClass + '" ';
+        html += 'onclick="scrollToDocReference(' + ann.para_id + ', \'' + ann.color + '\')" ';
+        html += 'title="Clic per veure al document">';
+        html += '<span class="ref-content">';
+        html += '<span class="ref-snippet">"' + escapeHtmlSafe(ann.snippet || '...') + '"</span>';
+        html += '<span class="ref-reason">' + escapeHtmlSafe(ann.reason) + '</span>';
+        html += '</span>';
+        html += '<span class="ref-arrow">' + icon('chevronRight', 'i--sm') + '</span>';
+        html += '</div>';
+        return html;
+      }
+
+      /**
+       * Acceptar un canvi individual
+       */
+      function acceptSingleAnnotation(annotationId) {
+        const ann = pendingAnnotations.find(a => a.id === annotationId);
+        if (!ann || ann.status !== 'pending') return;
+
+        // Actualitzar UI immediatament (optimistic)
+        const el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
+        if (el) {
+          el.setAttribute('data-status', 'applying');
+          el.querySelector('.btn-accept').disabled = true;
+          el.querySelector('.btn-reject').disabled = true;
+        }
+
+        // Cridar Apps Script per aplicar el canvi
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.ok) {
+              ann.status = 'accepted';
+              updateAnnotationUI(annotationId, 'accepted');
+              showToast('Canvi aplicat', 'success');
+              updateBulkActionsBar();
+            } else {
+              ann.status = 'pending';
+              updateAnnotationUI(annotationId, 'pending');
+              showToast(result.error || 'Error aplicant canvi', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            ann.status = 'pending';
+            updateAnnotationUI(annotationId, 'pending');
+            showToast('Error: ' + err.message, 'error');
+          })
+          .applySingleChange({
+            targetId: ann.para_id,
+            originalText: ann.originalText,
+            proposedText: ann.proposedText
+          });
+      }
+
+      /**
+       * Rebutjar un canvi individual (sense aplicar res)
+       */
+      function rejectSingleAnnotation(annotationId) {
+        const ann = pendingAnnotations.find(a => a.id === annotationId);
+        if (!ann || ann.status !== 'pending') return;
+
+        ann.status = 'rejected';
+        updateAnnotationUI(annotationId, 'rejected');
+        updateBulkActionsBar();
+        showToast('Canvi descartat', 'info');
+      }
+
+      /**
+       * Acceptar tots els canvis pendents
+       */
+      function acceptAllAnnotations() {
+        const pending = pendingAnnotations.filter(a => a.type === 'change' && a.status === 'pending');
+        if (pending.length === 0) return;
+
+        // Construir array de canvis per l'existent applyPendingChanges
+        const changes = pending.map(ann => ({
+          targetId: ann.para_id,
+          originalText: ann.originalText,
+          proposedText: ann.proposedText
+        }));
+
+        showToast('Aplicant ' + changes.length + ' canvis...', 'info');
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.ok) {
+              pending.forEach(ann => {
+                ann.status = 'accepted';
+                updateAnnotationUI(ann.id, 'accepted');
+              });
+              updateBulkActionsBar();
+              showToast('Tots els canvis aplicats (' + result.applied + ')', 'success');
+            } else {
+              showToast(result.error || 'Error aplicant canvis', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error: ' + err.message, 'error');
+          })
+          .applyPendingChanges(changes, annotationDocSnapshot);
+      }
+
+      /**
+       * Descartar tots els canvis pendents
+       */
+      function discardAllAnnotations() {
+        const pending = pendingAnnotations.filter(a => a.type === 'change' && a.status === 'pending');
+        pending.forEach(ann => {
+          ann.status = 'rejected';
+          updateAnnotationUI(ann.id, 'rejected');
+        });
+        updateBulkActionsBar();
+        showToast('Tots els canvis descartats', 'info');
+      }
+
+      /**
+       * Actualitza la UI d'una anotació segons el seu status
+       */
+      function updateAnnotationUI(annotationId, status) {
+        const el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
+        if (!el) return;
+
+        el.setAttribute('data-status', status);
+
+        // Actualitzar contingut del status
+        const statusEl = el.querySelector('.annotation-status');
+        if (statusEl) {
+          if (status === 'accepted') {
+            statusEl.innerHTML = icon('checkCircle', 'i--sm') + ' Aplicat';
+          } else if (status === 'rejected') {
+            statusEl.innerHTML = icon('xCircle', 'i--sm') + ' Descartat';
+          } else {
+            statusEl.innerHTML = '';
+          }
+        }
+      }
+
+      /**
+       * Actualitza la barra d'accions bulk
+       */
+      function updateBulkActionsBar() {
+        const bulkBar = document.querySelector('.annotation-bulk-actions');
+        if (!bulkBar) return;
+
+        const pending = pendingAnnotations.filter(a => a.type === 'change' && a.status === 'pending');
+
+        if (pending.length === 0) {
+          bulkBar.style.display = 'none';
+        } else {
+          bulkBar.style.display = 'flex';
+          const infoEl = bulkBar.querySelector('.bulk-info');
+          if (infoEl) {
+            infoEl.textContent = pending.length + ' canvi' + (pending.length !== 1 ? 's' : '') + ' pendent' + (pending.length !== 1 ? 's' : '');
+          }
+        }
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -3383,7 +3650,7 @@
             hideUndoBar();
             addBubble('error', 'Error: ' + err.message);
           })
-          .restoreText(pendingUndo.targetId, pendingUndo.originalText, pendingUndo.bodyIndex);  // v6.6: bodyIndex
+          .restoreText(pendingUndo.targetId, pendingUndo.originalText, pendingUndo.bodyIndex, pendingUndo.formatSnapshot);  // v6.6: bodyIndex
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -3508,9 +3775,20 @@
               return;
             }
 
-            // v3.3: Handle old Preview Mode response (sidebar panel - legacy)
+            // v11.0: Handle Preview Mode with Unified Annotations
             if (res.status === 'preview' && res.changes && res.changes.length > 0) {
-              showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
+              var annotations = res.changes.map(function(c, i) {
+                return {
+                  id: 'change-' + i,
+                  type: 'change',
+                  para_id: parseInt(c.targetId),
+                  originalText: c.originalText,
+                  proposedText: c.proposedText,
+                  reason: c.reason || 'Canvi proposat',
+                  status: 'pending'
+                };
+              });
+              addBubbleWithAnnotations(res.ai_response, annotations, res.doc_snapshot);
               if (res.credits !== undefined) {
                 updateCredits(res.credits);
               }
@@ -4125,9 +4403,20 @@
               return;
             }
 
-            // Handle old Preview Mode response (legacy)
+            // v11.0: Handle Preview Mode with Unified Annotations
             if (res.status === 'preview' && res.changes && res.changes.length > 0) {
-              showPreviewPanel(res.changes, res.ai_response, res.doc_snapshot);
+              var annotations = res.changes.map(function(c, i) {
+                return {
+                  id: 'change-' + i,
+                  type: 'change',
+                  para_id: parseInt(c.targetId),
+                  originalText: c.originalText,
+                  proposedText: c.proposedText,
+                  reason: c.reason || 'Canvi proposat',
+                  status: 'pending'
+                };
+              });
+              addBubbleWithAnnotations(res.ai_response, annotations, res.doc_snapshot);
               if (res.credits !== undefined) {
                 updateCredits(res.credits);
               }
