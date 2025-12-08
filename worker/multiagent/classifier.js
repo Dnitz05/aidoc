@@ -296,7 +296,7 @@ async function callGeminiClassifier(userPrompt, apiKey, signal) {
         ],
         generationConfig: {
           temperature: 0.1,  // Baixa temperatura per consistència
-          maxOutputTokens: 1024,
+          maxOutputTokens: 4096,  // Augmentat per gemini-2.5-flash amb thinking (~1000 tokens)
           topP: 0.8,
         },
         safetySettings: [
