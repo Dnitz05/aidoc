@@ -54,8 +54,10 @@ La teva ÚNICA tasca és analitzar la instrucció i retornar un JSON estructurat
 ### Preguntes vs Accions
 - Si la instrucció és una PREGUNTA PURA sense intent d'edició → CHAT_ONLY o REFERENCE_HIGHLIGHT
 - Una pregunta que demana LOCALITZAR/TROBAR/REVISAR → REFERENCE_HIGHLIGHT
-- Una pregunta MAI pot ser UPDATE_BY_ID o REWRITE directament
 - "Veus X?" / "Hi ha X?" / "Trobes X?" → REFERENCE_HIGHLIGHT (mostrar al document)
+- EXCEPCIÓ IMPORTANT: "Pots corregir/arreglar/millorar X?" = intent d'ACCIÓ → UPDATE_BY_ID o REWRITE
+- Verbs d'ACCIÓ (corregir, arreglar, esmenar, millorar, canviar) → UPDATE_BY_ID encara que sigui pregunta
+- "Pots corregir les faltes?" → UPDATE_BY_ID (no REFERENCE_HIGHLIGHT!)
 
 ### Quan triar REFERENCE_HIGHLIGHT
 - Qualsevol instrucció que demani LOCALITZAR, TROBAR, IDENTIFICAR, REVISAR, COMPROVAR
@@ -195,6 +197,20 @@ Instrucció: "Corregeix l'article 5"
   "secondary_confidence": 0.55,
   "action_type": "modify",
   "target_paragraphs": [5],
+  "is_question": false,
+  "risk_level": "medium"
+}
+
+### Exemple 7: Petició d'acció en forma de pregunta (IMPORTANT!)
+Instrucció: "Pots corregir les faltes del document?"
+{
+  "mode": "UPDATE_BY_ID",
+  "confidence": 0.90,
+  "reasoning": "CORREGIR és verb d'ACCIÓ, no pregunta d'observació. Intent clar de modificar tot el document.",
+  "action_type": "modify",
+  "scope": "document",
+  "target_paragraphs": [],
+  "modification_type": "fix",
   "is_question": false,
   "risk_level": "medium"
 }`;
