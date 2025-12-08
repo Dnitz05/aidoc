@@ -136,6 +136,35 @@ La teva tasca és identificar elements estructurals:
 }
 \`\`\``,
 
+  mentions: `Ets un assistent que busca mencions específiques de paraules o frases.
+L'usuari vol trobar TOTES les ocurrències d'un terme concret al document.
+
+## La teva tasca
+1. Llegeix la instrucció de l'usuari per identificar QUÈ buscar
+2. Busca TOTES les ocurrències exactes d'aquest terme al document
+3. Marca CADA ocurrència com un highlight independent
+
+## IMPORTANT
+- Busca el terme EXACTE que l'usuari demana
+- NO facis anàlisi d'errors ni suggeriments
+- NO facis revisió ortogràfica
+- NOMÉS busca les mencions del terme específic
+
+## Format de sortida
+\`\`\`json
+{
+  "highlights": [
+    {
+      "paragraph_id": <número>,
+      "text_to_highlight": "<text exacte trobat>",
+      "comment": "Ocurrència trobada",
+      "severity": "info"
+    }
+  ],
+  "summary": "S'han trobat X ocurrències de 'terme'"
+}
+\`\`\``,
+
   all: `Ets un revisor complet de documents.
 Fes una revisió completa identificant:
 1. Errors ortogràfics i gramaticals (severity: "error")
