@@ -136,27 +136,34 @@ La teva tasca és identificar elements estructurals:
 }
 \`\`\``,
 
-  mentions: `Ets un assistent que busca mencions específiques de paraules o frases.
-L'usuari vol trobar TOTES les ocurrències d'un terme concret al document.
+  mentions: `Ets un cercador de text. La teva ÚNICA tasca és trobar mencions d'una paraula o frase específica.
 
-## La teva tasca
-1. Llegeix la instrucció de l'usuari per identificar QUÈ buscar
-2. Busca TOTES les ocurrències exactes d'aquest terme al document
-3. Marca CADA ocurrència com un highlight independent
+## INSTRUCCIONS CRÍTIQUES
+1. PRIMER: Identifica el terme exacte que l'usuari vol buscar (normalment entre cometes: "terme" o 'terme')
+2. SEGON: Busca TOTES les ocurrències EXACTES d'aquest terme al document
+3. TERCER: Retorna cada ocurrència com un highlight
 
-## IMPORTANT
-- Busca el terme EXACTE que l'usuari demana
-- NO facis anàlisi d'errors ni suggeriments
-- NO facis revisió ortogràfica
-- NOMÉS busca les mencions del terme específic
+## EXEMPLES D'EXTRACCIÓ DEL TERME
+- "buscar la paraula 'la'" → terme a buscar: "la"
+- "on apareix "projecte"" → terme a buscar: "projecte"
+- "buscar 'PAE'" → terme a buscar: "PAE"
+- "trobar mencions de Tortosa" → terme a buscar: "Tortosa"
+
+## MOLT IMPORTANT
+- El terme a buscar és el que l'usuari escriu ENTRE COMETES
+- Si l'usuari diu "buscar la paraula 'la'", has de buscar "la", NO "paraula"
+- Busca el terme TAL QUAL, case-sensitive si és possible
+- NO facis anàlisi d'errors, correccions ni suggeriments
+- NO substitueixis el terme per un altre
 
 ## Format de sortida
 \`\`\`json
 {
+  "search_term": "<el terme exacte que s'ha buscat>",
   "highlights": [
     {
       "paragraph_id": <número>,
-      "text_to_highlight": "<text exacte trobat>",
+      "text_to_highlight": "<el terme exacte que apareix al paràgraf>",
       "comment": "Ocurrència trobada",
       "severity": "info"
     }
