@@ -1,6 +1,7 @@
 /**
- * REFERENCE_HIGHLIGHT Executor v12.1
+ * REFERENCE_HIGHLIGHT Executor v12.2
  *
+ * v12.2: Filtre falsos positius on error == correcció ('Àrea' → 'Àrea')
  * v12.1: Detecció de diacrítics catalans + temperatura optimitzada 0.1
  * v8.4: Word boundary multilingüe per precisió total en detecció de paraules
  *       (evita "el" dins "del", funciona amb accents: és, àrea, ç, ñ)
@@ -35,33 +36,33 @@ const WORD_CHARS = 'a-zA-Z0-9àèéíòóúüïçñÀÈÉÍÒÓÚÜÏÇÑáéí�
 // ═══════════════════════════════════════════════════════════════
 
 const HIGHLIGHT_PROMPTS = {
-  errors: `DETECTOR D'ERRORS ORTOGRÀFICS
-Objectiu: Trobar paraules MAL ESCRITES al document.
+  errors: `DETECTOR D'ERRORS ORTOGRÀFICS v12.2
+Objectiu: Trobar NOMÉS paraules MAL ESCRITES al document.
 
-## QUÈ ÉS UN ERROR (la paraula ACTUAL al document està malament)
-| Error real | Per què | Correcció |
-|------------|---------|-----------|
-| "dde" | Lletra repetida per error | "de" |
-| "documentacio" | Falta accent (NO existeix sense) | "documentació" |
-| "area" | Falta accent obligatori | "àrea" |
-| "els casa" | Discordança de nombre | "les cases" |
+## ⚠️ REGLA CRÍTICA: VERIFICACIÓ ABANS DE MARCAR
+Abans de marcar qualsevol paraula, verifica:
+1. La paraula TAL COM APAREIX al document, és DIFERENT de la correcta?
+2. Si "Àrea" ja té accent → NO és error → NO marcar
+3. Si "area" no té accent → SÍ és error → marcar com 'area' → 'àrea'
 
-## CRÍTIC: COM VERIFICAR
-1. Llegir la paraula TAL COM APAREIX al document
-2. Aquesta paraula EXACTA, existeix al diccionari?
-   - "documentació" (amb accent) → SÍ existeix → NO és error
-   - "documentacio" (sense accent) → NO existeix → SÍ és error
-3. NOMÉS marcar si la paraula ACTUAL no existeix o està mal escrita
+## EXEMPLES DE VERIFICACIÓ
+| Al document | És error? | Per què |
+|-------------|-----------|---------|
+| "Àrea" | ❌ NO | Ja té l'accent correcte |
+| "area" | ✅ SÍ | Li falta l'accent → 'àrea' |
+| "documentació" | ❌ NO | Ja és correcte |
+| "documentacio" | ✅ SÍ | Li falta l'accent → 'documentació' |
+| "urbangística" | ✅ SÍ | Error de tecleig → 'urbanística' |
 
-## ERRORS COMUNS A BUSCAR
-- Lletres repetides: "dde", "eel", "laa"
-- Accents oblidats: "area", "documentacio", "especifica"
-- Faltes de tecleig: "porjecte", "documetnació"
+## QUÈ MARCAR (la correcció HA DE SER DIFERENT)
+- Lletres repetides: "dde" → "de"
+- Accents oblidats: "area" → "àrea"
+- Faltes de tecleig: "urbangística" → "urbanística"
 
-## NO MARCAR
-- Paraules que JA estan correctes (encara que tinguin accent)
+## NO MARCAR MAI
+- Paraules que JA són correctes (encara que tinguin accents)
 - Noms propis, sigles, abreviatures
-- Variants ortogràfiques vàlides
+- Casos on original == correcció
 
 ## OUTPUT
 \`\`\`json
@@ -69,8 +70,8 @@ Objectiu: Trobar paraules MAL ESCRITES al document.
   "highlights": [
     {
       "paragraph_id": <número>,
-      "text_to_highlight": "<PARAULA EXACTA mal escrita al document>",
-      "comment": "'<error>' → '<correcció>'",
+      "text_to_highlight": "<PARAULA MAL ESCRITA>",
+      "comment": "'<error>' → '<correcció diferent>'",
       "severity": "error"
     }
   ],
@@ -78,7 +79,7 @@ Objectiu: Trobar paraules MAL ESCRITES al document.
 }
 \`\`\`
 
-REGLA D'OR: Si la paraula al document JA és correcta, NO la marquis.`,
+🔴 MAI retornis un error on la correcció sigui igual a l'original!`,
 
   suggestions: `EDITOR DE MILLORES MESURABLES
 Objectiu: Identificar oportunitats de millora CONCRETES i ACCIONABLES (no errors ortogràfics).
@@ -277,10 +278,11 @@ IMPORTANT: Preferir qualitat sobre quantitat. Si el document està bé, dir-ho.`
  * @param {Object} documentContext - Context del document
  * @param {Object} conversationContext - Context de conversa
  * @param {Object} options - Opcions d'execució
+ * @param {Object} [options.provider] - Provider d'IA (BYOK)
  * @returns {Promise<Object>} - Resultat amb highlights
  */
 async function executeReferenceHighlight(intent, documentContext, conversationContext, options = {}) {
-  const { apiKey, signal } = options;
+  const { apiKey, signal, provider } = options;
   const language = intent.language || 'ca';
   const strategy = intent.highlight_strategy || HighlightStrategy.ALL;
 
@@ -288,6 +290,7 @@ async function executeReferenceHighlight(intent, documentContext, conversationCo
     strategy,
     target_paragraphs: intent.target_paragraphs?.length || 'all',
     has_entities: !!intent.entities?.length,
+    provider: provider?.name || 'gemini-legacy',
   });
 
   // Validar que tenim document
@@ -309,8 +312,26 @@ async function executeReferenceHighlight(intent, documentContext, conversationCo
       targetParagraphs
     );
 
-    // Cridar Gemini
-    const response = await callGeminiHighlight(systemPrompt, userPrompt, apiKey, signal);
+    // Cridar IA (BYOK o Gemini)
+    let response;
+    let usage = null;
+
+    if (provider) {
+      const result = await provider.chat(
+        [{ role: 'user', content: userPrompt }],
+        {
+          systemPrompt,
+          temperature: TEMPERATURES.highlight,
+          maxTokens: 4096,
+          signal,
+        }
+      );
+      response = result.content;
+      usage = result.usage;
+    } else {
+      // Fallback a crida directa Gemini (compatibilitat enrere)
+      response = await callGeminiHighlight(systemPrompt, userPrompt, apiKey, signal);
+    }
 
     // Parsejar i validar resposta
     const parsedResponse = parseHighlightResponse(response, documentContext);
@@ -342,9 +363,13 @@ async function executeReferenceHighlight(intent, documentContext, conversationCo
       _meta: {
         executor: 'highlight',
         strategy,
+        provider: provider?.name || 'gemini',
+        model: provider?.model || GEMINI.model_highlight,
         total_found: filteredHighlights.length,
         paragraphs_analyzed: targetParagraphs.length,
         proper_nouns_filtered: validatedHighlights.length - filteredHighlights.length,
+        tokens_input: usage?.input,
+        tokens_output: usage?.output,
       },
     };
 
@@ -828,8 +853,9 @@ const CATALAN_DIACRITIC_WORDS = {
 };
 
 /**
- * Filtra highlights que són falsos positius de noms propis
- * Un nom propi NO s'ha de marcar com a error de diacrítics
+ * Filtra highlights que són falsos positius:
+ * 1. Noms propis marcats com errors de diacrítics
+ * 2. "Errors" on la correcció és igual a l'original ('Àrea' → 'Àrea')
  *
  * @param {Array} highlights - Highlights validats
  * @param {Object} documentContext - Context del document
@@ -843,16 +869,34 @@ function filterProperNounHighlights(highlights, documentContext) {
     .join(' ');
 
   return highlights.filter(h => {
+    // v12.2: Filtrar "errors" on la correcció és igual a l'original
+    // Patró: 'X' → 'X' o "X" → "X" o X → X
+    const comment = (h.reason || '').trim();
+    const sameWordPattern = /['""']?([^'""'→]+)['""']?\s*→\s*['""']?([^'""']+)['""']?/;
+    const match = comment.match(sameWordPattern);
+    if (match) {
+      const original = match[1].trim().toLowerCase();
+      const correction = match[2].trim().toLowerCase();
+      if (original === correction) {
+        logDebug('Highlight filtrat: correcció idèntica a l\'original', {
+          reason: h.reason,
+          original,
+          correction,
+          para_id: h.para_id,
+        });
+        return false;  // Descartar aquest fals positiu
+      }
+    }
     // Només filtrar errors de diacrítics/accents
     if (h.severity !== 'error') return true;
 
     // Comprovar si el comentari parla de diacrítics o accents
-    const comment = (h.reason || '').toLowerCase();
-    const isDiacriticError = comment.includes('accent') ||
-                             comment.includes('diacrític') ||
-                             comment.includes('diacrit') ||
-                             comment.includes('majúscula') ||
-                             comment.includes('→');
+    const commentLower = comment.toLowerCase();
+    const isDiacriticError = commentLower.includes('accent') ||
+                             commentLower.includes('diacrític') ||
+                             commentLower.includes('diacrit') ||
+                             commentLower.includes('majúscula') ||
+                             commentLower.includes('→');
 
     if (!isDiacriticError) return true;
 

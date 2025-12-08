@@ -1,5 +1,5 @@
 /**
- * Multi-Agent System Pipeline v8.3
+ * Multi-Agent System Pipeline v8.4
  *
  * Pipeline principal que orquestra tot el flux de processament:
  *
@@ -42,9 +42,10 @@ import { classifyInstruction } from './classifier.js';
  * @param {string} request.sessionId - ID de sessió
  * @param {string} request.documentId - ID del document (per cache)
  * @param {Object} env - Variables d'entorn (GEMINI_API_KEY, etc.)
+ * @param {Object} [provider] - Provider d'IA (BYOK). Si no s'especifica, usa Gemini central.
  * @returns {Promise<Object>} - Resultat del processament
  */
-async function processInstruction(request, env) {
+async function processInstruction(request, env, provider = null) {
   const telemetry = new TelemetryCollector();
   const startTime = Date.now();
 
@@ -58,6 +59,7 @@ async function processInstruction(request, env) {
     documentId = null,
   } = request;
 
+  // BYOK: Usar provider si s'ha proporcionat, sinó fallback a apiKey central
   const apiKey = env?.GEMINI_API_KEY;
 
   logInfo('Pipeline started', {
@@ -65,6 +67,8 @@ async function processInstruction(request, env) {
     paragraphs_count: paragraphs.length,
     has_selection: selectedParagraphIds.length > 0,
     session_id: sessionId?.slice(0, 8),
+    provider: provider?.name || 'gemini-central',
+    model: provider?.model || 'default',
   });
 
   try {
@@ -82,11 +86,11 @@ async function processInstruction(request, env) {
     });
 
     // ═══════════════════════════════════════════════════════════
-    // FASE 2: SESSION STATE
+    // FASE 2: SESSION STATE (v8.4: async amb KV persistent)
     // ═══════════════════════════════════════════════════════════
     telemetry.checkpoint('session_start');
 
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId, env);
     const conversationContext = getConversationContext(session);
 
     telemetry.checkpoint('session_end');
@@ -134,17 +138,17 @@ async function processInstruction(request, env) {
             documentContext,
             conversationContext,
             session,
-            { apiKey, signal, sanitizedInput }
+            { apiKey, signal, sanitizedInput, provider }
           ),
           TIMEOUTS.executor
         );
 
-        return finalizeResult(result, session, sessionId, telemetry, sanitizedInput);
+        return await finalizeResult(result, session, sessionId, telemetry, sanitizedInput, env);
       }
 
       // Altres fast paths (greeting, help, etc.)
       if (fastPathResult.response) {
-        return finalizeResult(fastPathResult.response, session, sessionId, telemetry, sanitizedInput);
+        return await finalizeResult(fastPathResult.response, session, sessionId, telemetry, sanitizedInput, env);
       }
     }
 
@@ -172,13 +176,13 @@ async function processInstruction(request, env) {
     // Si s'ha activat el mode segur
     if (classifyResult.safeModeUsed) {
       logWarn('Circuit breaker activated, using safe mode');
-      return finalizeResult(classifyResult.result, session, sessionId, telemetry, sanitizedInput);
+      return await finalizeResult(classifyResult.result, session, sessionId, telemetry, sanitizedInput, env);
     }
 
     // Si hi ha hagut timeout
     if (classifyResult.timedOut) {
       logWarn('Classification timed out');
-      return finalizeResult(classifyResult.result, session, sessionId, telemetry, sanitizedInput);
+      return await finalizeResult(classifyResult.result, session, sessionId, telemetry, sanitizedInput, env);
     }
 
     // getCachedOrClassify retorna { intent, cacheHit, cacheLayer }
@@ -206,7 +210,7 @@ async function processInstruction(request, env) {
         documentContext,
         conversationContext,
         session,
-        { apiKey, signal, sanitizedInput }
+        { apiKey, signal, sanitizedInput, provider }
       ),
       TIMEOUTS.executor,
       sanitizedInput.language
@@ -216,7 +220,7 @@ async function processInstruction(request, env) {
 
     // Gestionar resultat
     if (executeResult.safeModeUsed) {
-      return finalizeResult(executeResult.result, session, sessionId, telemetry, sanitizedInput);
+      return await finalizeResult(executeResult.result, session, sessionId, telemetry, sanitizedInput, env);
     }
 
     const result = executeResult.result;
@@ -224,7 +228,7 @@ async function processInstruction(request, env) {
     // ═══════════════════════════════════════════════════════════
     // FASE 7: FINALITZACIÓ
     // ═══════════════════════════════════════════════════════════
-    return finalizeResult(result, session, sessionId, telemetry, sanitizedInput);
+    return await finalizeResult(result, session, sessionId, telemetry, sanitizedInput, env);
 
   } catch (error) {
     logError('Pipeline error', {
@@ -266,8 +270,9 @@ async function executeWithTimeout(operation, timeout) {
 
 /**
  * Finalitza el resultat afegint metadades
+ * v8.4: async per suportar KV persistent
  */
-function finalizeResult(result, session, sessionId, telemetry, sanitizedInput) {
+async function finalizeResult(result, session, sessionId, telemetry, sanitizedInput, env) {
   // Actualitzar sessió amb el torn de conversa
   if (sessionId && session) {
     // Afegir torn d'usuari
@@ -278,8 +283,8 @@ function finalizeResult(result, session, sessionId, telemetry, sanitizedInput) {
       addConversationTurn(session, 'assistant', result.chat_response, result.mode);
     }
 
-    // Guardar sessió
-    saveSession(sessionId, session);
+    // Guardar sessió (async a KV)
+    await saveSession(sessionId, session, env);
   }
 
   // Afegir telemetria

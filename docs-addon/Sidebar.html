@@ -626,6 +626,60 @@
         <input type="text" class="form-input" id="licenseKey" placeholder="DOCMILE-XXXX-XXXX">
       </div>
 
+      <!-- v12.4: BYOK Settings -->
+      <div class="settings-card byok-card">
+        <div class="settings-card-header">
+          <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+          <div>
+            <div class="title">API Pròpia (BYOK)</div>
+            <div class="subtitle">Usa la teva pròpia clau d'IA</div>
+          </div>
+          <label class="toggle-switch toggle-sm">
+            <input type="checkbox" id="byokEnabled" onchange="toggleByokMode()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="byok-content" id="byokContent" style="display: none;">
+          <!-- Provider selector -->
+          <div class="byok-provider-selector">
+            <label class="form-label">Proveïdor d'IA</label>
+            <select class="form-input" id="byokProvider" onchange="onByokProviderChange()">
+              <option value="">Selecciona...</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI (ChatGPT)</option>
+              <option value="claude">Anthropic Claude</option>
+              <option value="mistral">Mistral AI</option>
+              <option value="groq">Groq</option>
+            </select>
+          </div>
+          <!-- Model selector -->
+          <div class="byok-model-selector" id="byokModelSection" style="display: none;">
+            <label class="form-label">Model</label>
+            <select class="form-input" id="byokModel"></select>
+          </div>
+          <!-- API Key input -->
+          <div class="byok-key-section" id="byokKeySection" style="display: none;">
+            <label class="form-label">API Key</label>
+            <div class="byok-key-row">
+              <input type="password" class="form-input" id="byokApiKey" placeholder="Enganxa la teva API key...">
+              <button class="byok-btn byok-toggle-visibility" onclick="toggleApiKeyVisibility()" title="Mostra/amaga">
+                <span class="i i--sm"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
+              </button>
+            </div>
+            <div class="byok-key-status" id="byokKeyStatus"></div>
+            <button class="byok-btn byok-save-key" id="byokSaveKeyBtn" onclick="saveByokApiKey()">
+              <span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+              Guardar API Key
+            </button>
+          </div>
+          <!-- Configured keys status -->
+          <div class="byok-configured" id="byokConfigured" style="display: none;">
+            <div class="byok-configured-header">Claus configurades:</div>
+            <div class="byok-configured-list" id="byokConfiguredList"></div>
+          </div>
+        </div>
+      </div>
+
       <div class="settings-card">
         <div class="settings-card-header">
           <span class="i i--accent"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
@@ -1702,6 +1756,8 @@
             // v5.1: Load credits if license is configured
             loadCredits();
           }
+          // v12.4: Load BYOK settings
+          initByokSettings();
         }).getSettings();
 
         // v2.8: Load banned words
@@ -2835,6 +2891,13 @@
         // 9. Ordered lists (1. item)
         html = html.replace(/^\d+\. (.+)$/gm, '<li class="md-li-num">$1</li>');
         html = html.replace(/(<li class="md-li-num">.*<\/li>\n?)+/g, '<ol class="md-list-num">$&</ol>');
+
+        // 9b. Remove newlines INSIDE lists (before br conversion)
+        html = html.replace(/<\/li>\n<li/g, '</li><li');
+        html = html.replace(/<ul class="md-list">\n/g, '<ul class="md-list">');
+        html = html.replace(/\n<\/ul>/g, '</ul>');
+        html = html.replace(/<ol class="md-list-num">\n/g, '<ol class="md-list-num">');
+        html = html.replace(/\n<\/ol>/g, '</ol>');
 
         // 10. Links [text](url) - only safe HTTPS URLs
         html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
@@ -5147,6 +5210,251 @@
           status.classList.add('visible');
           setTimeout(function() { status.classList.remove('visible'); }, 2000);
         }).saveSettings(JSON.stringify(newSettings));
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // BYOK (Bring Your Own Key) v12.4
+      // ═══════════════════════════════════════════════════════════
+
+      // Models per provider
+      const BYOK_MODELS = {
+        gemini: {
+          'gemini-2.0-flash': 'Gemini 2.0 Flash (Recomanat)',
+          'gemini-1.5-pro': 'Gemini 1.5 Pro',
+          'gemini-1.5-flash': 'Gemini 1.5 Flash'
+        },
+        openai: {
+          'gpt-4o-mini': 'GPT-4o Mini (Recomanat)',
+          'gpt-4o': 'GPT-4o (Més potent)',
+          'gpt-4-turbo': 'GPT-4 Turbo'
+        },
+        claude: {
+          'claude-sonnet-4-20250514': 'Claude Sonnet 4 (Recomanat)',
+          'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
+          'claude-3-5-haiku-20241022': 'Claude 3.5 Haiku (Ràpid)'
+        },
+        mistral: {
+          'mistral-small-latest': 'Mistral Small (Recomanat)',
+          'mistral-large-latest': 'Mistral Large',
+          'codestral-latest': 'Codestral (Codi)'
+        },
+        groq: {
+          'llama-3.3-70b-versatile': 'Llama 3.3 70B (Recomanat)',
+          'llama-3.1-8b-instant': 'Llama 3.1 8B (Ultraràpid)',
+          'mixtral-8x7b-32768': 'Mixtral 8x7B'
+        }
+      };
+
+      let byokStatus = null;
+
+      function initByokSettings() {
+        google.script.run
+          .withSuccessHandler(function(status) {
+            byokStatus = status;
+            updateByokUI(status);
+          })
+          .getByokStatus();
+      }
+
+      function updateByokUI(status) {
+        const toggle = document.getElementById('byokEnabled');
+        const content = document.getElementById('byokContent');
+        const configuredList = document.getElementById('byokConfiguredList');
+
+        if (status.enabled) {
+          toggle.checked = true;
+          content.style.display = 'block';
+
+          // Select active provider
+          document.getElementById('byokProvider').value = status.provider || '';
+          if (status.provider) {
+            onByokProviderChange();
+            document.getElementById('byokModel').value = status.model || '';
+          }
+        } else {
+          toggle.checked = false;
+          content.style.display = 'none';
+        }
+
+        // Update configured list
+        google.script.run
+          .withSuccessHandler(function(result) {
+            const configured = document.getElementById('byokConfigured');
+            const list = document.getElementById('byokConfiguredList');
+
+            const configuredProviders = Object.entries(result.providers)
+              .filter(([k, v]) => v.configured);
+
+            if (configuredProviders.length > 0) {
+              configured.style.display = 'block';
+              list.innerHTML = configuredProviders.map(([id, info]) =>
+                `<div class="byok-configured-item ${result.activeProvider === id ? 'active' : ''}">
+                   <span class="provider-name">${info.name}</span>
+                   <span class="provider-key">${info.masked}</span>
+                   <button class="byok-delete-key" onclick="deleteByokKey('${id}')" title="Eliminar">
+                     <span class="i i--sm i--error"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
+                   </button>
+                 </div>`
+              ).join('');
+            } else {
+              configured.style.display = 'none';
+            }
+          })
+          .getAllApiKeys();
+      }
+
+      function toggleByokMode() {
+        const enabled = document.getElementById('byokEnabled').checked;
+        const content = document.getElementById('byokContent');
+
+        if (enabled) {
+          content.style.display = 'block';
+          // If there was a previous active provider, select it
+          if (byokStatus && byokStatus.provider) {
+            document.getElementById('byokProvider').value = byokStatus.provider;
+            onByokProviderChange();
+          }
+        } else {
+          content.style.display = 'none';
+          // Clear active provider
+          google.script.run
+            .withSuccessHandler(function() {
+              byokStatus = { enabled: false };
+              showByokMessage('Mode BYOK desactivat. Usant Docmile central.', 'info');
+            })
+            .clearActiveProvider();
+        }
+      }
+
+      function onByokProviderChange() {
+        const provider = document.getElementById('byokProvider').value;
+        const modelSection = document.getElementById('byokModelSection');
+        const keySection = document.getElementById('byokKeySection');
+
+        if (!provider) {
+          modelSection.style.display = 'none';
+          keySection.style.display = 'none';
+          return;
+        }
+
+        // Populate model dropdown
+        const modelSelect = document.getElementById('byokModel');
+        modelSelect.innerHTML = Object.entries(BYOK_MODELS[provider] || {})
+          .map(([id, name]) => `<option value="${id}">${name}</option>`)
+          .join('');
+
+        modelSection.style.display = 'block';
+        keySection.style.display = 'block';
+
+        // Check if key already exists
+        google.script.run
+          .withSuccessHandler(function(result) {
+            const statusEl = document.getElementById('byokKeyStatus');
+            if (result.providers[provider] && result.providers[provider].configured) {
+              statusEl.innerHTML = `<span class="byok-status-ok">✓ Clau configurada: ${result.providers[provider].masked}</span>`;
+              document.getElementById('byokApiKey').placeholder = 'Canviar clau (opcional)...';
+            } else {
+              statusEl.innerHTML = '';
+              document.getElementById('byokApiKey').placeholder = 'Enganxa la teva API key...';
+            }
+          })
+          .getAllApiKeys();
+      }
+
+      function toggleApiKeyVisibility() {
+        const input = document.getElementById('byokApiKey');
+        input.type = input.type === 'password' ? 'text' : 'password';
+      }
+
+      function saveByokApiKey() {
+        const provider = document.getElementById('byokProvider').value;
+        const model = document.getElementById('byokModel').value;
+        const apiKey = document.getElementById('byokApiKey').value.trim();
+
+        if (!provider) {
+          showByokMessage('Selecciona un proveïdor', 'error');
+          return;
+        }
+
+        const btn = document.getElementById('byokSaveKeyBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="spinner" width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/></svg> Guardant...';
+
+        // If there's a new API key, save it first
+        if (apiKey) {
+          // Validate format
+          google.script.run
+            .withSuccessHandler(function(validation) {
+              if (!validation.valid) {
+                showByokMessage(validation.error, 'error');
+                resetByokSaveBtn();
+                return;
+              }
+
+              // Save the key
+              google.script.run
+                .withSuccessHandler(function(saveResult) {
+                  if (!saveResult.success) {
+                    showByokMessage(saveResult.error, 'error');
+                    resetByokSaveBtn();
+                    return;
+                  }
+
+                  // Now set as active
+                  setActiveByokProvider(provider, model);
+                })
+                .saveApiKey(provider, apiKey);
+            })
+            .validateApiKey(provider, apiKey);
+        } else {
+          // No new key, just set as active (must already have a key)
+          setActiveByokProvider(provider, model);
+        }
+      }
+
+      function setActiveByokProvider(provider, model) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              byokStatus = { enabled: true, provider: provider, model: model };
+              showByokMessage(`Ara uses ${result.name} (${model})`, 'success');
+              updateByokUI(byokStatus);
+              document.getElementById('byokApiKey').value = '';
+            } else {
+              showByokMessage(result.error, 'error');
+            }
+            resetByokSaveBtn();
+          })
+          .setActiveProvider(provider, model);
+      }
+
+      function deleteByokKey(provider) {
+        if (!confirm(`Segur que vols eliminar la clau de ${provider}?`)) return;
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              showByokMessage('Clau eliminada', 'info');
+              updateByokUI(byokStatus || { enabled: false });
+            } else {
+              showByokMessage(result.error, 'error');
+            }
+          })
+          .deleteApiKey(provider);
+      }
+
+      function showByokMessage(message, type) {
+        const statusEl = document.getElementById('byokKeyStatus');
+        const className = type === 'error' ? 'byok-status-error' :
+                          type === 'success' ? 'byok-status-ok' : 'byok-status-info';
+        statusEl.innerHTML = `<span class="${className}">${message}</span>`;
+        setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
+      }
+
+      function resetByokSaveBtn() {
+        const btn = document.getElementById('byokSaveKeyBtn');
+        btn.disabled = false;
+        btn.innerHTML = '<span class="i i--sm"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> Guardar API Key';
       }
 
       // ═══════════════════════════════════════════════════════════

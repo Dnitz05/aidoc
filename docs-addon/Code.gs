@@ -1415,8 +1415,13 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
     footnotes: captureStats.footnotes_count
   });
 
+  // v12.4: Build auth object for BYOK support
+  const authObject = buildAuthObject();
+
   const payload = {
     license_key: settings.license_key,
+    // v12.4: BYOK auth - si hi ha provider actiu, enviar auth
+    auth: authObject,
     user_instruction: instruction,
     text: contentPayload,
     doc_metadata: { doc_id: doc.getId() },

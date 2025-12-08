@@ -13,6 +13,7 @@ import { processInstruction, runShadowMode, getPipelineStatus } from './pipeline
 import { Mode } from './types.js';
 import { USE_NEW_PIPELINE, FEATURE_FLAGS } from './config.js';
 import { logInfo, logWarn, logDebug } from './telemetry.js';
+import { createProviderFromAuth, getProvidersInfo, validateApiKey, PROVIDERS } from './providers/index.js';
 
 // ═══════════════════════════════════════════════════════════════
 // REQUEST CONVERSION (Legacy → New Format)
@@ -319,24 +320,45 @@ async function processWithNewPipeline(legacyBody, env, options = {}) {
     return null;  // Indicar que cal usar el pipeline legacy
   }
 
+  // Crear provider segons auth del body
+  let provider;
+  try {
+    provider = createProviderFromAuth(legacyBody.auth, env);
+  } catch (authError) {
+    logWarn('Failed to create provider from auth, using Gemini fallback', {
+      error: authError.message,
+    });
+    // Fallback a Gemini si no hi ha auth vàlid
+    if (env.GEMINI_API_KEY) {
+      const { createProvider } = await import('./providers/index.js');
+      provider = createProvider(PROVIDERS.GEMINI, env.GEMINI_API_KEY);
+    } else {
+      return null; // No hi ha provider disponible
+    }
+  }
+
   logInfo('Using new multi-agent pipeline', {
     instruction_length: legacyBody.user_instruction?.length,
+    provider: provider?.name,
+    model: provider?.model,
   });
 
   try {
     // Convertir request
     const newRequest = convertLegacyRequest(legacyBody);
 
-    // Executar pipeline
-    const newResponse = await processInstruction(newRequest, env);
+    // Executar pipeline amb provider
+    const newResponse = await processInstruction(newRequest, env, provider);
 
     // Convertir resposta
     const legacyResponse = convertToLegacyResponse(newResponse);
 
     // Afegir metadades del nou pipeline
     legacyResponse._multiagent = {
-      version: '8.3.0',
+      version: '8.4.0',  // Versió amb BYOK
       pipeline: 'new',
+      provider: provider?.name,
+      model: provider?.model,
       telemetry: newResponse._telemetry,
     };
 

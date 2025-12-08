@@ -36,8 +36,10 @@
         --shadow-sm: 0 1px 3px rgba(60, 64, 67, 0.15);
         --shadow-md: 0 2px 6px rgba(60, 64, 67, 0.2);
 
-        /* User message gradient */
-        --user-msg-gradient: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+        /* User message - blau molt clar amb text fosc */
+        --user-msg-bg: linear-gradient(135deg, #e8f0fe 0%, #d2e3fc 100%);
+        --user-msg-text: #1967d2;
+        --user-msg-border: #c2d9fc;
 
         /* Spacing */
         --space-xs: 4px;
@@ -105,8 +107,10 @@
         --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
         --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
 
-        /* User message gradient */
-        --user-msg-gradient: linear-gradient(135deg, #8ab4f8 0%, #669df6 100%);
+        /* User message - blau suau per dark mode */
+        --user-msg-bg: linear-gradient(135deg, #1e3a5f 0%, #1a3352 100%);
+        --user-msg-text: #a8c7fa;
+        --user-msg-border: #2d4a6f;
       }
 
       * {
@@ -332,13 +336,10 @@
 
       .msg.user {
         align-self: flex-end;
-        background: var(--user-msg-gradient);
-        color: white;
+        background: var(--user-msg-bg);
+        color: var(--user-msg-text);
+        border: 1px solid var(--user-msg-border);
         border-bottom-right-radius: var(--space-xs);
-      }
-
-      [data-theme="dark"] .msg.user {
-        color: #202124;
       }
 
       .msg.ai {
@@ -732,17 +733,28 @@
       .md-content h5.md-header { font-size: 0.98em; }
       .md-content h6.md-header { font-size: 0.92em; }
 
-      /* Lists */
+      /* Lists - compact spacing */
       .md-content ul.md-list,
       .md-content ol.md-list-num {
-        margin: 8px 0;
-        padding-left: 18px;
+        margin: 4px 0;
+        padding-left: 16px;
+        list-style-position: outside;
       }
 
       .md-content .md-li,
       .md-content .md-li-num {
-        margin: 3px 0;
-        line-height: 1.45;
+        margin: 0;
+        padding: 0;
+        line-height: 1.35;
+      }
+
+      /* Only remove spacing from block elements inside list items */
+      .md-content .md-li > p,
+      .md-content .md-li > div,
+      .md-content .md-li-num > p,
+      .md-content .md-li-num > div {
+        margin: 0;
+        padding: 0;
       }
 
       /* Links */
@@ -807,101 +819,101 @@
          REFERENCE HIGHLIGHTS (v7.0)
          ═══════════════════════════════════════════════════════════ */
 
-      /* Container de referències */
+      /* ═══════════════════════════════════════════════════════════
+         REFERÈNCIES v2.0 - Disseny simplificat
+         ═══════════════════════════════════════════════════════════ */
+
+      /* Container de referències - compacte */
       .reference-list {
-        margin-top: 12px;
+        margin-top: 8px;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 3px;
       }
 
-      /* Item de referència clicable */
+      /* Item de referència - minimalista */
       .reference-item {
         display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 10px;
-        border-radius: var(--radius-md);
+        align-items: baseline;
+        gap: 6px;
+        padding: 4px 6px;
+        border-radius: var(--radius-xs);
         cursor: pointer;
-        transition: all 0.15s ease;
-        border: 1px solid transparent;
+        transition: background 0.1s ease;
+        border-left: 2px solid transparent;
       }
 
       .reference-item:hover {
-        transform: translateX(4px);
+        background: var(--bg-secondary);
       }
 
       .reference-item.active {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 2px var(--accent-muted);
+        background: var(--bg-secondary);
       }
 
       .reference-item.cleared {
-        opacity: 0.5;
+        opacity: 0.4;
         pointer-events: none;
       }
 
-      /* Colors de fons segons tipus */
+      /* Colors només border-left */
       .reference-item.ref-yellow {
-        background: rgba(255, 245, 157, 0.25);
-        border-left: 3px solid #FFF59D;
+        border-left-color: #FFF59D;
       }
 
       .reference-item.ref-orange {
-        background: rgba(255, 204, 128, 0.25);
-        border-left: 3px solid #FFCC80;
+        border-left-color: #FFCC80;
       }
 
       .reference-item.ref-blue {
-        background: rgba(144, 202, 249, 0.25);
-        border-left: 3px solid #90CAF9;
+        border-left-color: #90CAF9;
       }
 
       .reference-item.ref-purple {
-        background: rgba(206, 147, 216, 0.25);
-        border-left: 3px solid #CE93D8;
+        border-left-color: #CE93D8;
       }
 
-      /* Badge amb emoji */
+      /* Badge - petit */
       .ref-badge {
-        font-size: 14px;
+        font-size: 12px;
         flex-shrink: 0;
+        line-height: 1;
       }
 
-      /* Contingut */
+      /* Contingut - inline */
       .ref-content {
         flex: 1;
         min-width: 0;
         display: flex;
-        flex-direction: column;
-        gap: 2px;
+        align-items: baseline;
+        gap: 6px;
       }
 
       .ref-snippet {
         font-size: 11px;
-        color: var(--text-secondary);
+        color: var(--text-muted);
         font-style: italic;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        max-width: 120px;
       }
 
       .ref-reason {
-        font-size: 12px;
-        color: var(--text-primary);
-        font-weight: 500;
+        font-size: 11px;
+        color: var(--text-secondary);
       }
 
-      /* Fletxa */
+      /* Fletxa - subtil */
       .ref-arrow {
         flex-shrink: 0;
-        opacity: 0.5;
-        transition: opacity 0.15s, transform 0.15s;
+        opacity: 0.3;
+        font-size: 10px;
+        transition: opacity 0.1s;
       }
 
       .reference-item:hover .ref-arrow {
-        opacity: 1;
-        transform: translateX(2px);
+        opacity: 0.6;
       }
 
       /* Botó netejar */
@@ -951,35 +963,40 @@
          ANNOTATION SYSTEM v11.0 - Unified Highlights + Changes
          ═══════════════════════════════════════════════════════════ */
 
-      /* Llista d'anotacions */
+      /* ═══════════════════════════════════════════════════════════
+         ANOTACIONS v2.0 - Disseny simplificat
+         ═══════════════════════════════════════════════════════════ */
+
+      /* Llista d'anotacions - compacta */
       .annotation-list {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        margin-top: 10px;
+        gap: 4px;
+        margin-top: 8px;
       }
 
-      /* Base d'anotació */
+      /* Base d'anotació - minimalista */
       .annotation-item {
         display: flex;
         flex-direction: column;
-        padding: 10px 12px;
-        border-radius: var(--radius-md);
-        transition: all 0.2s ease;
-        animation: refSlideIn 0.2s ease forwards;
+        padding: 6px 8px;
+        border-radius: var(--radius-sm);
+        transition: opacity 0.15s ease;
+        animation: refSlideIn 0.15s ease forwards;
       }
 
-      /* Canvi pendent */
+      /* Canvi pendent - subtle */
       .annotation-item.change-item[data-status="pending"] {
-        background: rgba(59, 130, 246, 0.08);
-        border-left: 3px solid var(--accent);
+        background: transparent;
+        border-left: 2px solid var(--accent);
+        padding-left: 10px;
       }
 
       /* Canvi acceptat */
       .annotation-item.change-item[data-status="accepted"] {
-        background: rgba(34, 197, 94, 0.08);
-        border-left: 3px solid #22c55e;
-        opacity: 0.7;
+        border-left: 2px solid #22c55e;
+        padding-left: 10px;
+        opacity: 0.6;
       }
 
       .annotation-item.change-item[data-status="accepted"] .annotation-actions {
@@ -987,24 +1004,21 @@
       }
 
       .annotation-item.change-item[data-status="accepted"] .annotation-status {
-        display: flex;
-        align-items: center;
-        gap: 4px;
+        display: inline;
         color: #22c55e;
-        font-size: 11px;
-        margin-top: 6px;
+        font-size: 10px;
+        margin-left: 6px;
       }
 
       /* Canvi rebutjat */
       .annotation-item.change-item[data-status="rejected"] {
-        background: rgba(239, 68, 68, 0.05);
-        border-left: 3px solid rgba(239, 68, 68, 0.3);
-        opacity: 0.5;
+        border-left: 2px solid var(--text-muted);
+        padding-left: 10px;
+        opacity: 0.4;
       }
 
       .annotation-item.change-item[data-status="rejected"] .annotation-diff {
         text-decoration: line-through;
-        opacity: 0.6;
       }
 
       .annotation-item.change-item[data-status="rejected"] .annotation-actions {
@@ -1012,52 +1026,43 @@
       }
 
       .annotation-item.change-item[data-status="rejected"] .annotation-status {
-        display: flex;
-        align-items: center;
-        gap: 4px;
+        display: inline;
         color: var(--text-muted);
-        font-size: 11px;
-        margin-top: 6px;
+        font-size: 10px;
+        margin-left: 6px;
       }
 
-      /* Capçalera anotació */
+      /* Capçalera anotació - inline */
       .annotation-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 6px;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 6px;
+        margin-bottom: 2px;
       }
 
       .annotation-location {
         font-size: 10px;
         font-weight: 600;
         color: var(--accent);
-        background: rgba(59, 130, 246, 0.1);
-        padding: 2px 6px;
-        border-radius: var(--radius-xs);
       }
 
       .annotation-reason {
         font-size: 11px;
         color: var(--text-secondary);
-        flex: 1;
       }
 
-      /* Diff dins anotació */
+      /* Diff dins anotació - inline sense fons */
       .annotation-diff {
         font-size: 12px;
         line-height: 1.5;
-        padding: 8px;
-        background: var(--bg-secondary);
-        border-radius: var(--radius-sm);
         word-break: break-word;
       }
 
-      /* Accions individuals */
+      /* Accions individuals - compactes */
       .annotation-actions {
-        display: flex;
-        gap: 8px;
-        margin-top: 8px;
+        display: inline-flex;
+        gap: 6px;
+        margin-top: 4px;
       }
 
       .annotation-status {
@@ -1067,10 +1072,10 @@
       .btn-accept, .btn-reject {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 5px 12px;
-        border-radius: var(--radius-sm);
-        font-size: 11px;
+        gap: 3px;
+        padding: 3px 8px;
+        border-radius: var(--radius-xs);
+        font-size: 10px;
         font-weight: 500;
         cursor: pointer;
         border: none;
@@ -1078,52 +1083,56 @@
       }
 
       .btn-accept {
-        background: rgba(34, 197, 94, 0.12);
+        background: transparent;
         color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.3);
       }
 
       .btn-accept:hover {
-        background: rgba(34, 197, 94, 0.22);
+        background: rgba(34, 197, 94, 0.1);
+        border-color: #22c55e;
       }
 
       .btn-reject {
-        background: rgba(239, 68, 68, 0.08);
-        color: #ef4444;
-      }
-
-      .btn-reject:hover {
-        background: rgba(239, 68, 68, 0.18);
-      }
-
-      /* Barra d'accions bulk */
-      .annotation-bulk-actions {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 12px;
-        margin-top: 10px;
-        background: var(--bg-secondary);
-        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--text-muted);
         border: 1px solid var(--border);
       }
 
+      .btn-reject:hover {
+        color: #ef4444;
+        border-color: rgba(239, 68, 68, 0.3);
+      }
+
+      /* Barra d'accions bulk - simplificada */
+      .annotation-bulk-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+        margin-top: 6px;
+        border-top: 1px solid var(--border);
+      }
+
       .bulk-info {
-        font-size: 11px;
-        color: var(--text-secondary);
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-right: auto;
       }
 
       .bulk-buttons {
         display: flex;
-        gap: 8px;
+        gap: 6px;
       }
 
       .btn-accept-all, .btn-discard-all {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 6px 12px;
-        border-radius: var(--radius-sm);
-        font-size: 11px;
+        gap: 3px;
+        padding: 4px 10px;
+        border-radius: var(--radius-xs);
+        font-size: 10px;
         font-weight: 500;
         cursor: pointer;
         border: none;
@@ -1140,7 +1149,7 @@
       }
 
       .btn-discard-all {
-        background: var(--bg-tertiary);
+        background: transparent;
         color: var(--text-secondary);
         border: 1px solid var(--border);
       }
@@ -1150,17 +1159,17 @@
         border-color: var(--error);
       }
 
-      /* Dark mode adjustments */
+      /* Dark mode - mínim */
       [data-theme="dark"] .annotation-item.change-item[data-status="pending"] {
-        background: rgba(59, 130, 246, 0.12);
+        background: transparent;
       }
 
       [data-theme="dark"] .annotation-item.change-item[data-status="accepted"] {
-        background: rgba(34, 197, 94, 0.12);
+        background: transparent;
       }
 
       [data-theme="dark"] .annotation-diff {
-        background: var(--bg-tertiary);
+        background: transparent;
       }
 
       /* ═══════════════════════════════════════════════════════════
@@ -1677,40 +1686,40 @@
          PREVIEW MODE (v3.2) - Visual Diff (LEGACY - sidebar preview)
          ═══════════════════════════════════════════════════════════ */
 
+      /* ═══════════════════════════════════════════════════════════
+         PREVIEW PANEL v2.0 - Disseny simplificat
+         ═══════════════════════════════════════════════════════════ */
+
       .preview-panel {
-        background: var(--bg-secondary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        margin: var(--space-md);
-        overflow: hidden;
-        animation: msgAppear 0.3s ease;
+        background: transparent;
+        border-left: 2px solid var(--accent);
+        margin: 8px 0;
+        padding-left: 10px;
+        animation: msgAppear 0.2s ease;
       }
 
       .preview-header {
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: var(--space-sm);
-        padding: var(--space-md);
-        background: var(--bg-tertiary);
-        border-bottom: 1px solid var(--border);
-        font-weight: 600;
-        font-size: 13px;
-        color: var(--text-primary);
+        gap: 6px;
+        font-weight: 500;
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
       }
 
       .preview-header .icon {
-        font-size: 16px;
+        font-size: 12px;
       }
 
       .preview-content {
-        padding: var(--space-md);
-        max-height: 300px;
+        max-height: 250px;
         overflow-y: auto;
       }
 
       .preview-change {
-        margin-bottom: var(--space-md);
-        padding-bottom: var(--space-md);
+        margin-bottom: 8px;
+        padding-bottom: 8px;
         border-bottom: 1px solid var(--border);
       }
 
@@ -1723,105 +1732,81 @@
       .preview-location {
         font-size: 10px;
         font-weight: 600;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: var(--space-xs);
+        color: var(--accent);
+        margin-bottom: 2px;
       }
 
       .preview-diff {
-        font-size: 13px;
-        line-height: 1.6;
+        font-size: 12px;
+        line-height: 1.5;
         color: var(--text-primary);
       }
 
-      /* Diff colors */
+      /* Diff colors - inline */
       .diff-del {
-        background: rgba(239, 68, 68, 0.15);
         color: #dc2626;
         text-decoration: line-through;
-        padding: 1px 2px;
-        border-radius: 2px;
       }
 
       .diff-ins {
-        background: rgba(34, 197, 94, 0.15);
         color: #16a34a;
-        text-decoration: none;
-        padding: 1px 2px;
-        border-radius: 2px;
         font-weight: 500;
       }
 
       .diff-context {
-        background: rgba(34, 197, 94, 0.08);
         color: var(--text-secondary);
-        padding: 1px 2px;
-        border-radius: 2px;
       }
 
-      /* Dark mode adjustments */
+      /* Dark mode */
       [data-theme="dark"] .diff-del {
-        background: rgba(239, 68, 68, 0.2);
         color: #f87171;
       }
 
       [data-theme="dark"] .diff-ins {
-        background: rgba(34, 197, 94, 0.2);
         color: #4ade80;
-      }
-
-      [data-theme="dark"] .diff-context {
-        background: rgba(34, 197, 94, 0.1);
-        color: var(--text-secondary);
       }
 
       .preview-actions {
         display: flex;
-        gap: var(--space-sm);
-        padding: var(--space-md);
-        background: var(--bg-tertiary);
-        border-top: 1px solid var(--border);
+        gap: 8px;
+        margin-top: 8px;
       }
 
       .preview-actions .btn {
-        flex: 1;
-        padding: var(--space-sm) var(--space-md);
-        font-size: 12px;
-        font-weight: 600;
-        border-radius: var(--radius-md);
+        padding: 4px 12px;
+        font-size: 11px;
+        font-weight: 500;
+        border-radius: var(--radius-xs);
         cursor: pointer;
-        transition: all 0.15s ease;
-        display: flex;
+        transition: all 0.1s ease;
+        display: inline-flex;
         align-items: center;
-        justify-content: center;
-        gap: var(--space-xs);
+        gap: 4px;
       }
 
       .preview-actions .btn-apply {
-        background: var(--success);
+        background: var(--accent);
         color: white;
         border: none;
       }
 
       .preview-actions .btn-apply:hover {
-        background: #15803d;
-        transform: translateY(-1px);
+        background: var(--accent-hover);
       }
 
       .preview-actions .btn-cancel {
-        background: var(--bg-secondary);
+        background: transparent;
         color: var(--text-secondary);
         border: 1px solid var(--border);
       }
 
       .preview-actions .btn-cancel:hover {
-        background: var(--bg-tertiary);
         color: var(--text-primary);
+        border-color: var(--text-muted);
       }
 
       .preview-panel.applying {
-        opacity: 0.7;
+        opacity: 0.5;
         pointer-events: none;
       }
 
@@ -4092,35 +4077,34 @@
       }
 
       .diff-label {
-        font-size: 10px;
+        font-size: 9px;
         font-weight: 600;
         text-transform: uppercase;
         color: var(--text-muted);
-        display: block;
-        margin-bottom: 4px;
+        display: inline;
+        margin-right: 6px;
       }
 
       .diff-text {
         font-size: 11px;
-        padding: var(--space-xs) var(--space-sm);
-        border-radius: var(--radius-sm);
+        padding: 2px 0;
         font-family: var(--font-mono);
         white-space: pre-wrap;
         word-break: break-word;
-        max-height: 80px;
+        max-height: 60px;
         overflow-y: auto;
       }
 
       .diff-before {
-        background: rgba(239, 68, 68, 0.1);
-        border-left: 2px solid var(--error);
-        color: var(--text-secondary);
+        color: #dc2626;
+        border-left: 2px solid #dc2626;
+        padding-left: 6px;
       }
 
       .diff-after {
-        background: rgba(34, 197, 94, 0.1);
-        border-left: 2px solid var(--success);
-        color: var(--text-secondary);
+        color: #16a34a;
+        border-left: 2px solid #16a34a;
+        padding-left: 6px;
       }
 
       .timeline-revert-btn {
@@ -7312,4 +7296,174 @@
 
       .skeleton-line.short {
         width: 60%;
+      }
+
+      /* ═══════════════════════════════════════════════════════════
+         BYOK (Bring Your Own Key) v12.4
+         ═══════════════════════════════════════════════════════════ */
+
+      .byok-card .settings-card-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+      }
+
+      .byok-card .settings-card-header > div {
+        flex: 1;
+      }
+
+      .toggle-sm {
+        transform: scale(0.85);
+      }
+
+      .byok-content {
+        padding-top: var(--space-md);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+
+      .byok-provider-selector,
+      .byok-model-selector,
+      .byok-key-section {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+      }
+
+      .form-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .byok-key-row {
+        display: flex;
+        gap: var(--space-xs);
+      }
+
+      .byok-key-row .form-input {
+        flex: 1;
+      }
+
+      .byok-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-xs);
+        padding: var(--space-sm) var(--space-md);
+        border: none;
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .byok-toggle-visibility {
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        padding: var(--space-sm);
+        min-width: 36px;
+      }
+
+      .byok-toggle-visibility:hover {
+        background: var(--bg-elevated);
+        color: var(--text-primary);
+      }
+
+      .byok-save-key {
+        background: var(--accent);
+        color: white;
+        width: 100%;
+        margin-top: var(--space-xs);
+      }
+
+      .byok-save-key:hover {
+        background: var(--accent-hover);
+      }
+
+      .byok-save-key:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .byok-key-status {
+        min-height: 20px;
+        font-size: 12px;
+      }
+
+      .byok-status-ok {
+        color: var(--success);
+      }
+
+      .byok-status-error {
+        color: var(--error);
+      }
+
+      .byok-status-info {
+        color: var(--text-secondary);
+      }
+
+      .byok-configured {
+        margin-top: var(--space-sm);
+        padding-top: var(--space-sm);
+        border-top: 1px solid var(--border);
+      }
+
+      .byok-configured-header {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: var(--space-sm);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .byok-configured-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+      }
+
+      .byok-configured-item {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-xs) var(--space-sm);
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-sm);
+        font-size: 12px;
+      }
+
+      .byok-configured-item.active {
+        background: var(--accent-muted);
+        border: 1px solid var(--accent);
+      }
+
+      .byok-configured-item .provider-name {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .byok-configured-item .provider-key {
+        flex: 1;
+        color: var(--text-muted);
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .byok-delete-key {
+        background: none;
+        border: none;
+        padding: 2px;
+        cursor: pointer;
+        opacity: 0.5;
+        transition: opacity 0.15s;
+      }
+
+      .byok-delete-key:hover {
+        opacity: 1;
       }

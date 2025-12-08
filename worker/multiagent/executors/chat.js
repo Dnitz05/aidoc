@@ -1,9 +1,11 @@
 /**
- * CHAT_ONLY Executor v12.1
+ * CHAT_ONLY Executor v12.3
  *
  * Executor per respondre preguntes i conversar sense modificar el document.
  * Utilitza el context del document per donar respostes contextualitzades.
  *
+ * v12.3: Consistència obligatòria en format de llistes
+ * v12.2: Format markdown millorat
  * v12.1: Format de cita [[§ID]] clicable + response_style templates
  */
 
@@ -47,50 +49,65 @@ const RESPONSE_STYLES = {
   },
 };
 
-const CHAT_SYSTEM_PROMPT = `ASSISTENT DOCUMENTAL CONCÍS v12.1
-Objectiu: Respondre NOMÉS el que es pregunta, amb cites clicables.
+const CHAT_SYSTEM_PROMPT = `ASSISTENT DOCUMENTAL v12.3
+Objectiu: Respondre de forma clara i ben estructurada, amb cites clicables.
 
 ## ⚠️ FORMAT DE CITA CRÍTIC: [[§ID]]
 Utilitza SEMPRE el format [[§ID]] per citar paràgrafs.
 Exemple: "Segons [[§15]], el signant és Aitor Gilabert."
 El número ID comença a 1 (§1 = primer paràgraf).
 
-## REGLA D'OR: CONCISIÓ
-- Pregunta simple → Resposta simple (1-2 frases màxim)
-- "Qui signa?" → "Segons [[§15]], Aitor Gilabert Juan, Arquitecte Municipal." FI.
-- MAI afegir informació que NO s'ha demanat
-- MAI fer llistes exhaustives si només es demana UNA cosa
+## 📝 FORMAT MARKDOWN
+USA format markdown per millorar la llegibilitat:
+- **Negreta** per conceptes clau, noms importants, xifres destacades
+- *Cursiva* per termes tècnics o èmfasi suau
+- Llistes amb • o - quan hi ha múltiples elements
+- > Citacions per text literal del document
+- Paràgrafs separats per temes diferents
 
 ## RESPONSE STYLES
 
 ### Pregunta Directa (qui, quin, quina, quan)
-Format: Una frase amb [[§ID]]
-Exemple: "[[§15]] Aitor Gilabert Juan, Arquitecte Municipal."
+Format: Resposta clara amb [[§ID]] i negreta al element clau
+Exemple: "Segons [[§15]], el signant és **Aitor Gilabert Juan**, Arquitecte Municipal."
 
 ### Pregunta d'Ubicació (on, a quin paràgraf)
-Format: "Es menciona a [[§X]]: «cita curta»"
-Exemple: "Es menciona a [[§7]]: «El termini d'execució serà de 12 mesos»."
-
-### Pregunta de Resum
-Format: 3-5 bullets amb [[§ID]] cada un
+Format: Indicació + citació
 Exemple:
-• Objectiu: rehabilitació de masia [[§2]]
-• Termini: 12 mesos [[§7]]
-• Pressupost: 150.000€ [[§12]]
+"Es menciona a [[§7]]:
+> «El termini d'execució serà de **12 mesos**»"
+
+### Pregunta de Resum / Múltiples elements
+Format: Llista estructurada amb [[§ID]]
+⚠️ CONSISTÈNCIA OBLIGATÒRIA: Tots els ítems d'una llista han de seguir el MATEIX format.
+Patró: "- **Element en negreta** [[§ID]]"
+Exemple:
+S'ha de sol·licitar informe a:
+- **Servei Territorial de Cultura** [[§12]]
+- **Agència Catalana de l'Aigua** [[§13]]
+- **Institut Cartogràfic i Geològic** [[§14]]
 
 ### Pregunta Exploratòria (explica, per què, com)
-Format: 2-4 frases amb [[§ID]] intercalats
-Exemple: "El document estableix les condicions [[§3]] i desenvolupa els requisits [[§8]]."
+Format: Explicació estructurada amb paràgrafs i [[§ID]]
+Exemple:
+"El document estableix les **condicions generals** [[§3]] per a l'execució del projecte.
 
-## EXEMPLES DE RESPOSTES CORRECTES
+Desenvolupa els **requisits tècnics** [[§8]], incloent-hi les especificacions de materials i els terminis d'execució."
 
-Usuari: "Qui signa l'informe?"
-✅ CORRECTE: "[[§15]] Aitor Gilabert Juan, Arquitecte Municipal."
-❌ INCORRECTE: Una llista de totes les persones sense [[§ID]]
+### Pregunta sobre errors/faltes
+Format: Llista clara amb ubicació i explicació
+Exemple:
+**Errors detectats:**
+- [[§3]]: *"connexió"* hauria de ser *"connexió"* (accent)
+- [[§7]]: Falta el punt final
 
-Usuari: "On parla del pressupost?"
-✅ CORRECTE: "El pressupost es detalla a [[§12]]: «El cost total és de 150.000€»."
-❌ INCORRECTE: "Al paràgraf 12" (sense format clicable)
+## REGLES DE FORMAT
+1. Usa **negreta** per destacar la informació més rellevant
+2. Usa llistes quan hi ha 2+ elements relacionats
+3. **CONSISTÈNCIA**: Tots els ítems d'una llista han de tenir el MATEIX format (tots amb negreta o cap)
+4. Separa idees diferents en paràgrafs
+5. Inclou sempre [[§ID]] per cada referència al document
+6. No abuses del format - usa'l per clarificar, no per decorar
 
 ## RESTRICCIONS
 - PROHIBIT inventar informació
@@ -110,34 +127,61 @@ RECORDA: Cada referència ha de ser [[§ID]] per ser clicable.`;
  * @param {Object} documentContext - Context del document
  * @param {Object} conversationContext - Context de conversa
  * @param {Object} options - Opcions d'execució
- * @param {string} options.apiKey - API key de Gemini
+ * @param {string} options.apiKey - API key de Gemini (fallback)
+ * @param {Object} [options.provider] - Provider d'IA (BYOK)
  * @param {AbortSignal} options.signal - Signal per cancel·lar
  * @returns {Promise<Object>} - Resultat de l'executor
  */
 async function executeChatOnly(intent, documentContext, conversationContext, options = {}) {
-  const { apiKey, signal } = options;
+  const { apiKey, signal, provider } = options;
   const language = intent.language || 'ca';
 
   logInfo('Executing CHAT_ONLY', {
     instruction_length: intent.original_instruction?.length,
     has_document: !!documentContext?.paragraphs?.length,
+    provider: provider?.name || 'gemini-legacy',
   });
 
   try {
     // Construir el prompt
     const userPrompt = buildChatPrompt(intent, documentContext, conversationContext);
 
-    // Cridar Gemini
-    const response = await callGeminiChat(userPrompt, apiKey, signal);
+    let response;
+    let usage = null;
 
-    logDebug('CHAT_ONLY completed', { response_length: response.length });
+    // BYOK: Usar provider si disponible
+    if (provider) {
+      const result = await provider.chat(
+        [{ role: 'user', content: userPrompt }],
+        {
+          systemPrompt: CHAT_SYSTEM_PROMPT,
+          temperature: TEMPERATURES.chat,
+          maxTokens: 4096,
+          signal,
+        }
+      );
+      response = result.content;
+      usage = result.usage;
+    } else {
+      // Fallback a crida directa Gemini (compatibilitat enrere)
+      response = await callGeminiChat(userPrompt, apiKey, signal);
+    }
+
+    logDebug('CHAT_ONLY completed', {
+      response_length: response.length,
+      provider: provider?.name || 'gemini-legacy',
+    });
 
     return {
       mode: Mode.CHAT_ONLY,
       chat_response: response,
       _meta: {
         executor: 'chat',
-        tokens_estimated: Math.ceil(response.length / 4),
+        provider: provider?.name || 'gemini',
+        model: provider?.model || GEMINI.model_chat,
+        tokens_input: usage?.input,
+        tokens_output: usage?.output,
+        tokens_estimated: usage ? (usage.input + usage.output) : Math.ceil(response.length / 4),
       },
     };
 
@@ -153,10 +197,11 @@ async function executeChatOnly(intent, documentContext, conversationContext, opt
 
     return {
       mode: Mode.CHAT_ONLY,
-      chat_response: fallbackMessages[language] || fallbackMessages.ca,
+      chat_response: error.localizedMessage || fallbackMessages[language] || fallbackMessages.ca,
       _meta: {
         executor: 'chat',
         error: error.message,
+        error_code: error.code,
         fallback: true,
       },
     };

@@ -155,7 +155,7 @@ IMPORTANT: Genera NOMÉS el preview. L'aplicació real es farà després de conf
  * @returns {Promise<Object>} - Resultat amb preview o aplicació
  */
 async function executeRewrite(intent, documentContext, conversationContext, options = {}) {
-  const { apiKey, signal } = options;
+  const { apiKey, signal, provider } = options;
   const language = intent.language || 'ca';
 
   // Determinar tipus de reescriptura
@@ -166,6 +166,7 @@ async function executeRewrite(intent, documentContext, conversationContext, opti
     scope: intent.scope,
     target_paragraphs: intent.target_paragraphs?.length || 'all',
     user_confirmed: intent.user_confirmed,
+    provider: provider?.name || 'gemini-legacy',
   });
 
   // Si ja tenim confirmació, aplicar directament
@@ -182,13 +183,14 @@ async function executeRewrite(intent, documentContext, conversationContext, opti
 
   try {
     // Generar preview
-    const preview = await generateRewritePreview(
+    const { preview, usage } = await generateRewritePreview(
       rewriteType,
       intent,
       documentContext,
       targetParagraphs,
       apiKey,
-      signal
+      signal,
+      provider
     );
 
     if (!preview) {
@@ -211,7 +213,11 @@ async function executeRewrite(intent, documentContext, conversationContext, opti
       _meta: {
         executor: 'rewrite',
         rewrite_type: rewriteType,
+        provider: provider?.name || 'gemini',
+        model: provider?.model || GEMINI.model_rewrite,
         risk_level: determineRiskLevel(targetParagraphs, documentContext),
+        tokens_input: usage?.input,
+        tokens_output: usage?.output,
       },
     };
 
@@ -299,7 +305,7 @@ function determineRiskLevel(targetParagraphs, documentContext) {
 /**
  * Genera el preview de la reescriptura
  */
-async function generateRewritePreview(rewriteType, intent, documentContext, targetParagraphs, apiKey, signal) {
+async function generateRewritePreview(rewriteType, intent, documentContext, targetParagraphs, apiKey, signal, provider) {
   // Construir prompt
   const systemPrompt = (REWRITE_PROMPTS[rewriteType] || REWRITE_PROMPTS.complete) + BASE_PROMPT;
 
@@ -329,43 +335,62 @@ async function generateRewritePreview(rewriteType, intent, documentContext, targ
 
   const userPrompt = parts.join('\n');
 
-  // Cridar Gemini
-  const url = `${GEMINI.base_url}/models/${GEMINI.model_rewrite}:generateContent?key=${apiKey}`;
+  let responseText;
+  let usage = null;
 
-  const requestBody = {
-    contents: [
+  // Cridar IA (BYOK o Gemini)
+  if (provider) {
+    const result = await provider.chat(
+      [{ role: 'user', content: userPrompt }],
       {
-        role: 'user',
-        parts: [
-          { text: systemPrompt },
-          { text: userPrompt },
-        ],
+        systemPrompt,
+        temperature: 0.6, // Més creatiu per reescriptura
+        maxTokens: 8192,
+        signal,
+      }
+    );
+    responseText = result.content;
+    usage = result.usage;
+  } else {
+    // Fallback a crida directa Gemini (compatibilitat enrere)
+    const url = `${GEMINI.base_url}/models/${GEMINI.model_rewrite}:generateContent?key=${apiKey}`;
+
+    const requestBody = {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: systemPrompt },
+            { text: userPrompt },
+          ],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.6,
+        topP: 0.9,
+        maxOutputTokens: 8192,
       },
-    ],
-    generationConfig: {
-      temperature: 0.6, // Més creatiu per reescriptura
-      topP: 0.9,
-      maxOutputTokens: 8192, // Augmentat: thinking + documents grans
-    },
-  };
+    };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-    signal,
-  });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      signal,
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
 
-  const data = await response.json();
-  const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
   // Parsejar resposta
-  return parsePreviewResponse(responseText, targetParagraphs);
+  const preview = parsePreviewResponse(responseText, targetParagraphs);
+  return { preview, usage };
 }
 
 /**

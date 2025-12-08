@@ -254,7 +254,7 @@ Objectiu: Traduir preservant significat, to i estil.
  * @returns {Promise<Object>} - Resultat amb canvis
  */
 async function executeUpdateById(intent, documentContext, conversationContext, options = {}) {
-  const { apiKey, signal } = options;
+  const { apiKey, signal, provider } = options;
   const language = intent.language || 'ca';
   const modificationType = intent.modification_type || 'improve';
 
@@ -262,6 +262,7 @@ async function executeUpdateById(intent, documentContext, conversationContext, o
     modification_type: modificationType,
     target_paragraphs: intent.target_paragraphs,
     scope: intent.scope,
+    provider: provider?.name || 'gemini-legacy',
   });
 
   // Validar que tenim paràgrafs target
@@ -287,8 +288,29 @@ async function executeUpdateById(intent, documentContext, conversationContext, o
       validTargets
     );
 
-    // Cridar Gemini (v12.1: passa modificationType per temperatura)
-    const response = await callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal, modificationType);
+    // Cridar IA (BYOK o Gemini)
+    let response;
+    let usage = null;
+
+    // v12.1: Seleccionar temperatura segons el mode
+    const temperature = TEMPERATURES[modificationType] || TEMPERATURES.improve;
+
+    if (provider) {
+      const result = await provider.chat(
+        [{ role: 'user', content: userPrompt }],
+        {
+          systemPrompt,
+          temperature,
+          maxTokens: 8192,
+          signal,
+        }
+      );
+      response = result.content;
+      usage = result.usage;
+    } else {
+      // Fallback a crida directa Gemini (compatibilitat enrere)
+      response = await callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal, modificationType);
+    }
 
     // Parsejar resposta (v12.1: suporta format find/replace per FIX)
     const parsedResponse = parseUpdateResponse(response, modificationType);
@@ -317,7 +339,11 @@ async function executeUpdateById(intent, documentContext, conversationContext, o
       _meta: {
         executor: 'update',
         modification_type: modificationType,
+        provider: provider?.name || 'gemini',
+        model: provider?.model || GEMINI.model_update,
         paragraphs_modified: validatedChanges.length,
+        tokens_input: usage?.input,
+        tokens_output: usage?.output,
       },
     };
 
