@@ -23,50 +23,106 @@ import { logInfo, logDebug, logError, logWarn } from '../telemetry.js';
 // ═══════════════════════════════════════════════════════════════
 
 const REWRITE_PROMPTS = {
-  tone: `Ets un escriptor expert en adaptar textos a diferents tons.
+  tone: `ADAPTADOR DE TO
+Objectiu: Canviar el to del text mantenint 100% del contingut.
 
-## Tons disponibles
-- formal: Professional, respectuós, sense contraccions
-- informal: Proper, conversacional, amigable
-- academic: Rigorós, amb terminologia específica
-- persuasive: Convincent, amb arguments forts
-- neutral: Objectiu, sense emocions
+## ESCALA DE TONS
+| To | Característiques | Transformacions |
+|----|------------------|-----------------|
+| formal | Vostè, sense contraccions, tercera persona | "cal que facis" → "és necessari que realitzi" |
+| informal | Tu, contraccions, primera persona | "es recomana" → "et recomanem" |
+| acadèmic | Passiva, terminologia, cites | "diuen que" → "segons la literatura" |
+| persuasiu | Imperatius, beneficis, urgència | "pots fer" → "fes-ho ara i aconseguiràs" |
+| neutral | Objectiu, sense emocions, fets | "increïble resultat" → "resultat significatiu" |
 
-## Regles
-- Manté TOTA la informació del text original
-- Canvia NOMÉS l'estil, no el contingut
-- El text resultant ha de ser natural`,
+## PRESERVAR OBLIGATÒRIAMENT
+- Tota la informació factual
+- L'estructura argumentativa
+- Dades i cites
+- Noms propis i referències
 
-  style: `Ets un editor expert en estils d'escriptura.
+## PROTOCOL
+1. Identificar to actual
+2. Mapar cada element al to nou
+3. Verificar que no s'ha perdut informació
+4. Assegurar naturalitat del resultat`,
 
-## Estils disponibles
-- concise: Breu i directe
-- detailed: Amb més explicacions i exemples
-- narrative: Com una història
-- technical: Precís amb termes tècnics
-- simple: Fàcil d'entendre per tothom`,
+  style: `TRANSFORMADOR D'ESTIL
+Objectiu: Canviar l'estil d'escriptura preservant el contingut.
 
-  audience: `Ets un expert en adaptar contingut per a diferents audiències.
+## ESTILS I TRANSFORMACIONS
+| Estil | Frases | Vocabulari | Estructura |
+|-------|--------|------------|------------|
+| concís | <15 paraules | directe | punts clau |
+| detallat | elaborades | precís | exemples |
+| narratiu | fluides | evocador | cronològic |
+| tècnic | precises | especialitzat | sistemàtic |
+| simple | curtes | quotidià | clar |
 
-## Audiències
-- experts: Professionals del camp
-- beginners: Persones sense coneixement previ
-- children: Nens (simplificar molt)
-- executives: Directius (resum executiu)
-- general: Públic general`,
+## RESTRICCIONS
+- Mantenir el significat exacte
+- No afegir informació nova (excepte "detallat")
+- No eliminar informació (excepte "concís" i "simple")
+- Adaptar exemples al nou estil`,
 
-  format: `Ets un expert en reformatar contingut.
+  audience: `ADAPTADOR D'AUDIÈNCIA
+Objectiu: Reescriure per a una audiència específica.
 
-## Formats
-- bullets: Convertir a llista amb punts
-- numbered: Llista numerada
-- prose: Text narratiu corrent
-- qa: Format pregunta-resposta
-- summary: Resum dels punts clau`,
+## PERFILS D'AUDIÈNCIA
+| Audiència | Nivell | Vocabulari | Exemples |
+|-----------|--------|------------|----------|
+| experts | Alt | Tècnic | Casos edge |
+| principiants | Bàsic | Simple | Analogies quotidianes |
+| nens | Molt bàsic | Familiar | Històries, jocs |
+| directius | Executiu | Business | ROI, KPIs |
+| general | Mitjà | Accessible | Diversos |
 
-  complete: `Ets un escriptor professional.
-Reescriu el text seguint les instruccions de l'usuari.
-Manté la informació essencial però pots canviar completament l'estructura i estil.`,
+## PROTOCOL D'ADAPTACIÓ
+1. Identificar conceptes clau
+2. Traduir a vocabulari de l'audiència
+3. Afegir context si cal (principiants)
+4. Simplificar estructura (nens, general)
+5. Destacar impacte (directius)`,
+
+  format: `REFORMATADOR DE CONTINGUT
+Objectiu: Canviar el format mantenint el contingut.
+
+## FORMATS DISPONIBLES
+| Format | Estructura | Quan usar |
+|--------|------------|-----------|
+| bullets | • Punt per idea | Llistes, instruccions |
+| numbered | 1. 2. 3. | Processos, passos |
+| prose | Paràgrafs narratius | Explicacions, històries |
+| qa | P: R: | FAQ, entrevistes |
+| summary | Punts clau destacats | Resums executius |
+| table | Files i columnes | Comparatives |
+
+## TRANSFORMACIONS TÍPIQUES
+- Prosa → Bullets: Una frase = un punt
+- Bullets → Prosa: Connectar amb transicions
+- Qualsevol → Summary: 3-5 punts principals
+- Qualsevol → QA: Convertir afirmacions en P+R`,
+
+  complete: `REESCRIPTOR COMPLET
+Objectiu: Reescriptura total seguint les instruccions de l'usuari.
+
+## PRINCIPIS
+1. FIDELITAT: Mantenir la informació essencial
+2. CREATIVITAT: Llibertat en estructura i estil
+3. COHERÈNCIA: Text natural i fluït
+4. PROPÒSIT: Complir l'objectiu de l'usuari
+
+## RESTRICCIONS
+- NO inventar dades noves
+- NO contradir l'original
+- NO ometre informació crítica
+- Mantenir noms propis i cites
+
+## PROTOCOL
+1. Comprendre l'objectiu de l'usuari
+2. Identificar informació essencial
+3. Reescriure amb llibertat creativa
+4. Verificar fidelitat al contingut original`,
 };
 
 const BASE_PROMPT = `
@@ -266,7 +322,7 @@ async function generateRewritePreview(rewriteType, intent, documentContext, targ
   const textToRewrite = targetParagraphs
     .map(id => {
       const para = documentContext.paragraphs[id];
-      return `§${id}: ${para.text || para}`;
+      return `§${id + 1}: ${para.text || para}`;  // v12.1: 1-indexed per consistència UI
     })
     .join('\n\n');
   parts.push(textToRewrite);
@@ -333,7 +389,10 @@ function parsePreviewResponse(responseText, targetParagraphs) {
     const preview = parsed.preview || parsed;
 
     return {
-      original_paragraphs: preview.original_paragraphs || targetParagraphs,
+      // v12.1: LLM retorna 1-indexed, targetParagraphs ja és 0-indexed
+      original_paragraphs: preview.original_paragraphs
+        ? preview.original_paragraphs.map(id => id - 1).filter(id => id >= 0)
+        : targetParagraphs,
       rewritten_text: preview.rewritten_text || '',
       changes_summary: preview.changes_summary || '',
       word_count_before: preview.word_count_before || 0,

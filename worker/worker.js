@@ -3492,15 +3492,20 @@ async function handleGenerateTitle(body, env, corsHeaders) {
   // 1. "Nova conversa" = provisional, needs AI title
   // 2. Title > 50 chars = probably user message saved as title (legacy bug)
   // 3. Anything else (short, non-default) = already AI-generated, skip
+  console.log('[generate_title] Current title:', conv.title, 'Length:', conv.title?.length);
+
   const needsTitle = !conv.title ||
                      conv.title === 'Nova conversa' ||
                      conv.title.length > 50;
+
+  console.log('[generate_title] needsTitle:', needsTitle);
 
   if (!needsTitle) {
     return new Response(JSON.stringify({
       status: "ok",
       title: conv.title,
-      skipped: true
+      skipped: true,
+      debug: { title_length: conv.title?.length }
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
@@ -3558,15 +3563,19 @@ Write ONLY the title (natural, 2-4 words, same language as conversation):`;
   );
 
   if (!geminiResponse.ok) {
-    throw new Error("gemini_error");
+    const errText = await geminiResponse.text();
+    console.error('[generate_title] Gemini error:', geminiResponse.status, errText);
+    throw new Error("gemini_error: " + geminiResponse.status);
   }
 
   const geminiResult = await geminiResponse.json();
+  console.log('[generate_title] Gemini result:', JSON.stringify(geminiResult).substring(0, 200));
   let title = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || conv.title;
 
   // Clean up title (max 40 chars for short titles)
   title = title.replace(/^["']|["']$/g, '').trim();
   if (title.length > 40) title = title.substring(0, 37) + '...';
+  console.log('[generate_title] Generated title:', title);
 
   // Save title using stored procedure
   const updateResponse = await fetch(
@@ -3593,7 +3602,8 @@ Write ONLY the title (natural, 2-4 words, same language as conversation):`;
   return new Response(JSON.stringify({
     status: "ok",
     title: title,
-    generated: true
+    generated: true,
+    debug: { original_title: conv.title, msg_count: msgs.length }
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 

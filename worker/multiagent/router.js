@@ -202,7 +202,7 @@ function buildParagraphOptions(documentContext, language) {
 
   return paragraphs.map((para, i) => {
     const text = (para.text || para).slice(0, 50);
-    return `§${i}: ${text}${text.length >= 50 ? '...' : ''}`;
+    return `§${i + 1}: ${text}${text.length >= 50 ? '...' : ''}`;  // v12.1: 1-indexed per UI
   });
 }
 

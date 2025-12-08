@@ -9,8 +9,8 @@
  */
 
 import { Mode, RiskLevel, createDefaultIntent, validateIntentPayload } from './types.js';
-import { CONFIDENCE_THRESHOLDS } from './config.js';
-import { logWarn, logError, logDebug } from './telemetry.js';
+import { CONFIDENCE_THRESHOLDS, LENGTH_THRESHOLDS } from './config.js';
+import { logWarn, logError, logDebug, logInfo as logInfoTelemetry } from './telemetry.js';
 
 // ═══════════════════════════════════════════════════════════════
 // VALIDATION RESULT TYPES
@@ -490,6 +490,353 @@ function applyFallbackCascade(validationResult, originalPayload, language = 'ca'
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SHADOW VALIDATOR v12.1 - Validació de Respostes Gemini
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Detecta si una paraula és probablement un nom propi
+ * Condicions:
+ * 1. Comença amb majúscula
+ * 2. NO està a l'inici de frase
+ * 3. NO existeix en minúscula al document
+ *
+ * @param {string} word - La paraula a verificar
+ * @param {string} paragraphText - Text complet del paràgraf
+ * @param {string} fullDocumentText - Text complet del document (opcional)
+ * @returns {boolean}
+ */
+function isLikelyProperNoun(word, paragraphText, fullDocumentText = '') {
+  if (!word || word.length < 2) return false;
+
+  // 1. Comença amb majúscula?
+  const startsWithCapital = /^[A-ZÁÉÍÓÚÀÈÒÙÏÜÇ]/.test(word);
+  if (!startsWithCapital) return false;
+
+  // 2. Està a l'inici de frase? Busquem el context
+  const wordIndex = paragraphText.indexOf(word);
+  if (wordIndex === -1) return false;
+
+  // Obtenim el text abans de la paraula
+  const textBefore = paragraphText.substring(0, wordIndex).trimEnd();
+
+  // Si és l'inici del paràgraf o segueix un punt/interrogació/exclamació
+  const isAtSentenceStart = textBefore === '' ||
+    /[.!?:]\s*$/.test(textBefore) ||
+    /^["'«"']?\s*$/.test(textBefore.slice(-2));
+
+  if (isAtSentenceStart) return false;
+
+  // 3. Existeix versió en minúscula al document?
+  const lowerWord = word.toLowerCase();
+  const searchText = fullDocumentText || paragraphText;
+
+  // Busquem la paraula en minúscula (no a l'inici de frase)
+  const lowerPattern = new RegExp(`[a-záéíóúàèòùïüç]\\s+${lowerWord}\\b`, 'i');
+  if (lowerPattern.test(searchText)) {
+    return false; // Si existeix en minúscula, no és nom propi
+  }
+
+  // Casos especials: articles catalans que sovint es confonen
+  const commonWords = ['al', 'del', 'el', 'en', 'es', 'la', 'les', 'els', 'un', 'una'];
+  if (commonWords.includes(lowerWord)) return false;
+
+  return true;
+}
+
+/**
+ * Valida canvis de mode FIX amb LENGTH_THRESHOLDS
+ * @param {Array} changes - Canvis proposats
+ * @param {Object} documentContext - Context del document
+ * @returns {{validChanges: Array, rejectedChanges: Array, warnings: Array}}
+ */
+function validateFixChanges(changes, documentContext) {
+  const validChanges = [];
+  const rejectedChanges = [];
+  const warnings = [];
+
+  const thresholds = LENGTH_THRESHOLDS.fix;
+
+  for (const change of changes) {
+    const paragraph = documentContext?.paragraphs?.[change.paragraph_id];
+    if (!paragraph) {
+      rejectedChanges.push({ ...change, rejection_reason: 'Paràgraf no trobat' });
+      continue;
+    }
+
+    const originalText = paragraph.text || paragraph || '';
+    const findText = change.find;
+    const replaceText = change.replace;
+
+    // Verificar que find existeix al paràgraf
+    if (!originalText.includes(findText)) {
+      rejectedChanges.push({
+        ...change,
+        rejection_reason: `HALLUCINATION: "${findText}" no existeix al paràgraf`,
+      });
+      logWarn('HALLUCINATION detectada en FIX', {
+        paragraph_id: change.paragraph_id,
+        find: findText,
+        actual_text: originalText.substring(0, 100),
+      });
+      continue;
+    }
+
+    // Calcular canvi de longitud del find/replace
+    const lengthDelta = (replaceText.length - findText.length) / Math.max(findText.length, 1);
+
+    if (lengthDelta < thresholds.min || lengthDelta > thresholds.max) {
+      if (thresholds.action === 'BLOCK') {
+        rejectedChanges.push({
+          ...change,
+          rejection_reason: `Canvi de longitud excessiu: ${(lengthDelta * 100).toFixed(1)}% (límit: ${thresholds.min * 100}% a ${thresholds.max * 100}%)`,
+        });
+        continue;
+      } else if (thresholds.action === 'WARN') {
+        warnings.push(`Canvi de longitud notable: ${(lengthDelta * 100).toFixed(1)}% al paràgraf ${change.paragraph_id + 1}`);
+      }
+    }
+
+    // Detectar si és un fals positiu de nom propi
+    if (change.reason === 'diacritic' || change.reason === 'accent') {
+      // Verificar si és un nom propi que no s'ha de modificar
+      const words = findText.split(/\s+/);
+      const firstCapitalWord = words.find(w => /^[A-ZÁÉÍÓÚÀÈÒÙÏÜÇ]/.test(w));
+
+      if (firstCapitalWord) {
+        const fullDocText = documentContext.paragraphs.map(p => p.text || p).join(' ');
+        if (isLikelyProperNoun(firstCapitalWord, originalText, fullDocText)) {
+          rejectedChanges.push({
+            ...change,
+            rejection_reason: `PROPER_NOUN: "${firstCapitalWord}" sembla un nom propi`,
+          });
+          logDebug('Possible nom propi detectat', { word: firstCapitalWord, change });
+          continue;
+        }
+      }
+    }
+
+    validChanges.push(change);
+  }
+
+  return { validChanges, rejectedChanges, warnings };
+}
+
+/**
+ * Valida canvis genèrics (improve, expand, simplify, etc.)
+ * @param {Array} changes - Canvis proposats
+ * @param {string} modificationType - Tipus de modificació
+ * @param {Object} documentContext - Context del document
+ * @returns {{validChanges: Array, rejectedChanges: Array, warnings: Array}}
+ */
+function validateGenericChanges(changes, modificationType, documentContext) {
+  const validChanges = [];
+  const rejectedChanges = [];
+  const warnings = [];
+
+  const thresholds = LENGTH_THRESHOLDS[modificationType] || LENGTH_THRESHOLDS.improve;
+
+  for (const change of changes) {
+    const paragraph = documentContext?.paragraphs?.[change.paragraph_id];
+    if (!paragraph) {
+      rejectedChanges.push({ ...change, rejection_reason: 'Paràgraf no trobat' });
+      continue;
+    }
+
+    const originalText = change.original_text || paragraph.text || paragraph || '';
+    const newText = change.new_text || '';
+
+    // Calcular canvi de longitud
+    const lengthDelta = (newText.length - originalText.length) / Math.max(originalText.length, 1);
+
+    if (lengthDelta < thresholds.min || lengthDelta > thresholds.max) {
+      if (thresholds.action === 'BLOCK') {
+        rejectedChanges.push({
+          ...change,
+          rejection_reason: `Canvi de longitud fora de rang: ${(lengthDelta * 100).toFixed(1)}% (permès: ${thresholds.min * 100}% a ${thresholds.max * 100}%)`,
+        });
+        continue;
+      } else if (thresholds.action === 'WARN') {
+        warnings.push(`Canvi de longitud ${modificationType}: ${(lengthDelta * 100).toFixed(1)}% al paràgraf ${change.paragraph_id + 1}`);
+      }
+    }
+
+    // Verificar que el nou text no és idèntic a l'original
+    if (newText.trim() === originalText.trim()) {
+      warnings.push(`Canvi sense efecte al paràgraf ${change.paragraph_id + 1}`);
+      continue; // Saltar canvis que no canvien res
+    }
+
+    validChanges.push(change);
+  }
+
+  return { validChanges, rejectedChanges, warnings };
+}
+
+/**
+ * Valida highlights per reduir falsos positius
+ * @param {Array} highlights - Highlights proposats
+ * @param {Object} documentContext - Context del document
+ * @returns {{validHighlights: Array, rejectedHighlights: Array, warnings: Array}}
+ */
+function validateHighlightResponse(highlights, documentContext) {
+  const validHighlights = [];
+  const rejectedHighlights = [];
+  const warnings = [];
+
+  for (const h of highlights) {
+    const paragraph = documentContext?.paragraphs?.[h.paragraph_id];
+    if (!paragraph) {
+      rejectedHighlights.push({ ...h, rejection_reason: 'Paràgraf no trobat' });
+      continue;
+    }
+
+    const paragraphText = paragraph.text || paragraph || '';
+    const highlightText = h.text_to_highlight || h.snippet || '';
+
+    // Verificar que el text existeix al paràgraf
+    if (!paragraphText.includes(highlightText)) {
+      // Intentar cerca fuzzy (per diferències de whitespace)
+      const normalizedPara = paragraphText.replace(/\s+/g, ' ').trim();
+      const normalizedHighlight = highlightText.replace(/\s+/g, ' ').trim();
+
+      if (!normalizedPara.includes(normalizedHighlight)) {
+        rejectedHighlights.push({
+          ...h,
+          rejection_reason: `Text "${highlightText.substring(0, 30)}..." no trobat`,
+        });
+        continue;
+      }
+    }
+
+    // Per errors de diacrítics, verificar que no és nom propi
+    if (h.color === 'yellow' || h.color === 'orange') {
+      const fullDocText = documentContext.paragraphs.map(p => p.text || p).join(' ');
+      const wordsToCheck = highlightText.split(/\s+/).filter(w => /^[A-ZÁÉÍÓÚÀÈÒÙÏÜÇ]/.test(w));
+
+      let isProperNoun = false;
+      for (const word of wordsToCheck) {
+        if (isLikelyProperNoun(word, paragraphText, fullDocText)) {
+          isProperNoun = true;
+          break;
+        }
+      }
+
+      if (isProperNoun) {
+        rejectedHighlights.push({
+          ...h,
+          rejection_reason: 'PROPER_NOUN: Sembla un nom propi',
+        });
+        continue;
+      }
+    }
+
+    validHighlights.push(h);
+  }
+
+  return { validHighlights, rejectedHighlights, warnings };
+}
+
+/**
+ * Validador principal de resposta Gemini v12.1
+ * Aplica Shadow Validation segons el mode i tipus de modificació
+ *
+ * @param {Object} response - Resposta de l'executor
+ * @param {string} mode - Mode de l'operació (UPDATE_BY_ID, REFERENCE_HIGHLIGHT, etc.)
+ * @param {string} modificationType - Tipus de modificació (fix, improve, expand, etc.)
+ * @param {Object} documentContext - Context del document
+ * @returns {Object} - Resposta validada amb canvis filtrats
+ */
+function validateGeminiResponse(response, mode, modificationType, documentContext) {
+  if (!response) {
+    return {
+      valid: false,
+      response: null,
+      errors: ['Resposta buida'],
+      warnings: [],
+    };
+  }
+
+  const allWarnings = [];
+  const allErrors = [];
+
+  // Validar segons el mode
+  if (mode === 'UPDATE_BY_ID' && response.changes) {
+    let validationResult;
+
+    if (modificationType === 'fix') {
+      validationResult = validateFixChanges(response.changes, documentContext);
+    } else {
+      validationResult = validateGenericChanges(response.changes, modificationType, documentContext);
+    }
+
+    allWarnings.push(...validationResult.warnings);
+
+    if (validationResult.rejectedChanges.length > 0) {
+      logWarn('Shadow Validator: Canvis rebutjats', {
+        rejected: validationResult.rejectedChanges.length,
+        total: response.changes.length,
+        details: validationResult.rejectedChanges.map(c => ({
+          paragraph_id: c.paragraph_id,
+          reason: c.rejection_reason,
+        })),
+      });
+    }
+
+    // Retornar resposta amb canvis filtrats
+    return {
+      valid: validationResult.validChanges.length > 0,
+      response: {
+        ...response,
+        changes: validationResult.validChanges,
+        _validation: {
+          rejected_changes: validationResult.rejectedChanges,
+          original_count: response.changes.length,
+          valid_count: validationResult.validChanges.length,
+        },
+      },
+      errors: validationResult.validChanges.length === 0 ? ['Tots els canvis han estat rebutjats'] : [],
+      warnings: allWarnings,
+    };
+  }
+
+  if (mode === 'REFERENCE_HIGHLIGHT' && response.highlights) {
+    const validationResult = validateHighlightResponse(response.highlights, documentContext);
+
+    allWarnings.push(...validationResult.warnings);
+
+    if (validationResult.rejectedHighlights.length > 0) {
+      logDebug('Shadow Validator: Highlights rebutjats', {
+        rejected: validationResult.rejectedHighlights.length,
+        total: response.highlights.length,
+      });
+    }
+
+    return {
+      valid: validationResult.validHighlights.length > 0 || !!response.chat_response,
+      response: {
+        ...response,
+        highlights: validationResult.validHighlights,
+        _validation: {
+          rejected_highlights: validationResult.rejectedHighlights,
+          original_count: response.highlights.length,
+          valid_count: validationResult.validHighlights.length,
+        },
+      },
+      errors: [],
+      warnings: allWarnings,
+    };
+  }
+
+  // Per altres modes, retornar sense modificar
+  return {
+    valid: true,
+    response,
+    errors: [],
+    warnings: allWarnings,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // EXECUTOR OUTPUT VALIDATION
 // ═══════════════════════════════════════════════════════════════
 
@@ -579,6 +926,13 @@ export {
   validateIntent,
   applyFallbackCascade,
   validateExecutorOutput,
+
+  // Shadow Validator v12.1
+  validateGeminiResponse,
+  validateFixChanges,
+  validateGenericChanges,
+  validateHighlightResponse,
+  isLikelyProperNoun,
 
   // Individual validators (for testing)
   validateStructure,

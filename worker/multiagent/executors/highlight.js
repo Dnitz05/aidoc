@@ -1,6 +1,7 @@
 /**
- * REFERENCE_HIGHLIGHT Executor v8.4
+ * REFERENCE_HIGHLIGHT Executor v12.1
  *
+ * v12.1: Detecció de diacrítics catalans + temperatura optimitzada 0.1
  * v8.4: Word boundary multilingüe per precisió total en detecció de paraules
  *       (evita "el" dins "del", funciona amb accents: és, àrea, ç, ñ)
  *
@@ -13,9 +14,10 @@
  */
 
 import { Mode, HighlightStrategy, createErrorResult } from '../types.js';
-import { GEMINI, TIMEOUTS } from '../config.js';
+import { GEMINI, TIMEOUTS, TEMPERATURES } from '../config.js';
 import { logInfo, logDebug, logError, logWarn } from '../telemetry.js';
 import { formatContextForPrompt, formatContextForExecutor } from '../context.js';
+import { isLikelyProperNoun } from '../validator.js';
 
 // ═══════════════════════════════════════════════════════════════
 // CONSTANTS PER WORD BOUNDARY MULTILINGÜE
@@ -33,106 +35,154 @@ const WORD_CHARS = 'a-zA-Z0-9àèéíòóúüïçñÀÈÉÍÒÓÚÜÏÇÑáéí�
 // ═══════════════════════════════════════════════════════════════
 
 const HIGHLIGHT_PROMPTS = {
-  errors: `Ets un corrector lingüístic expert en català, castellà i anglès.
-La teva tasca és identificar ERRORS ortogràfics, gramaticals i de puntuació.
+  errors: `DETECTOR D'ERRORS ORTOGRÀFICS
+Objectiu: Trobar paraules MAL ESCRITES al document.
 
-## Què buscar
-- Faltes d'ortografia
-- Errors gramaticals (concordança, temps verbals, etc.)
-- Puntuació incorrecta
-- Errors de majúscules/minúscules
-- Paraules mal escrites o confoses (ex: "a" vs "ha")
+## QUÈ ÉS UN ERROR (la paraula ACTUAL al document està malament)
+| Error real | Per què | Correcció |
+|------------|---------|-----------|
+| "dde" | Lletra repetida per error | "de" |
+| "documentacio" | Falta accent (NO existeix sense) | "documentació" |
+| "area" | Falta accent obligatori | "àrea" |
+| "els casa" | Discordança de nombre | "les cases" |
 
-## Què NO marcar
-- Estil (això no és un error)
-- Preferències personals
-- Formes alternatives vàlides
+## CRÍTIC: COM VERIFICAR
+1. Llegir la paraula TAL COM APAREIX al document
+2. Aquesta paraula EXACTA, existeix al diccionari?
+   - "documentació" (amb accent) → SÍ existeix → NO és error
+   - "documentacio" (sense accent) → NO existeix → SÍ és error
+3. NOMÉS marcar si la paraula ACTUAL no existeix o està mal escrita
 
-## Format de sortida
-Retorna un JSON array amb els errors trobats:
+## ERRORS COMUNS A BUSCAR
+- Lletres repetides: "dde", "eel", "laa"
+- Accents oblidats: "area", "documentacio", "especifica"
+- Faltes de tecleig: "porjecte", "documetnació"
+
+## NO MARCAR
+- Paraules que JA estan correctes (encara que tinguin accent)
+- Noms propis, sigles, abreviatures
+- Variants ortogràfiques vàlides
+
+## OUTPUT
 \`\`\`json
 {
   "highlights": [
     {
       "paragraph_id": <número>,
-      "text_to_highlight": "<text exacte a destacar>",
-      "comment": "<explicació de l'error i correcció>",
+      "text_to_highlight": "<PARAULA EXACTA mal escrita al document>",
+      "comment": "'<error>' → '<correcció>'",
       "severity": "error"
     }
   ],
-  "summary": "<resum breu del que s'ha trobat>"
+  "summary": "<N errors>" | "Cap error"
 }
 \`\`\`
 
-IMPORTANT: El "text_to_highlight" ha de ser text EXACTE que existeix al paràgraf.`,
+REGLA D'OR: Si la paraula al document JA és correcta, NO la marquis.`,
 
-  suggestions: `Ets un editor professional expert en millorar textos.
-La teva tasca és identificar OPORTUNITATS DE MILLORA (no errors).
+  suggestions: `EDITOR DE MILLORES MESURABLES
+Objectiu: Identificar oportunitats de millora CONCRETES i ACCIONABLES (no errors ortogràfics).
 
-## Què buscar
-- Frases massa llargues o confuses
-- Repeticions de paraules
-- Expressions que es podrien simplificar
-- Oportunitats per millorar la claredat
-- To inconsistent
+## CRITERIS OBJECTIUS PER MARCAR
+| Problema | Llindar mesurable | Exemple |
+|----------|-------------------|---------|
+| Frase llarga | >40 paraules sense puntuació | "La reunió que vam fer..." (45 paraules) |
+| Repetició | Mateixa paraula 3+ cops en 2 frases | "important...important...important" |
+| Veu passiva encadenada | 2+ passives consecutives | "va ser aprovat...fou revisat" |
+| Subordinació excessiva | 3+ nivells de "que" | "que diu que creu que..." |
+| Ambigüitat pronominal | "això/ho" sense referent clar | "Ho van fer però això no..." |
 
-## Què NO marcar
-- Errors ortogràfics (això és altra categoria)
-- Coses que ja estan bé
+## QUÈ NO MARCAR
+- Errors ortogràfics → usa mode "errors"
+- Estil de l'autor que és coherent
+- Preferències personals sense justificació objectiva
+- Text tècnic que requereix precisió
 
-## Format de sortida
+## FORMAT DEL SUGGERIMENT
+Cada suggeriment ha d'incloure:
+1. El problema específic detectat
+2. Per què és millorable (criteri objectiu)
+3. Direcció de millora (sense reescriure)
+
+## OUTPUT
 \`\`\`json
 {
   "highlights": [
     {
       "paragraph_id": <número>,
-      "text_to_highlight": "<text exacte a destacar>",
-      "comment": "<suggeriment de millora>",
+      "text_to_highlight": "<fragment problemàtic EXACTE>",
+      "comment": "[Tipus]: <descripció> → <direcció millora>",
       "severity": "suggestion"
     }
   ],
-  "summary": "<resum breu>"
+  "summary": "X oportunitats de millora identificades"
 }
-\`\`\``,
+\`\`\`
 
-  references: `Ets un assistent que identifica referències a conceptes específics.
-L'usuari t'indicarà què buscar i tu has de trobar-ho al document.
+IMPORTANT: Millor pocs suggeriments de qualitat que molts de dubtosos.`,
 
-## Format de sortida
+  references: `CERCADOR DE REFERÈNCIES CONCEPTUALS
+Objectiu: Localitzar totes les mencions d'un concepte o tema al document.
+
+## PROTOCOL
+1. Identificar el concepte clau de la instrucció
+2. Buscar mencions DIRECTES (la paraula exacta)
+3. Buscar mencions INDIRECTES (sinònims, pronoms referents)
+4. Ordenar per ordre d'aparició
+
+## TIPUS DE COINCIDÈNCIES
+- EXACTA: El terme tal qual apareix
+- VARIANT: Formes flexionades (singular/plural, masculí/femení)
+- SINÒNIM: Paraules equivalents en context
+- REFERÈNCIA: Pronoms que clarament es refereixen al terme
+
+## OUTPUT
 \`\`\`json
 {
   "highlights": [
     {
       "paragraph_id": <número>,
-      "text_to_highlight": "<text exacte trobat>",
-      "comment": "<context o explicació>",
+      "text_to_highlight": "<text EXACTE al document>",
+      "comment": "[Exacta|Variant|Sinònim|Referència]: <breu context>",
       "severity": "info"
     }
   ],
-  "summary": "<resum del que s'ha trobat>"
+  "summary": "X mencions de '<concepte>' trobades"
 }
 \`\`\``,
 
-  structure: `Ets un analista d'estructura de documents.
-La teva tasca és identificar elements estructurals:
-- Títols i subtítols
-- Llistes
-- Definicions
-- Conclusions
-- Arguments principals
+  structure: `ANALISTA D'ESTRUCTURA DOCUMENTAL
+Objectiu: Identificar i categoritzar elements estructurals del document.
 
-## Format de sortida
+## TAXONOMIA D'ELEMENTS
+| Element | Indicadors | Color suggerit |
+|---------|------------|----------------|
+| Títol/Heading | Línia curta, sense punt final, majúscules | purple |
+| Introducció | Primer paràgraf, presenta tema | blue |
+| Tesi/Argument | "considero que", "l'objectiu és" | purple |
+| Evidència | Dades, cites, "segons" | blue |
+| Transició | "per altra banda", "en canvi" | info |
+| Conclusió | "en conclusió", "per tant", últim paràgraf | purple |
+| Llista | Numeració, guions, punts | info |
+
+## PROTOCOL
+1. Llegir tot el document primer
+2. Identificar estructura macro (intro/cos/conclusió)
+3. Marcar elements micro dins de cada secció
+4. Verificar coherència estructural
+
+## OUTPUT
 \`\`\`json
 {
   "highlights": [
     {
       "paragraph_id": <número>,
-      "text_to_highlight": "<text exacte>",
-      "comment": "<tipus d'element estructural>",
+      "text_to_highlight": "<element estructural EXACTE>",
+      "comment": "[Tipus]: <funció en el document>",
       "severity": "info"
     }
   ],
-  "summary": "<resum de l'estructura>"
+  "summary": "Estructura: [tipus de document]. Seccions: [llista]"
 }
 \`\`\``,
 
@@ -172,26 +222,48 @@ La teva tasca és identificar elements estructurals:
 }
 \`\`\``,
 
-  all: `Ets un revisor complet de documents.
-Fes una revisió completa identificant:
-1. Errors ortogràfics i gramaticals (severity: "error")
-2. Suggeriments de millora (severity: "suggestion")
-3. Elements estructurals importants (severity: "info")
+  all: `REVISOR INTEGRAL CONSERVADOR
+Objectiu: Revisió completa prioritzant precisió sobre exhaustivitat.
 
-## Format de sortida
+## JERARQUIA DE SEVERITATS (usar correctament)
+| Severity | Criteri | Exemples |
+|----------|---------|----------|
+| error | Paraula inexistent al diccionari, discordança gramatical | "increiblement", "els casa" |
+| suggestion | Problema mesurable de claredat | Frase >40 paraules, repetició 3+ cops |
+| info | Element estructural o informatiu | Títols, conclusions, referències |
+
+## LÍMITS MÀXIMS
+- Errors: Només els INEQUÍVOCS (màxim ~5 per document típic)
+- Suggeriments: Només els més impactants (màxim ~5)
+- Info: Estructura principal (màxim ~3)
+
+## PROTOCOL DE REVISIÓ
+1. PRIMERA PASSADA: Errors ortogràfics evidents (paraules inexistents)
+2. SEGONA PASSADA: Problemes de claredat mesurables
+3. TERCERA PASSADA: Estructura i organització
+
+## LLISTA DE FALSOS POSITIUS (NO MARCAR)
+- Noms propis, sigles, abreviatures
+- Majúscules en càrrecs/institucions
+- Estil coherent de l'autor
+- Coses que JA ESTAN CORRECTES
+
+## OUTPUT
 \`\`\`json
 {
   "highlights": [
     {
       "paragraph_id": <número>,
-      "text_to_highlight": "<text exacte>",
-      "comment": "<comentari>",
+      "text_to_highlight": "<text EXACTE>",
+      "comment": "<problema específic>",
       "severity": "error|suggestion|info"
     }
   ],
-  "summary": "<resum general>"
+  "summary": "Revisió: X errors, Y suggeriments, Z elements estructurals"
 }
-\`\`\``,
+\`\`\`
+
+IMPORTANT: Preferir qualitat sobre quantitat. Si el document està bé, dir-ho.`,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -246,14 +318,18 @@ async function executeReferenceHighlight(intent, documentContext, conversationCo
     // Verificar highlights
     const validatedHighlights = validateHighlights(parsedResponse.highlights, documentContext);
 
+    // v12.1: Filtrar noms propis per reduir falsos positius
+    const filteredHighlights = filterProperNounHighlights(validatedHighlights, documentContext);
+
     logDebug('REFERENCE_HIGHLIGHT completed', {
-      total_highlights: validatedHighlights.length,
-      by_severity: countBySeverity(validatedHighlights),
+      total_highlights: filteredHighlights.length,
+      filtered_proper_nouns: validatedHighlights.length - filteredHighlights.length,
+      by_severity: countBySeverity(filteredHighlights),
     });
 
     // Construir resposta de chat
     const chatResponse = buildHighlightChatResponse(
-      validatedHighlights,
+      filteredHighlights,
       parsedResponse.summary,
       strategy,
       language
@@ -261,13 +337,14 @@ async function executeReferenceHighlight(intent, documentContext, conversationCo
 
     return {
       mode: Mode.REFERENCE_HIGHLIGHT,
-      highlights: validatedHighlights,
+      highlights: filteredHighlights,
       chat_response: chatResponse,
       _meta: {
         executor: 'highlight',
         strategy,
-        total_found: validatedHighlights.length,
+        total_found: filteredHighlights.length,
         paragraphs_analyzed: targetParagraphs.length,
+        proper_nouns_filtered: validatedHighlights.length - filteredHighlights.length,
       },
     };
 
@@ -305,7 +382,7 @@ function buildHighlightPrompt(strategy, intent, documentContext, targetParagraph
   parts.push('## Document a analitzar');
   const filteredParagraphs = documentContext.paragraphs
     .filter(p => targetParagraphs.includes(p.id))
-    .map(p => `§${p.id}: ${p.text}`)
+    .map(p => `§${p.id + 1}: ${p.text}`)  // v12.1: 1-indexed per consistència UI
     .join('\n');
   parts.push(filteredParagraphs);
 
@@ -336,9 +413,9 @@ async function callGeminiHighlight(systemPrompt, userPrompt, apiKey, signal) {
       },
     ],
     generationConfig: {
-      temperature: 0.3, // Més determinístic per a detecció d'errors
+      temperature: TEMPERATURES.highlight,  // v12.1: 0.1 per reduir falsos positius
       topP: 0.8,
-      maxOutputTokens: 4096,  // Augmentat per documents grans
+      maxOutputTokens: 4096,
     },
   };
 
@@ -423,10 +500,11 @@ function extractHighlightsFromText(text, documentContext) {
   for (const mention of paragraphMentions) {
     const idMatch = mention.match(/§(\d+)/);
     if (idMatch) {
-      const paraId = parseInt(idMatch[1], 10);
-      if (paraId < documentContext.paragraphs.length) {
+      const paraId = parseInt(idMatch[1], 10);  // 1-indexed from LLM (§1, §2...)
+      // v12.1: Check 1-indexed bounds (1 to length inclusive)
+      if (paraId > 0 && paraId <= documentContext.paragraphs.length) {
         highlights.push({
-          paragraph_id: paraId,
+          paragraph_id: paraId,  // Keep 1-indexed, validateHighlights will convert
           text_to_highlight: '',  // No podem extreure sense JSON
           comment: mention.replace(/§\d+[:\s]+/, '').trim(),
           severity: 'info',
@@ -482,8 +560,9 @@ function validateHighlights(highlights, documentContext) {
       comment: h.comment?.slice(0, 50)
     });
 
-    // Validar paragraph_id
-    const paraId = h.paragraph_id ?? h.para_id;
+    // Validar paragraph_id (v12.1: LLM retorna 1-indexed, convertim a 0-indexed)
+    const rawParaId = h.paragraph_id ?? h.para_id;
+    const paraId = rawParaId - 1;  // v12.1: 1-indexed → 0-indexed
     if (typeof paraId !== 'number' ||
         paraId < 0 ||
         paraId >= documentContext.paragraphs.length) {
@@ -714,6 +793,95 @@ function severityToColor(severity) {
     info: 'purple',        // Informació/clarificacions → lila
   };
   return colors[severity] || 'yellow';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v12.1: DETECCIÓ DE DIACRÍTICS CATALANS I NOMS PROPIS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Paraules amb diacrítics que sovint són falsos positius
+ * Format: paraula sense accent → paraula correcta amb accent
+ * Si la paraula apareix amb accent JA és correcta, no marcar
+ */
+const CATALAN_DIACRITIC_WORDS = {
+  // Accent diacrític (no canvia significat, només marca tònica)
+  'area': 'àrea',
+  'telefon': 'telèfon',
+  'pagina': 'pàgina',
+  'musica': 'música',
+  'numero': 'número',
+  'ultim': 'últim',
+  'public': 'públic',
+  'unic': 'únic',
+  'interes': 'interès',
+  'frances': 'francès',
+  'angles': 'anglès',
+  // Sovint confosos
+  'projecte': null,  // JA és correcte, no té accent
+  'document': null,  // JA és correcte
+  'periode': 'període',
+  'caracter': 'caràcter',
+  'dificil': 'difícil',
+  'facil': 'fàcil',
+  'util': 'útil',
+};
+
+/**
+ * Filtra highlights que són falsos positius de noms propis
+ * Un nom propi NO s'ha de marcar com a error de diacrítics
+ *
+ * @param {Array} highlights - Highlights validats
+ * @param {Object} documentContext - Context del document
+ * @returns {Array} - Highlights filtrats
+ */
+function filterProperNounHighlights(highlights, documentContext) {
+  if (!highlights || !highlights.length) return [];
+
+  const fullDocText = documentContext.paragraphs
+    .map(p => p.text || p)
+    .join(' ');
+
+  return highlights.filter(h => {
+    // Només filtrar errors de diacrítics/accents
+    if (h.severity !== 'error') return true;
+
+    // Comprovar si el comentari parla de diacrítics o accents
+    const comment = (h.reason || '').toLowerCase();
+    const isDiacriticError = comment.includes('accent') ||
+                             comment.includes('diacrític') ||
+                             comment.includes('diacrit') ||
+                             comment.includes('majúscula') ||
+                             comment.includes('→');
+
+    if (!isDiacriticError) return true;
+
+    // Obtenir el text marcat
+    const matchedText = h.matched_text || '';
+    if (!matchedText) return true;
+
+    // Obtenir el text del paràgraf
+    const paragraph = documentContext.paragraphs[h.para_id];
+    const paraText = paragraph?.text || paragraph || '';
+
+    // Comprovar si és un nom propi
+    const words = matchedText.split(/\s+/);
+    for (const word of words) {
+      if (/^[A-ZÁÉÍÓÚÀÈÒÙÏÜÇ]/.test(word)) {
+        // Paraula amb majúscula - potser és nom propi
+        if (isLikelyProperNoun(word, paraText, fullDocText)) {
+          logDebug('Highlight filtrat: possible nom propi', {
+            word,
+            para_id: h.para_id,
+            reason: h.reason,
+          });
+          return false;  // Filtrar aquest highlight
+        }
+      }
+    }
+
+    return true;  // Mantenir el highlight
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════

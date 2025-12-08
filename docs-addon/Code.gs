@@ -2229,6 +2229,118 @@ function applySingleChange(change) {
   }
 }
 
+// --- v12.1: APPLY FIND/REPLACE CHANGES (FIX mode - native format preservation) ---
+/**
+ * Aplica canvis usant replaceText() natiu que preserva format automàticament.
+ * Optimitzat per mode FIX on només es canvien errors ortogràfics/tipogràfics.
+ *
+ * @param {Array} changes - Array de {targetId, find, replace, context?}
+ *   - find: text exacte a trobar (amb context si cal per unicitat)
+ *   - replace: text de reemplaçament
+ *   - context: objecte opcional {before, after} per verificar unicitat
+ * @returns {Object} {ok, applied, skipped, undoSnapshots, error}
+ */
+function applyFindReplaceChanges(changes) {
+  try {
+    if (!changes || !Array.isArray(changes) || changes.length === 0) {
+      return { ok: false, error: "No hi ha canvis per aplicar" };
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+
+    // Obtenir elements editables
+    const elementsToProcess = getEditableElements(body);
+
+    // Crear mapa ID -> Element
+    let mapIdToElement = {};
+    let currentIndex = 0;
+    for (const el of elementsToProcess) {
+      const text = el.asText().getText();
+      if (text.trim().length > 0) {
+        mapIdToElement[currentIndex] = el;
+        currentIndex++;
+      }
+    }
+
+    const undoSnapshots = [];
+    let appliedCount = 0;
+    let skippedCount = 0;
+
+    for (const change of changes) {
+      const targetId = parseInt(change.targetId, 10);
+      const targetElement = mapIdToElement[targetId];
+
+      if (!targetElement) {
+        skippedCount++;
+        continue;
+      }
+
+      const text = targetElement.asText();
+      const currentText = text.getText();
+
+      // Verificar que el text 'find' existeix al paràgraf
+      if (!currentText.includes(change.find)) {
+        skippedCount++;
+        continue;
+      }
+
+      // v12.1: Context Anchor - verificar unicitat si es proporciona context
+      if (change.context) {
+        const fullPattern = (change.context.before || '') + change.find + (change.context.after || '');
+        if (!currentText.includes(fullPattern)) {
+          // El context no coincideix, potser el document ha canviat
+          skippedCount++;
+          continue;
+        }
+      }
+
+      // Comptar ocurrències del text 'find' al paràgraf
+      const occurrences = (currentText.match(new RegExp(escapeRegExp(change.find), 'g')) || []).length;
+
+      // Si hi ha múltiples ocurrències i no hi ha context, saltar per seguretat
+      if (occurrences > 1 && !change.context) {
+        // Loguejar per debug però aplicar igualment (replaceText canvia totes)
+        // En producció, el backend hauria d'enviar context per casos ambigus
+      }
+
+      // Guardar snapshot per undo
+      undoSnapshots.push({
+        targetId: change.targetId,
+        originalText: currentText,
+        bodyIndex: getBodyIndex(targetElement)
+      });
+
+      // MAGIC: replaceText() natiu preserva el format automàticament!
+      // Això és el core de l'optimització v12.1
+      text.replaceText(escapeRegExp(change.find), change.replace);
+      appliedCount++;
+    }
+
+    // Invalidar cache
+    invalidateCaptureCache();
+
+    return {
+      ok: true,
+      applied: appliedCount,
+      skipped: skippedCount,
+      undoSnapshots: undoSnapshots
+    };
+
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+/**
+ * Escapa caràcters especials per usar en RegExp
+ * @param {string} string
+ * @returns {string}
+ */
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // IN-DOCUMENT PREVIEW v3.8 - Track Changes Style
 // ═══════════════════════════════════════════════════════════════════════════

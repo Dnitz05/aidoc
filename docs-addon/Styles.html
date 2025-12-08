@@ -630,6 +630,34 @@
         color: inherit;
       }
 
+      /* v12.1: Paragraph Reference Links [[§ID]] */
+      .para-ref-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 1px;
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.9em;
+        padding: 1px 5px;
+        margin: 0 1px;
+        border-radius: var(--radius-sm);
+        background: var(--accent-muted);
+        transition: all 0.15s ease;
+        cursor: pointer;
+      }
+
+      .para-ref-link:hover {
+        background: var(--accent);
+        color: white;
+        text-decoration: none;
+      }
+
+      .para-ref-link .para-ref-icon {
+        font-weight: 600;
+        opacity: 0.8;
+      }
+
       /* ═══════════════════════════════════════════════════════════
          MARKDOWN STYLES (v6.5)
          ═══════════════════════════════════════════════════════════ */

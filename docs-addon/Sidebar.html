@@ -944,6 +944,7 @@
       // v11.0: Annotation System - Unified Highlights + Changes
       let pendingAnnotations = [];      // Array d'anotacions {id, type, para_id, status, ...}
       let annotationDocSnapshot = null; // Snapshot per verificar canvis
+      let annotationModificationType = null; // v12.1: Per router híbrid (fix|improve|expand|simplify|translate)
       let cachedTimelineData = null;    // v4.1: Pre-loaded timeline data
 
       // v5.3: Selection polling
@@ -2106,6 +2107,7 @@
         }
 
         // v11.0: Handle Preview Mode response with Unified Annotations
+        // v12.1: Afegit suport per modification_type i find/replace per mode FIX
         if (res.status === 'preview' && res.changes && res.changes.length > 0) {
           // Convertir changes a annotations per la nova UI unificada
           const annotations = res.changes.map(function(c, i) {
@@ -2115,12 +2117,17 @@
               para_id: parseInt(c.targetId),
               originalText: c.originalText,
               proposedText: c.proposedText,
+              // v12.1: Camps per mode FIX (find/replace natiu)
+              find: c.find || null,
+              replace: c.replace || null,
+              context: c.context || null,
               reason: c.reason || 'Canvi proposat',
               status: 'pending'
             };
           });
 
-          addBubbleWithAnnotations(res.ai_response, annotations, res.doc_snapshot);
+          // v12.1: Passar modification_type per routing híbrid
+          addBubbleWithAnnotations(res.ai_response, annotations, res.doc_snapshot, res.modification_type);
           if (res.credits !== undefined) {
             updateCredits(res.credits);
           }
@@ -2862,26 +2869,66 @@
       }
 
       /**
-       * v6.8: Parseja referències [[text]] - només extreu el text, sense botó inline
-       * El botó de la cantonada s'encarrega de navegar
+       * v12.1: Parseja referències [[§ID]] i [[text]]
+       * Format [[§ID]] → Link clicable que navega al paràgraf ID
+       * Format [[text]] → Text destacat (compatibilitat 6.8)
        * @param {string} html - HTML amb possibles referències
        * @returns {Object} - { html: string, firstRef: string|null }
        */
       function parseDocumentReferences(html) {
-        // Regex: [[text]] - captura el contingut entre dobles claudàtors
-        const refPattern = /\[\[([^\]]+)\]\]/g;
         let firstRef = null;
 
-        const result = html.replace(refPattern, function(match, searchText) {
-          // Guardar la primera referència per al botó de cantonada
+        // v12.1: Primer processar [[§ID]] - format cita amb número de paràgraf
+        // Pattern: [[§número]] o [[\u00a7número]] (unicode § = \u00a7)
+        const paragraphRefPattern = /\[\[§(\d+)\]\]/g;
+
+        let result = html.replace(paragraphRefPattern, function(match, paraNum) {
+          const paraId = parseInt(paraNum, 10) - 1; // Convertir a 0-indexed
+          if (!firstRef) {
+            firstRef = '__PARA_' + paraId + '__';
+          }
+          // Link clicable que navega al paràgraf
+          return '<a href="#" class="para-ref-link" onclick="navigateToParagraph(' + paraId + '); return false;" ' +
+                 'title="Anar al paràgraf ' + paraNum + '">' +
+                 '<span class="para-ref-icon">§</span>' + paraNum + '</a>';
+        });
+
+        // v6.8: Després processar [[text]] - text literal per buscar
+        const textRefPattern = /\[\[([^\]§]+)\]\]/g;
+
+        result = result.replace(textRefPattern, function(match, searchText) {
           if (!firstRef) {
             firstRef = searchText;
           }
-          // Mostrar només el text, sense botó inline
+          // Mostrar text destacat (sense link, el botó de cantonada navegarà)
           return '<span class="doc-ref-text">' + searchText + '</span>';
         });
 
         return { html: result, firstRef: firstRef };
+      }
+
+      /**
+       * v12.1: Navega a un paràgraf pel seu ID (0-indexed)
+       * Crida a Apps Script per fer scroll al paràgraf
+       * @param {number} paraId - ID del paràgraf (0-indexed)
+       */
+      function navigateToParagraph(paraId) {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              showToast('Navegant a §' + (paraId + 1), 'success');
+              // Auto-clear highlight després de 2.5s
+              setTimeout(function() {
+                google.script.run.clearHighlight();
+              }, 2500);
+            } else {
+              showToast(result?.error || 'Paràgraf no trobat', 'error');
+            }
+          })
+          .withFailureHandler(function(error) {
+            showToast('Error: ' + error.message, 'error');
+          })
+          .scrollToParagraph(paraId);
       }
 
       function addBubble(type, text, isEdit, lastEditWord, selectionBadge) {
@@ -3157,8 +3204,9 @@
        * @param {string} aiResponse - Text de resposta de l'AI
        * @param {Array} annotations - Array d'anotacions
        * @param {string} docSnapshot - Snapshot del document (opcional)
+       * @param {string} modificationType - v12.1: Tipus de modificació (fix|improve|expand|simplify|translate)
        */
-      function addBubbleWithAnnotations(aiResponse, annotations, docSnapshot) {
+      function addBubbleWithAnnotations(aiResponse, annotations, docSnapshot, modificationType) {
         const container = document.getElementById('chatHistory');
         const bubble = document.createElement('div');
         bubble.className = 'msg ai';
@@ -3166,6 +3214,7 @@
         // Guardar dades per accions posteriors
         pendingAnnotations = annotations;
         annotationDocSnapshot = docSnapshot || null;
+        annotationModificationType = modificationType || null; // v12.1: Per router híbrid
 
         // Resposta principal amb markdown
         let html = '<div class="md-content">' + renderMarkdownHtml(aiResponse) + '</div>';
@@ -3255,6 +3304,7 @@
 
       /**
        * Acceptar un canvi individual
+       * v12.1: Router híbrid - FIX usa replaceText natiu, altres usen FormatPreserver
        */
       function acceptSingleAnnotation(annotationId) {
         const ann = pendingAnnotations.find(a => a.id === annotationId);
@@ -3268,30 +3318,48 @@
           el.querySelector('.btn-reject').disabled = true;
         }
 
-        // Cridar Apps Script per aplicar el canvi
-        google.script.run
-          .withSuccessHandler(function(result) {
-            if (result && result.ok) {
-              ann.status = 'accepted';
-              updateAnnotationUI(annotationId, 'accepted');
-              showToast('Canvi aplicat', 'success');
-              updateBulkActionsBar();
-            } else {
-              ann.status = 'pending';
-              updateAnnotationUI(annotationId, 'pending');
-              showToast(result.error || 'Error aplicant canvi', 'error');
-            }
-          })
-          .withFailureHandler(function(err) {
+        const successHandler = function(result) {
+          if (result && result.ok) {
+            ann.status = 'accepted';
+            updateAnnotationUI(annotationId, 'accepted');
+            showToast('Canvi aplicat', 'success');
+            updateBulkActionsBar();
+          } else {
             ann.status = 'pending';
             updateAnnotationUI(annotationId, 'pending');
-            showToast('Error: ' + err.message, 'error');
-          })
-          .applySingleChange({
-            targetId: ann.para_id,
-            originalText: ann.originalText,
-            proposedText: ann.proposedText
-          });
+            showToast(result.error || 'Error aplicant canvi', 'error');
+          }
+        };
+
+        const failureHandler = function(err) {
+          ann.status = 'pending';
+          updateAnnotationUI(annotationId, 'pending');
+          showToast('Error: ' + err.message, 'error');
+        };
+
+        // v12.1: Router híbrid
+        if (annotationModificationType === 'fix') {
+          // Mode FIX: usa find/replace natiu
+          google.script.run
+            .withSuccessHandler(successHandler)
+            .withFailureHandler(failureHandler)
+            .applyFindReplaceChanges([{
+              targetId: ann.para_id,
+              find: ann.find || ann.originalText,
+              replace: ann.replace || ann.proposedText,
+              context: ann.context || null
+            }]);
+        } else {
+          // Altres modes: usa FormatPreserver
+          google.script.run
+            .withSuccessHandler(successHandler)
+            .withFailureHandler(failureHandler)
+            .applySingleChange({
+              targetId: ann.para_id,
+              originalText: ann.originalText,
+              proposedText: ann.proposedText
+            });
+        }
       }
 
       /**
@@ -3309,37 +3377,59 @@
 
       /**
        * Acceptar tots els canvis pendents
+       * v12.1: Router híbrid - usa applyFindReplaceChanges per mode FIX
        */
       function acceptAllAnnotations() {
         const pending = pendingAnnotations.filter(a => a.type === 'change' && a.status === 'pending');
         if (pending.length === 0) return;
 
-        // Construir array de canvis per l'existent applyPendingChanges
-        const changes = pending.map(ann => ({
-          targetId: ann.para_id,
-          originalText: ann.originalText,
-          proposedText: ann.proposedText
-        }));
+        showToast('Aplicant ' + pending.length + ' canvis...', 'info');
 
-        showToast('Aplicant ' + changes.length + ' canvis...', 'info');
+        const successHandler = function(result) {
+          if (result && result.ok) {
+            pending.forEach(ann => {
+              ann.status = 'accepted';
+              updateAnnotationUI(ann.id, 'accepted');
+            });
+            updateBulkActionsBar();
+            const skippedMsg = result.skipped > 0 ? ' (' + result.skipped + ' saltats)' : '';
+            showToast('Tots els canvis aplicats (' + result.applied + ')' + skippedMsg, 'success');
+          } else {
+            showToast(result.error || 'Error aplicant canvis', 'error');
+          }
+        };
 
-        google.script.run
-          .withSuccessHandler(function(result) {
-            if (result && result.ok) {
-              pending.forEach(ann => {
-                ann.status = 'accepted';
-                updateAnnotationUI(ann.id, 'accepted');
-              });
-              updateBulkActionsBar();
-              showToast('Tots els canvis aplicats (' + result.applied + ')', 'success');
-            } else {
-              showToast(result.error || 'Error aplicant canvis', 'error');
-            }
-          })
-          .withFailureHandler(function(err) {
-            showToast('Error: ' + err.message, 'error');
-          })
-          .applyPendingChanges(changes, annotationDocSnapshot);
+        const failureHandler = function(err) {
+          showToast('Error: ' + err.message, 'error');
+        };
+
+        // v12.1: Router híbrid - FIX usa replaceText natiu, altres usen FormatPreserver
+        if (annotationModificationType === 'fix') {
+          // Mode FIX: usa find/replace natiu que preserva format automàticament
+          const changes = pending.map(ann => ({
+            targetId: ann.para_id,
+            find: ann.find || ann.originalText,  // Backend pot enviar 'find' específic
+            replace: ann.replace || ann.proposedText,
+            context: ann.context || null  // Context per unicitat (opcional)
+          }));
+
+          google.script.run
+            .withSuccessHandler(successHandler)
+            .withFailureHandler(failureHandler)
+            .applyFindReplaceChanges(changes);
+        } else {
+          // Altres modes: usa FormatPreserver per canvis complets de paràgraf
+          const changes = pending.map(ann => ({
+            targetId: ann.para_id,
+            originalText: ann.originalText,
+            proposedText: ann.proposedText
+          }));
+
+          google.script.run
+            .withSuccessHandler(successHandler)
+            .withFailureHandler(failureHandler)
+            .applyPendingChanges(changes, annotationDocSnapshot);
+        }
       }
 
       /**
@@ -3776,6 +3866,7 @@
             }
 
             // v11.0: Handle Preview Mode with Unified Annotations
+            // v12.1: Afegit suport per modification_type i find/replace per mode FIX
             if (res.status === 'preview' && res.changes && res.changes.length > 0) {
               var annotations = res.changes.map(function(c, i) {
                 return {
@@ -3784,11 +3875,16 @@
                   para_id: parseInt(c.targetId),
                   originalText: c.originalText,
                   proposedText: c.proposedText,
+                  // v12.1: Camps per mode FIX (find/replace natiu)
+                  find: c.find || null,
+                  replace: c.replace || null,
+                  context: c.context || null,
                   reason: c.reason || 'Canvi proposat',
                   status: 'pending'
                 };
               });
-              addBubbleWithAnnotations(res.ai_response, annotations, res.doc_snapshot);
+              // v12.1: Passar modification_type per routing híbrid
+              addBubbleWithAnnotations(res.ai_response, annotations, res.doc_snapshot, res.modification_type);
               if (res.credits !== undefined) {
                 updateCredits(res.credits);
               }
@@ -4404,6 +4500,7 @@
             }
 
             // v11.0: Handle Preview Mode with Unified Annotations
+            // v12.1: Afegit suport per modification_type i find/replace per mode FIX
             if (res.status === 'preview' && res.changes && res.changes.length > 0) {
               var annotations = res.changes.map(function(c, i) {
                 return {
@@ -4412,11 +4509,16 @@
                   para_id: parseInt(c.targetId),
                   originalText: c.originalText,
                   proposedText: c.proposedText,
+                  // v12.1: Camps per mode FIX (find/replace natiu)
+                  find: c.find || null,
+                  replace: c.replace || null,
+                  context: c.context || null,
                   reason: c.reason || 'Canvi proposat',
                   status: 'pending'
                 };
               });
-              addBubbleWithAnnotations(res.ai_response, annotations, res.doc_snapshot);
+              // v12.1: Passar modification_type per routing híbrid
+              addBubbleWithAnnotations(res.ai_response, annotations, res.doc_snapshot, res.modification_type);
               if (res.credits !== undefined) {
                 updateCredits(res.credits);
               }

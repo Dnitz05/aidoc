@@ -223,7 +223,9 @@ const HighlightColor = {
  * @typedef {Object} IntentPayload
  * @property {string} mode - Mode seleccionat (CHAT_ONLY, REFERENCE_HIGHLIGHT, etc.)
  * @property {number} confidence - Confiança de la classificació (0-1)
+ * @property {string} thought - v12.1: Chain-of-thought del classifier (1 frase)
  * @property {string} reasoning - Raonament de la classificació (max 150 chars)
+ * @property {string|null} response_style - v12.1: Estil de resposta per CHAT_ONLY (concise|bullet_points|detailed)
  * @property {string|null} secondary_mode - Mode secundari per fallback
  * @property {number|null} secondary_confidence - Confiança del mode secundari
  * @property {string} action_type - Tipus d'acció (analyze, locate, modify, etc.)
@@ -408,7 +410,10 @@ function createDefaultIntent() {
   return {
     mode: Mode.CHAT_ONLY,
     confidence: 0.5,
+    // v12.1: Nous camps
+    thought: '',
     reasoning: 'Default fallback',
+    response_style: null,
     secondary_mode: null,
     secondary_confidence: null,
     action_type: ActionType.EXPLAIN,

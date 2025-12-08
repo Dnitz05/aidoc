@@ -1,12 +1,14 @@
 /**
- * CHAT_ONLY Executor v8.3
+ * CHAT_ONLY Executor v12.1
  *
  * Executor per respondre preguntes i conversar sense modificar el document.
  * Utilitza el context del document per donar respostes contextualitzades.
+ *
+ * v12.1: Format de cita [[§ID]] clicable + response_style templates
  */
 
 import { Mode, createErrorResult } from '../types.js';
-import { GEMINI, TIMEOUTS } from '../config.js';
+import { GEMINI, TIMEOUTS, TEMPERATURES } from '../config.js';
 import { logInfo, logDebug, logError } from '../telemetry.js';
 import { formatContextForPrompt } from '../context.js';
 
@@ -14,29 +16,88 @@ import { formatContextForPrompt } from '../context.js';
 // SYSTEM PROMPT
 // ═══════════════════════════════════════════════════════════════
 
-const CHAT_SYSTEM_PROMPT = `Ets un assistent especialitzat en ajudar amb documents de Google Docs.
-El teu rol és NOMÉS respondre preguntes i conversar. NO fas canvis al document.
+/**
+ * Response Style Templates v12.1
+ * Defineixen l'extensió i format segons el tipus de pregunta
+ */
+const RESPONSE_STYLES = {
+  // Pregunta directa → Resposta minimal
+  direct: {
+    maxSentences: 2,
+    format: 'inline',
+    example: '[[§15]] Aitor Gilabert Juan, Arquitecte Municipal.',
+  },
+  // Pregunta d'ubicació → Referència amb snippet
+  location: {
+    maxSentences: 3,
+    format: 'quote',
+    example: 'Es menciona a [[§7]]: «El termini d\'execució serà de 12 mesos».',
+  },
+  // Pregunta de resum → Punts principals
+  summary: {
+    maxPoints: 5,
+    format: 'bullets',
+    example: '• Objectiu: rehabilitació [[§2]]\n• Termini: 12 mesos [[§7]]',
+  },
+  // Pregunta exploratòria → Explicació breu
+  exploratory: {
+    maxSentences: 4,
+    format: 'paragraph',
+    example: 'El document estableix... [[§3]] i desenvolupa... [[§8]].',
+  },
+};
 
-## Capacitats
-- Respondre preguntes sobre el contingut del document
-- Explicar conceptes mencionats al document
-- Resumir seccions o el document sencer
-- Donar opinions o suggeriments (sense aplicar-los)
-- Mantenir conversa general relacionada amb el document
+const CHAT_SYSTEM_PROMPT = `ASSISTENT DOCUMENTAL CONCÍS v12.1
+Objectiu: Respondre NOMÉS el que es pregunta, amb cites clicables.
 
-## Restriccions
-- MAI suggereixes canvis concrets amb text exacte
-- MAI dius "puc canviar X per Y"
-- Si l'usuari vol canvis, explica que ho pot demanar explícitament
+## ⚠️ FORMAT DE CITA CRÍTIC: [[§ID]]
+Utilitza SEMPRE el format [[§ID]] per citar paràgrafs.
+Exemple: "Segons [[§15]], el signant és Aitor Gilabert."
+El número ID comença a 1 (§1 = primer paràgraf).
 
-## Format de resposta
-- Respon en el mateix idioma que l'usuari
-- Sigues concís però complet
-- Utilitza markdown si és útil (llistes, negreta, etc.)
-- No facis referències a paràgrafs per número tret que sigui rellevant
+## REGLA D'OR: CONCISIÓ
+- Pregunta simple → Resposta simple (1-2 frases màxim)
+- "Qui signa?" → "Segons [[§15]], Aitor Gilabert Juan, Arquitecte Municipal." FI.
+- MAI afegir informació que NO s'ha demanat
+- MAI fer llistes exhaustives si només es demana UNA cosa
 
-## Context
-Tens accés al document de l'usuari. Utilitza'l per donar respostes precises i contextualitzades.`;
+## RESPONSE STYLES
+
+### Pregunta Directa (qui, quin, quina, quan)
+Format: Una frase amb [[§ID]]
+Exemple: "[[§15]] Aitor Gilabert Juan, Arquitecte Municipal."
+
+### Pregunta d'Ubicació (on, a quin paràgraf)
+Format: "Es menciona a [[§X]]: «cita curta»"
+Exemple: "Es menciona a [[§7]]: «El termini d'execució serà de 12 mesos»."
+
+### Pregunta de Resum
+Format: 3-5 bullets amb [[§ID]] cada un
+Exemple:
+• Objectiu: rehabilitació de masia [[§2]]
+• Termini: 12 mesos [[§7]]
+• Pressupost: 150.000€ [[§12]]
+
+### Pregunta Exploratòria (explica, per què, com)
+Format: 2-4 frases amb [[§ID]] intercalats
+Exemple: "El document estableix les condicions [[§3]] i desenvolupa els requisits [[§8]]."
+
+## EXEMPLES DE RESPOSTES CORRECTES
+
+Usuari: "Qui signa l'informe?"
+✅ CORRECTE: "[[§15]] Aitor Gilabert Juan, Arquitecte Municipal."
+❌ INCORRECTE: Una llista de totes les persones sense [[§ID]]
+
+Usuari: "On parla del pressupost?"
+✅ CORRECTE: "El pressupost es detalla a [[§12]]: «El cost total és de 150.000€»."
+❌ INCORRECTE: "Al paràgraf 12" (sense format clicable)
+
+## RESTRICCIONS
+- PROHIBIT inventar informació
+- PROHIBIT ometre [[§ID]] en les cites
+- PROHIBIT usar format §X en lloc de [[§X]]
+
+RECORDA: Cada referència ha de ser [[§ID]] per ser clicable.`;
 
 // ═══════════════════════════════════════════════════════════════
 // EXECUTOR IMPLEMENTATION
@@ -165,9 +226,9 @@ async function callGeminiChat(userPrompt, apiKey, signal) {
       },
     ],
     generationConfig: {
-      temperature: 0.7,
+      temperature: TEMPERATURES.chat,  // v12.1: 0.3 per no inventar
       topP: 0.9,
-      maxOutputTokens: 4096,  // Augmentat per thinking mode
+      maxOutputTokens: 4096,
     },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },

@@ -77,6 +77,40 @@ const CONFIDENCE_THRESHOLDS = {
 };
 
 // ═══════════════════════════════════════════════════════════════
+// TEMPERATURES PER MODE (v12.1 - Optimitzat per Gemini Ultra)
+// ═══════════════════════════════════════════════════════════════
+
+const TEMPERATURES = {
+  classifier: 0.0,      // Determinisme absolut - lògica pura
+  fix: 0.0,             // Zero creativitat - només mecànica
+  highlight: 0.1,       // Anàlisi estricta per reduir falsos positius
+  chat: 0.3,            // Baixa per no inventar dades
+  improve: 0.5,         // Fluïdesa moderada per reformular
+  expand: 0.5,          // Creativitat moderada per afegir contingut
+  simplify: 0.4,        // Equilibri per condensar
+  translate: 0.3,       // Baixa per precisió
+  rewrite: 0.7,         // Màxima creativitat per canviar to/estil
+};
+
+// ═══════════════════════════════════════════════════════════════
+// LENGTH THRESHOLDS PER MODE (v12.1 - Shadow Validator)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Thresholds de canvi de longitud per mode
+ * - min/max: % de canvi permès (negatiu = reducció, positiu = expansió)
+ * - action: 'BLOCK' = rebutjar canvi, 'WARN' = log però permetre, 'PASS' = ignorar
+ */
+const LENGTH_THRESHOLDS = {
+  fix: { min: -0.10, max: 0.10, action: 'BLOCK' },      // ±10% - Molt estricte
+  improve: { min: -0.30, max: 0.40, action: 'WARN' },   // -30% a +40%
+  expand: { min: 0.10, max: 2.0, action: 'BLOCK' },     // Mínim +10%, màx +200%
+  simplify: { min: -0.60, max: 0.10, action: 'WARN' },  // -60% a +10%
+  translate: { min: -0.40, max: 0.40, action: 'PASS' }, // ±40% (depèn d'idioma)
+  rewrite: { min: -1.0, max: 10.0, action: 'PASS' },    // Sense límit real
+};
+
+// ═══════════════════════════════════════════════════════════════
 // CIRCUIT BREAKER (Segons especificació v8.3)
 // ═══════════════════════════════════════════════════════════════
 
@@ -275,6 +309,10 @@ export {
   CONFIDENCE_THRESHOLDS,
   CIRCUIT_BREAKER,
   CACHE,
+
+  // v12.1: Temperatures i length thresholds
+  TEMPERATURES,
+  LENGTH_THRESHOLDS,
 
   // API config
   API,

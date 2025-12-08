@@ -11,7 +11,7 @@
  */
 
 import { Mode, ActionType } from '../types.js';
-import { GEMINI, TIMEOUTS } from '../config.js';
+import { GEMINI, TIMEOUTS, TEMPERATURES } from '../config.js';
 import { logInfo, logDebug, logError, logWarn } from '../telemetry.js';
 import { formatContextForExecutor } from '../context.js';
 
@@ -20,68 +20,140 @@ import { formatContextForExecutor } from '../context.js';
 // ═══════════════════════════════════════════════════════════════
 
 const UPDATE_PROMPTS = {
-  fix: `Ets un corrector lingüístic expert. La teva tasca és CORREGIR ERRORS sense canviar el significat.
+  // v12.1: Prompt FIX amb Context Anchors per Find/Replace natiu
+  fix: `CORRECTOR QUIRÚRGIC (Mode Find/Replace v12.1)
+Objectiu: Corregir errors ortogràfics amb canvis MÍNIMS i ATÒMICS.
 
-## Regles
-- Corregeix NOMÉS errors ortogràfics, gramaticals i de puntuació
-- NO canviïs l'estil ni el to
-- NO afegeixis ni eliminis informació
-- Manté la mateixa llargada aproximada
+## ⚠️ FORMAT DE SORTIDA CRÍTIC
+Retorna parells find/replace, NO el text complet del paràgraf.
+El camp "find" HA DE SER ÚNIC dins del paràgraf.
 
-## Format de sortida
+## REGLES FIND/REPLACE
+
+### Regla 1: Context Anchors (Ancoratge)
+Si l'error és una paraula comuna, INCLOU 2-3 paraules de context per assegurar unicitat:
+❌ find: "projecte" (pot aparèixer múltiples vegades)
+✅ find: "del projecte PAE" → "del Projecte PAE" (únic)
+
+❌ find: "mes" (ambigu)
+✅ find: "vull mes temps" → "vull més temps" (únic amb context)
+
+### Regla 2: Agrupació d'Errors Adjacents (Chunking)
+Si hi ha errors separats per menys de 3 paraules, AGRUPA'LS en un sol canvi:
+Text: "La documentacio dde l'area metropolitana"
+❌ 3 canvis separats (risc de conflicte d'índexs)
+✅ find: "documentacio dde l'area", replace: "documentació de l'àrea"
+
+### Regla 3: Verificació Pre-Output
+Abans de retornar cada canvi, VERIFICA MENTALMENT:
+1. El "find" apareix EXACTAMENT UNA vegada al paràgraf? → Si no, afegir context
+2. El "replace" té la mateixa longitud ±10%? → Si no, potser és "improve"
+3. L'error és OBJECTIU (no estilístic)? → Si no, no corregir
+
+## ERRORS A CORREGIR
+- Lletres repetides: "dde" → "de", "laa" → "la", "quee" → "que"
+- Accents oblidats: "area" → "àrea", "documentacio" → "documentació"
+- Concordança evident: "els casa" → "les cases"
+- Typos comuns: "tembé" → "també", "peró" → "però"
+
+## NO CORREGIR
+- Noms propis (majúscula a mig de frase): Joan, Barcelona, PAE
+- Sigles i acrònims: PAE, DOGC, API, URL
+- Estil o preferències (això és "improve", no "fix")
+- Paraules tècniques desconegudes
+
+## ACCENTS DIACRÍTICS CATALANS (ATENCIÓ ESPECIAL)
+Parells ambigus on ambdues formes existeixen:
+| Sense | Amb | Exemple sense | Exemple amb |
+|-------|-----|---------------|-------------|
+| te | té | "te verd" (planta) | "ell té raó" (verb) |
+| mes | més | "fa uns mesos" | "vull més" |
+| dona | dóna | "una dona" (femella) | "li dóna" (verb) |
+| sol | sòl | "el sol" (astre) | "el sòl" (terra) |
+
+PROTOCOL:
+- Si el context és 100% CLAR → Corregir
+- Si hi ha QUALSEVOL DUBTE → NO corregir (millor no tocar que equivocar-se)
+
+## OUTPUT JSON
 \`\`\`json
 {
   "changes": [
     {
       "paragraph_id": <número>,
-      "original_text": "<text original>",
-      "new_text": "<text corregit>",
-      "explanation": "<què s'ha corregit>"
+      "find": "<text únic amb context si cal>",
+      "replace": "<text corregit>",
+      "reason": "typo|accent|grammar|diacritic"
     }
   ]
 }
-\`\`\``,
+\`\`\`
 
-  improve: `Ets un editor professional. La teva tasca és MILLORAR el text mantenint el significat.
+Si no hi ha errors: {"changes": [], "message": "Cap error detectat"}`,
 
-## Objectius
-- Millorar claredat i llegibilitat
-- Eliminar repeticions innecessàries
-- Millorar el flux del text
-- Mantenir el to original
+  improve: `EDITOR DE MILLORES CONSERVATIVES
+Objectiu: Millorar claredat i fluïdesa SENSE canviar significat ni to.
 
-## Restriccions
-- NO canviïs el significat
-- NO afegeixis informació nova
-- Canvis moderats (no reescriptura total)
+## MILLORES PERMESES (amb criteri mesurable)
+| Tipus | Criteri | Acció |
+|-------|---------|-------|
+| Frase llarga | >40 paraules | Dividir en 2 frases |
+| Repetició | Paraula 3+ cops proper | Usar sinònim |
+| Veu passiva | Encadenament 2+ passives | Convertir a activa |
+| Subordinació | 3+ nivells de "que" | Simplificar estructura |
+| Connector feble | "i" repetit 4+ cops | Variar connectors |
 
-## Format de sortida
+## RESTRICCIONS ESTRICTES
+- PRESERVAR: significat, to, registre, terminologia tècnica
+- PROHIBIT: afegir idees noves, eliminar informació, canviar conclusions
+- LÍMIT: màxim 30% de canvi per paràgraf (si cal més, és "rewrite")
+
+## PROTOCOL
+1. Identificar problemes MESURABLES (no preferències)
+2. Aplicar canvis MÍNIMS necessaris
+3. Verificar que el significat és IDÈNTIC
+4. Si dubtes, NO canviar
+
+## OUTPUT
 \`\`\`json
 {
   "changes": [
     {
       "paragraph_id": <número>,
-      "original_text": "<text original>",
-      "new_text": "<text millorat>",
-      "explanation": "<què s'ha millorat>"
+      "original_text": "<paràgraf original>",
+      "new_text": "<paràgraf millorat>",
+      "explanation": "[Tipus]: què s'ha millorat i per què"
     }
   ]
 }
-\`\`\``,
+\`\`\`
 
-  expand: `Ets un escriptor expert. La teva tasca és EXPANDIR el contingut.
+Si el text ja és clar, retornar: {"changes": [], "message": "El text ja és adequat"}`,
 
-## Objectius
-- Afegir detalls o exemples rellevants
-- Desenvolupar idees existents
-- Mantenir coherència amb el context
+  expand: `DESENVOLUPADOR DE CONTINGUT
+Objectiu: Expandir text afegint detalls, exemples o explicacions rellevants.
 
-## Restriccions
-- NO contradiguis el contingut original
-- Manté el mateix estil i to
-- Expansió moderada (2-3x màxim)
+## TIPUS D'EXPANSIÓ
+| Tipus | Quan usar | Resultat esperat |
+|-------|-----------|------------------|
+| Detall | Afirmació genèrica | Afegir dades concretes |
+| Exemple | Concepte abstracte | Il·lustrar amb cas pràctic |
+| Explicació | Terme tècnic | Clarificar per audiència general |
+| Context | Referència implícita | Fer explícit el rerefons |
 
-## Format de sortida
+## RESTRICCIONS
+- COHERÈNCIA: No contradir el text original
+- PROPORCIÓ: Expansió 1.5x-2x (no més del doble)
+- ESTIL: Mantenir to i registre originals
+- FONT: Només afegir informació que es pugui inferir del context
+
+## PROTOCOL
+1. Identificar què necessita expansió
+2. Determinar tipus d'expansió adequat
+3. Afegir contingut COHERENT amb l'existent
+4. Verificar que no hi ha contradiccions
+
+## OUTPUT
 \`\`\`json
 {
   "changes": [
@@ -89,21 +161,36 @@ const UPDATE_PROMPTS = {
       "paragraph_id": <número>,
       "original_text": "<text original>",
       "new_text": "<text expandit>",
-      "explanation": "<què s'ha afegit>"
+      "explanation": "[Tipus]: què s'ha afegit"
     }
   ]
 }
 \`\`\``,
 
-  simplify: `Ets un expert en comunicació clara. La teva tasca és SIMPLIFICAR el text.
+  simplify: `SIMPLIFICADOR DE TEXT
+Objectiu: Fer el text més accessible mantenint la informació essencial.
 
-## Objectius
-- Fer el text més accessible
-- Eliminar jargó innecessari
-- Frases més curtes i directes
-- Mantenir la informació essencial
+## TÈCNIQUES DE SIMPLIFICACIÓ
+| Tècnica | Abans | Després |
+|---------|-------|---------|
+| Frases curtes | 40+ paraules | 15-20 paraules |
+| Veu activa | "va ser aprovat" | "van aprovar" |
+| Paraules senzilles | "implementar" | "fer" |
+| Eliminar redundància | "cada un i tots" | "tots" |
 
-## Format de sortida
+## PRESERVAR OBLIGATÒRIAMENT
+- Informació factual completa
+- Termes tècnics necessaris (amb explicació si cal)
+- Matisos importants
+- Conclusions i arguments
+
+## PROHIBIT ELIMINAR
+- Dades numèriques
+- Noms propis i referències
+- Condicions o excepcions legals
+- Advertències o precaucions
+
+## OUTPUT
 \`\`\`json
 {
   "changes": [
@@ -111,20 +198,33 @@ const UPDATE_PROMPTS = {
       "paragraph_id": <número>,
       "original_text": "<text original>",
       "new_text": "<text simplificat>",
-      "explanation": "<què s'ha simplificat>"
+      "explanation": "Simplificat: [tècniques aplicades]"
     }
   ]
 }
 \`\`\``,
 
-  translate: `Ets un traductor professional. La teva tasca és TRADUIR el text.
+  translate: `TRADUCTOR PROFESSIONAL
+Objectiu: Traduir preservant significat, to i estil.
 
-## Objectius
-- Traducció natural, no literal
-- Mantenir el to i estil
-- Adaptar expressions idiomàtiques
+## PRINCIPIS DE TRADUCCIÓ
+1. SENTIT sobre literalitat
+2. Adaptar expressions idiomàtiques
+3. Mantenir registre (formal/informal)
+4. Preservar estructura argumentativa
 
-## Format de sortida
+## ELEMENTS A PRESERVAR
+- Noms propis: NO traduir (excepte si tenen versió oficial)
+- Sigles: Mantenir original + equivalent local si existeix
+- Termes tècnics: Usar terminologia estàndard del sector
+- Cites textuals: Indicar que és traducció
+
+## ELEMENTS A ADAPTAR
+- Expressions idiomàtiques → Equivalent funcional
+- Formats de data/hora → Convenció local
+- Unitats de mesura → Si s'indica a la instrucció
+
+## OUTPUT
 \`\`\`json
 {
   "changes": [
@@ -132,7 +232,8 @@ const UPDATE_PROMPTS = {
       "paragraph_id": <número>,
       "original_text": "<text original>",
       "new_text": "<text traduït>",
-      "target_language": "<idioma destí>"
+      "target_language": "<idioma destí>",
+      "explanation": "Traducció natural, [notes si escau]"
     }
   ]
 }
@@ -186,14 +287,14 @@ async function executeUpdateById(intent, documentContext, conversationContext, o
       validTargets
     );
 
-    // Cridar Gemini
-    const response = await callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal);
+    // Cridar Gemini (v12.1: passa modificationType per temperatura)
+    const response = await callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal, modificationType);
 
-    // Parsejar resposta
-    const parsedResponse = parseUpdateResponse(response);
+    // Parsejar resposta (v12.1: suporta format find/replace per FIX)
+    const parsedResponse = parseUpdateResponse(response, modificationType);
 
-    // Validar canvis
-    const validatedChanges = validateChanges(parsedResponse.changes, documentContext, validTargets);
+    // Validar canvis (v12.1: validació específica per mode)
+    const validatedChanges = validateChanges(parsedResponse.changes, documentContext, validTargets, modificationType);
 
     if (validatedChanges.length === 0) {
       return createNoChangesResponse(language, modificationType);
@@ -211,6 +312,8 @@ async function executeUpdateById(intent, documentContext, conversationContext, o
       mode: Mode.UPDATE_BY_ID,
       changes: validatedChanges,
       chat_response: chatResponse,
+      // v12.1: modification_type a nivell superior per router híbrid del frontend
+      modification_type: modificationType,
       _meta: {
         executor: 'update',
         modification_type: modificationType,
@@ -260,7 +363,7 @@ function buildUpdatePrompt(modificationType, intent, documentContext, targetPara
   for (const id of targetParagraphs) {
     const para = documentContext.paragraphs[id];
     const text = para.text || para;
-    parts.push(`§${id}: ${text}`);
+    parts.push(`§${id + 1}: ${text}`);  // v12.1: 1-indexed per consistència UI
   }
   parts.push('');
 
@@ -278,7 +381,7 @@ function buildUpdatePrompt(modificationType, intent, documentContext, targetPara
     for (const id of Array.from(contextIds).sort((a, b) => a - b)) {
       const para = documentContext.paragraphs[id];
       const text = (para.text || para).slice(0, 200);
-      parts.push(`§${id}: ${text}${text.length >= 200 ? '...' : ''}`);
+      parts.push(`§${id + 1}: ${text}${text.length >= 200 ? '...' : ''}`);  // v12.1: 1-indexed
     }
   }
 
@@ -294,9 +397,13 @@ function buildUpdatePrompt(modificationType, intent, documentContext, targetPara
 
 /**
  * Crida Gemini per generar actualitzacions
+ * v12.1: Temperatura específica per mode
  */
-async function callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal) {
+async function callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal, modificationType = 'improve') {
   const url = `${GEMINI.base_url}/models/${GEMINI.model_update}:generateContent?key=${apiKey}`;
+
+  // v12.1: Seleccionar temperatura segons el mode
+  const temperature = TEMPERATURES[modificationType] || TEMPERATURES.improve;
 
   const requestBody = {
     contents: [
@@ -309,9 +416,9 @@ async function callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal) {
       },
     ],
     generationConfig: {
-      temperature: 0.4, // Balanceig entre creativitat i consistència
+      temperature: temperature,
       topP: 0.85,
-      maxOutputTokens: 8192,  // Augmentat: 20 paràgrafs + thinking necessiten més espai
+      maxOutputTokens: 8192,
     },
   };
 
@@ -337,8 +444,9 @@ async function callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal) {
 
 /**
  * Parseja la resposta de Gemini
+ * v12.1: Suporta format find/replace per mode FIX
  */
-function parseUpdateResponse(responseText) {
+function parseUpdateResponse(responseText, modificationType = 'improve') {
   // Buscar JSON
   const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
   let jsonStr = jsonMatch ? jsonMatch[1] : responseText;
@@ -353,8 +461,30 @@ function parseUpdateResponse(responseText) {
 
   try {
     const parsed = JSON.parse(jsonStr);
+    const changes = parsed.changes || [];
+
+    // v12.1: Per mode FIX, assegurar format find/replace
+    // IMPORTANT: LLM retorna 1-indexed (§1, §2...), convertir a 0-indexed
+    if (modificationType === 'fix') {
+      return {
+        changes: changes.map(c => ({
+          paragraph_id: c.paragraph_id - 1,  // v12.1: 1-indexed → 0-indexed
+          find: c.find || c.original_text,  // Fallback a format antic
+          replace: c.replace || c.new_text,
+          reason: c.reason || c.explanation || 'fix',
+          // Preservar camps originals si existeixen
+          original_text: c.original_text,
+          new_text: c.new_text,
+        })),
+      };
+    }
+
+    // v12.1: Convertir paragraph_id a 0-indexed per modes no-FIX
     return {
-      changes: parsed.changes || [],
+      changes: changes.map(c => ({
+        ...c,
+        paragraph_id: c.paragraph_id - 1,  // v12.1: 1-indexed → 0-indexed
+      })),
     };
   } catch (error) {
     logWarn('Failed to parse update response as JSON', { error: error.message });
@@ -368,8 +498,9 @@ function parseUpdateResponse(responseText) {
 
 /**
  * Valida els canvis proposats
+ * v12.1: Suporta mode FIX amb hallucination checks
  */
-function validateChanges(changes, documentContext, validTargets) {
+function validateChanges(changes, documentContext, validTargets, modificationType = 'improve') {
   if (!Array.isArray(changes)) return [];
 
   const targetSet = new Set(validTargets);
@@ -382,16 +513,53 @@ function validateChanges(changes, documentContext, validTargets) {
       continue;
     }
 
-    // Validar que hi ha new_text
+    const original = documentContext.paragraphs[change.paragraph_id];
+    const originalText = original.text || original;
+
+    // v12.1: Validació específica per mode FIX (find/replace)
+    if (modificationType === 'fix') {
+      // Validar que hi ha find i replace
+      if (!change.find || !change.replace) {
+        logWarn('FIX change without find/replace', { id: change.paragraph_id });
+        continue;
+      }
+
+      // HALLUCINATION CHECK: El text "find" ha d'existir al paràgraf
+      if (!originalText.includes(change.find)) {
+        logWarn('HALLUCINATION: find text not found in paragraph', {
+          paragraph_id: change.paragraph_id,
+          find: change.find,
+          paragraph_preview: originalText.substring(0, 100),
+        });
+        continue;
+      }
+
+      // Verificar que find !== replace
+      if (change.find === change.replace) {
+        logDebug('FIX change identical, skipping', { find: change.find });
+        continue;
+      }
+
+      validated.push({
+        paragraph_id: change.paragraph_id,
+        find: change.find,
+        replace: change.replace,
+        reason: change.reason || 'fix',
+        // Per compatibilitat amb el frontend, també incloure format antic
+        original_text: originalText,
+        new_text: originalText.replace(change.find, change.replace),
+        explanation: `"${change.find}" → "${change.replace}" (${change.reason || 'fix'})`,
+      });
+      continue;
+    }
+
+    // Validació per altres modes (original_text/new_text)
     if (!change.new_text || typeof change.new_text !== 'string') {
       logWarn('Change without new_text', { id: change.paragraph_id });
       continue;
     }
 
     // Verificar que el canvi és diferent de l'original
-    const original = documentContext.paragraphs[change.paragraph_id];
-    const originalText = original.text || original;
-
     if (change.new_text.trim() === originalText.trim()) {
       logDebug('Change identical to original, skipping', { id: change.paragraph_id });
       continue;
@@ -453,7 +621,7 @@ function buildUpdateChatResponse(changes, modificationType, language) {
   // Afegir detalls dels canvis
   if (changes.length <= 3) {
     const details = changes.map(c => {
-      if (c.explanation) return `\n• §${c.paragraph_id}: ${c.explanation}`;
+      if (c.explanation) return `\n• §${c.paragraph_id + 1}: ${c.explanation}`;  // v12.1: 0-indexed → 1-indexed per display
       return '';
     }).filter(Boolean);
     if (details.length > 0) {

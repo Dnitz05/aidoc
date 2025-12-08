@@ -16,204 +16,101 @@ import {
   createDefaultIntent,
   validateIntentPayload,
 } from './types.js';
-import { API, TIMEOUTS, CONFIDENCE_THRESHOLDS } from './config.js';
+import { API, TIMEOUTS, CONFIDENCE_THRESHOLDS, TEMPERATURES } from './config.js';
 import { logInfo, logError, logDebug } from './telemetry.js';
 
 // ═══════════════════════════════════════════════════════════════
 // CLASSIFIER SYSTEM PROMPT
 // ═══════════════════════════════════════════════════════════════
 
-const CLASSIFIER_SYSTEM_PROMPT = `Ets un classificador d'intents per a un assistent de documents.
-La teva ÚNICA tasca és analitzar la instrucció i retornar un JSON estructurat.
+const CLASSIFIER_SYSTEM_PROMPT = `Ets el Router d'Intencions de Docmile v12.1. Retorna JSON estricte.
 
-## MODES DISPONIBLES
+## MATRIU DE DECISIÓ (ORDRE DE PRIORITAT ESTRICTE)
 
-1. **CHAT_ONLY**: Respondre preguntes, explicar, conversar sense modificar el document.
-   - "Què diu l'article 3?"
-   - "Explica'm el document"
-   - "Quin és el tema principal?"
+### PRIORITAT 0: PREGUNTA FACTUAL (OVERRIDE ABSOLUT - ignora ui_mode)
+Patrons interrogatius: "Qui...", "Quan...", "On...", "Quin és...", "Quina és...",
+"De què parla...", "Explica...", "Què diu...", "Què significa...", "Quants...",
+"Per què...", "Com...", "Quines..."
+ACCIÓ: mode = "CHAT_ONLY" (IGNORA ui_mode encara que sigui EDIT)
+response_style:
+- Si conté "resumeix/resum/sintetitza" → "bullet_points"
+- Si conté "explica/analitza/detalla" → "detailed"
+- Resta de preguntes → "concise"
 
-2. **REFERENCE_HIGHLIGHT**: Marcar/destacar parts del document SENSE modificar-lo.
-   - "Veus errors?" → Marcar errors trobats
-   - "On parla de pressupost?" → Marcar mencions
-   - "Revisa si es cita X" → Marcar on apareix X
-   - "Assenyala les inconsistències" → Marcar problemes
+### PRIORITAT 1: REFERENCE_HIGHLIGHT (Anàlisi Passiva - només marcar)
+| Patró | highlight_strategy | Exemple |
+|-------|-------------------|---------|
+| "veus/hi ha/detecta" + "error/falta" | errors | "Veus faltes?" |
+| "revisa" + "ortografia/gramàtica" | errors | "Revisa l'ortografia" |
+| "busca/troba" + terme | mentions | "Busca 'PAE'" |
+| "on apareix/surt/parla de" | mentions | "On parla de pressupost?" |
+| "suggeriments/què puc millorar" | suggestions | "Què puc millorar?" |
+| "estructura/apartats" | structure | "Quina estructura té?" |
+| "revisa tot/revisió completa" | all | "Fes una revisió completa" |
 
-3. **UPDATE_BY_ID**: Modificar paràgrafs específics identificats.
-   - "Corregeix l'article 5"
-   - "Millora el tercer paràgraf"
-   - "Canvia X per Y al paràgraf 3"
+### PRIORITAT 2: UPDATE_BY_ID (Modificació Activa)
+| Patró | modification_type | Exemple |
+|-------|-------------------|---------|
+| "corregeix/arregla/esmena" | fix | "Corregeix les faltes" |
+| "millora/poleix/refina" (sense to) | improve | "Millora el text" |
+| "amplia/desenvolupa/elabora" | expand | "Amplia el punt 3" |
+| "simplifica/escurça/condensa" | simplify | "Simplifica el text" |
+| "tradueix/passa a" + idioma | translate | "Tradueix a anglès" |
 
-4. **REWRITE**: Reescriure parts substancials o tot el document.
-   - "Fes el document més formal"
-   - "Reescriu la introducció"
-   - "Resumeix tot el document"
+### PRIORITAT 3: REWRITE (Transformació Global)
+| Patró | requires_confirmation |
+|-------|-----------------------|
+| "fes més formal/informal" | true |
+| "canvia el to/estil" | true |
+| "reescriu/reformula" (tot) | true |
+| "escriu un/genera/crea" (nou) | true |
 
-## REGLES CRÍTIQUES
+## REGLES ESPECIALS
 
-### Preguntes vs Accions
-- Si la instrucció és una PREGUNTA PURA sense intent d'edició → CHAT_ONLY o REFERENCE_HIGHLIGHT
-- Una pregunta que demana LOCALITZAR/TROBAR/REVISAR → REFERENCE_HIGHLIGHT
-- "Veus X?" / "Hi ha X?" / "Trobes X?" → REFERENCE_HIGHLIGHT (mostrar al document)
-- EXCEPCIÓ IMPORTANT: "Pots corregir/arreglar/millorar X?" = intent d'ACCIÓ → UPDATE_BY_ID o REWRITE
-- Verbs d'ACCIÓ (corregir, arreglar, esmenar, millorar, canviar) → UPDATE_BY_ID encara que sigui pregunta
-- "Pots corregir les faltes?" → UPDATE_BY_ID (no REFERENCE_HIGHLIGHT!)
+### "Pots/Podries + verb" = ACCIÓ (no pregunta)
+- "Pots corregir?" → UPDATE_BY_ID (fix)
+- "Podries millorar?" → UPDATE_BY_ID (improve)
 
-### Quan triar REFERENCE_HIGHLIGHT
-- Qualsevol instrucció que demani LOCALITZAR, TROBAR, IDENTIFICAR, REVISAR, COMPROVAR
-- Preguntes sobre existència/ubicació de contingut
-- Anàlisi que requereix mostrar ON al document
-- "Revisa si..." / "Comprova que..." → REFERENCE_HIGHLIGHT
-- Detecció d'errors, problemes, inconsistències
+### Diferència REVISA vs CORREGEIX
+- "Revisa X" → REFERENCE_HIGHLIGHT (només marca, no modifica)
+- "Corregeix X" → UPDATE_BY_ID (modifica el document)
 
-### Quan triar CHAT_ONLY
-- Preguntes que demanen EXPLICACIÓ sense mostrar ubicació
-- "Què significa...?", "Explica...", "Resumeix..." (sense modificar)
-- Preguntes sobre el contingut general
-- Conversa i interacció sense acció sobre el document
+### Extracció de keywords
+- Entre cometes → terme EXACTE: "busca 'la'" → ["la"]
+- Sense cometes → últim substantiu: "on apareix PAE" → ["PAE"]
 
-### Granularitat de Highlights
-- SEMPRE prefereix marcar text específic sobre paràgrafs sencers
-- scope: "word" > "phrase" > "sentence" > "paragraph"
-- Proporciona keywords per facilitar la cerca
-
-### Anàfores (referències a context previ)
-- "això", "l'anterior", "el següent" → Resol amb conversation_context
-- "el 4" després de parlar d'articles → "article 4"
-- "marca-ho" → Refereix al que s'acaba de discutir
-
-### Confirmació i Risc
-- REWRITE sempre requereix confirmació (risk_level: "high")
-- UPDATE_BY_ID que afecta >50% del paràgraf → risk_level: "medium"
-- Accions destructives (eliminar, esborrar tot) → requires_confirmation: true
-
-## OUTPUT FORMAT
-
-Retorna NOMÉS un objecte JSON vàlid amb aquests camps:
-
+## OUTPUT JSON
 {
-  "mode": "REFERENCE_HIGHLIGHT",
-  "confidence": 0.92,
-  "reasoning": "Demana revisar mencions, necessita localitzar",
-  "secondary_mode": null,
-  "secondary_confidence": null,
-  "action_type": "locate",
-  "scope": "phrase",
+  "thought": "<raonament breu 1 frase>",
+  "mode": "CHAT_ONLY|REFERENCE_HIGHLIGHT|UPDATE_BY_ID|REWRITE",
+  "confidence": 0.0-1.0,
+  "response_style": "concise|bullet_points|detailed|null",
+  "highlight_strategy": "errors|mentions|suggestions|structure|all|null",
+  "modification_type": "fix|improve|expand|simplify|translate|null",
+  "keywords": [],
   "target_paragraphs": [],
-  "keywords": ["serveis de cultura"],
-  "highlight_strategy": "mentions",
-  "expected_count": "few",
-  "color_scheme": null,
-  "modification_type": null,
-  "preserve_structure": true,
-  "preserve_tone": true,
+  "scope": "selection|paragraph|document",
   "requires_confirmation": false,
-  "risk_level": "low",
-  "is_question": true,
-  "resolved_references": []
+  "risk_level": "none|low|medium|high",
+  "is_question": true|false
 }
 
 ## EXEMPLES
 
-### Exemple 1: Pregunta sobre errors
-Instrucció: "Veus faltes al document?"
-{
-  "mode": "REFERENCE_HIGHLIGHT",
-  "confidence": 0.95,
-  "reasoning": "Pregunta sobre errors, cal mostrar-los al document",
-  "action_type": "analyze",
-  "scope": "word",
-  "keywords": [],
-  "highlight_strategy": "errors",
-  "expected_count": "few",
-  "is_question": true,
-  "risk_level": "low"
-}
+### Pregunta en mode Edit (OVERRIDE!)
+Instrucció: "Qui signa l'informe?" (ui_mode: EDIT)
+{"thought":"És pregunta factual. Override a CHAT_ONLY.","mode":"CHAT_ONLY","confidence":0.98,"response_style":"concise","is_question":true,"risk_level":"none"}
 
-### Exemple 2: Localització de mencions
-Instrucció: "Pots revisar si es citen els serveis de cultura?"
-{
-  "mode": "REFERENCE_HIGHLIGHT",
-  "confidence": 0.93,
-  "reasoning": "Revisar si es cita = localitzar mencions",
-  "action_type": "locate",
-  "scope": "phrase",
-  "keywords": ["serveis de cultura", "servei de cultura", "departament cultural"],
-  "highlight_strategy": "mentions",
-  "expected_count": "few",
-  "is_question": true,
-  "risk_level": "low"
-}
+### Resumeix (bullet_points)
+Instrucció: "Resumeix el document"
+{"thought":"Demana resum, response_style bullet_points","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":false,"risk_level":"none"}
 
-### Exemple 3: Pregunta de contingut
-Instrucció: "Què diu l'article 3?"
-{
-  "mode": "CHAT_ONLY",
-  "confidence": 0.90,
-  "reasoning": "Pregunta sobre contingut, no cal marcar",
-  "action_type": "explain",
-  "scope": "paragraph",
-  "target_paragraphs": [3],
-  "is_question": true,
-  "risk_level": "none"
-}
+### Revisa vs Corregeix
+Instrucció: "Revisa l'ortografia"
+{"thought":"Revisa = marcar, no modificar","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"errors","is_question":false,"risk_level":"low"}
 
-### Exemple 4: Correcció específica
-Instrucció: "Corregeix les faltes del paràgraf 5"
-{
-  "mode": "UPDATE_BY_ID",
-  "confidence": 0.88,
-  "reasoning": "Ordre de correcció a paràgraf específic",
-  "action_type": "modify",
-  "scope": "word",
-  "target_paragraphs": [5],
-  "modification_type": "fix",
-  "is_question": false,
-  "risk_level": "medium"
-}
-
-### Exemple 5: Reescriptura global
-Instrucció: "Fes el document més formal"
-{
-  "mode": "REWRITE",
-  "confidence": 0.91,
-  "reasoning": "Canvi d'estil global requereix reescriptura",
-  "action_type": "modify",
-  "scope": "document",
-  "modification_type": "improve",
-  "preserve_structure": true,
-  "requires_confirmation": true,
-  "risk_level": "high",
-  "is_question": false
-}
-
-### Exemple 6: Instrucció ambigua
-Instrucció: "Corregeix l'article 5"
-{
-  "mode": "UPDATE_BY_ID",
-  "confidence": 0.68,
-  "reasoning": "Ambigu: corregir errors o millorar contingut?",
-  "secondary_mode": "REFERENCE_HIGHLIGHT",
-  "secondary_confidence": 0.55,
-  "action_type": "modify",
-  "target_paragraphs": [5],
-  "is_question": false,
-  "risk_level": "medium"
-}
-
-### Exemple 7: Petició d'acció en forma de pregunta (IMPORTANT!)
-Instrucció: "Pots corregir les faltes del document?"
-{
-  "mode": "UPDATE_BY_ID",
-  "confidence": 0.90,
-  "reasoning": "CORREGIR és verb d'ACCIÓ, no pregunta d'observació. Intent clar de modificar tot el document.",
-  "action_type": "modify",
-  "scope": "document",
-  "target_paragraphs": [],
-  "modification_type": "fix",
-  "is_question": false,
-  "risk_level": "medium"
-}`;
+Instrucció: "Corregeix les faltes"
+{"thought":"Corregeix = modificar document","mode":"UPDATE_BY_ID","confidence":0.95,"modification_type":"fix","scope":"document","is_question":false,"risk_level":"medium"}`;
 
 // ═══════════════════════════════════════════════════════════════
 // API CALL FUNCTIONS
@@ -240,7 +137,8 @@ ${sanitizedInput.language}
 
     // Afegir estructura de headings si existeix
     if (documentContext.structure && documentContext.structure.length > 0) {
-      prompt += `- Estructura: ${documentContext.structure.map(h => `${h.text} (para ${h.para_id})`).join(', ')}
+      // v12.1: Mostrar amb §N (1-indexed per consistència UI)
+      prompt += `- Estructura: ${documentContext.structure.map(h => `${h.text} (§${h.id + 1})`).join(', ')}
 `;
     }
   }
@@ -311,8 +209,8 @@ async function callGeminiClassifier(userPrompt, apiKey, signal) {
           },
         ],
         generationConfig: {
-          temperature: 0.1,  // Baixa temperatura per consistència
-          maxOutputTokens: 4096,  // Augmentat per gemini-2.5-flash amb thinking (~1000 tokens)
+          temperature: TEMPERATURES.classifier,  // v12.1: 0.0 per determinisme absolut
+          maxOutputTokens: 4096,
           topP: 0.8,
         },
         safetySettings: [
@@ -407,12 +305,19 @@ function normalizeIntent(intent) {
   return {
     mode: intent.mode || defaults.mode,
     confidence: typeof intent.confidence === 'number' ? Math.max(0, Math.min(1, intent.confidence)) : defaults.confidence,
+    // v12.1: thought field per chain-of-thought del classifier
+    thought: intent.thought || '',
     reasoning: intent.reasoning || defaults.reasoning,
+    // v12.1: response_style per CHAT_ONLY (concise|bullet_points|detailed)
+    response_style: intent.response_style || null,
     secondary_mode: intent.secondary_mode || null,
     secondary_confidence: typeof intent.secondary_confidence === 'number' ? intent.secondary_confidence : null,
     action_type: intent.action_type || defaults.action_type,
     scope: intent.scope || defaults.scope,
-    target_paragraphs: Array.isArray(intent.target_paragraphs) ? intent.target_paragraphs : [],
+    // v12.1: Convertir de 1-indexed (usuari/LLM) a 0-indexed (intern)
+    target_paragraphs: Array.isArray(intent.target_paragraphs)
+      ? intent.target_paragraphs.map(id => id - 1).filter(id => id >= 0)
+      : [],
     keywords: Array.isArray(intent.keywords) ? intent.keywords : [],
     highlight_strategy: intent.highlight_strategy || null,
     expected_count: intent.expected_count || null,

@@ -322,11 +322,12 @@ function formatContextForPrompt(windowedContext) {
     lines.push('');
   }
 
-  // Paràgrafs
+  // Paràgrafs (v12.1: IDs 1-indexed per consistència amb UI)
   for (const para of windowedContext.paragraphs) {
     const prefix = para.isSelected ? '>>> ' : '';
     const headingMarker = para.isHeading ? ' [HEADING]' : '';
-    lines.push(`§${para.id}${headingMarker}: ${prefix}${para.text}`);
+    // Mostrar ID + 1 per UI (l'usuari veu §1, §2... no §0, §1...)
+    lines.push(`§${para.id + 1}${headingMarker}: ${prefix}${para.text}`);
   }
 
   // Text seleccionat si n'hi ha
@@ -364,11 +365,11 @@ function formatContextForExecutor(windowedContext, targetIds = []) {
 
   for (const para of windowedContext.paragraphs) {
     if (targetSet.has(para.id)) {
-      // Paràgraf target - mostrar complet
-      lines.push(`§${para.id} [TARGET]: ${para.text}`);
+      // Paràgraf target - mostrar complet (v12.1: 1-indexed)
+      lines.push(`§${para.id + 1} [TARGET]: ${para.text}`);
     } else if (contextIds.has(para.id)) {
-      // Context adjacent - mostrar truncat
-      lines.push(`§${para.id}: ${truncateParagraph(para.text, 200)}`);
+      // Context adjacent - mostrar truncat (v12.1: 1-indexed)
+      lines.push(`§${para.id + 1}: ${truncateParagraph(para.text, 200)}`);
     }
   }
 
