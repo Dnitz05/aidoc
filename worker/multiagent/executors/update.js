@@ -311,7 +311,7 @@ async function callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal) {
     generationConfig: {
       temperature: 0.4, // Balanceig entre creativitat i consistència
       topP: 0.85,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 8192,  // Augmentat: 20 paràgrafs + thinking necessiten més espai
     },
   };
 

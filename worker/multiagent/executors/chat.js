@@ -167,7 +167,7 @@ async function callGeminiChat(userPrompt, apiKey, signal) {
     generationConfig: {
       temperature: 0.7,
       topP: 0.9,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 4096,  // Augmentat per thinking mode
     },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },

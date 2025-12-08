@@ -302,7 +302,7 @@ async function callGeminiHighlight(systemPrompt, userPrompt, apiKey, signal) {
     generationConfig: {
       temperature: 0.3, // Més determinístic per a detecció d'errors
       topP: 0.8,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,  // Augmentat per documents grans
     },
   };
 

@@ -289,7 +289,7 @@ async function generateRewritePreview(rewriteType, intent, documentContext, targ
     generationConfig: {
       temperature: 0.6, // Més creatiu per reescriptura
       topP: 0.9,
-      maxOutputTokens: 4096, // Més espai per reescriptures llargues
+      maxOutputTokens: 8192, // Augmentat: thinking + documents grans
     },
   };
 
