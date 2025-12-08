@@ -3521,8 +3521,14 @@ async function handleGenerateTitle(body, env, corsHeaders) {
   }
 
   // v10.2: Build conversation summary from all available messages
+  // Debug: log message roles
+  console.log('[generate_title] Message roles:', msgs.map(m => m.role));
+
   const userMsgs = msgs.filter(m => m.role === 'user').map(m => m.content.substring(0, 150)).join('\n');
-  const aiMsgs = msgs.filter(m => m.role === 'assistant' || m.role === 'model').map(m => m.content.substring(0, 150)).join('\n');
+  const aiMsgs = msgs.filter(m => m.role === 'assistant' || m.role === 'model' || m.role === 'ai').map(m => m.content.substring(0, 150)).join('\n');
+
+  console.log('[generate_title] userMsgs:', userMsgs?.substring(0, 50));
+  console.log('[generate_title] aiMsgs:', aiMsgs?.substring(0, 50));
 
   const prompt = `Generate a SHORT and NATURAL title for this conversation.
 
@@ -3603,7 +3609,13 @@ Write ONLY the title (natural, 2-4 words, same language as conversation):`;
     status: "ok",
     title: title,
     generated: true,
-    debug: { original_title: conv.title, msg_count: msgs.length }
+    debug: {
+      original_title: conv.title,
+      msg_count: msgs.length,
+      roles: msgs.map(m => m.role),
+      user_preview: userMsgs?.substring(0, 50),
+      ai_preview: aiMsgs?.substring(0, 50)
+    }
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 

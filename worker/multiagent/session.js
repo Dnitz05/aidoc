@@ -1,27 +1,38 @@
 /**
- * Multi-Agent System Session State v8.3
+ * Multi-Agent System Session State v8.4
  *
  * Gestió de l'estat de sessió incloent:
  * - Historial de conversa (últims N torns)
  * - Pending intents (clarificacions pendents)
  * - Rewrite previews pendents de confirmació
  * - Referències a paràgrafs mencionats
+ *
+ * v8.4: Persistència amb Cloudflare KV (sessions sobreviuen deploys)
  */
 
 import { createSessionState, Mode } from './types.js';
 import { CACHE } from './config.js';
-import { logDebug, logInfo } from './telemetry.js';
+import { logDebug, logInfo, logError } from './telemetry.js';
 
 // ═══════════════════════════════════════════════════════════════
 // SESSION STORAGE
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Emmagatzematge de sessions in-memory.
- * En producció, això podria ser Cloudflare Durable Objects o KV.
- * @type {Map<string, SessionState>}
+ * Cache in-memory per reduir crides a KV (hot path)
+ * @type {Map<string, {session: SessionState, timestamp: number}>}
  */
-const sessionStore = new Map();
+const sessionCache = new Map();
+
+/**
+ * TTL del cache in-memory (5 minuts)
+ */
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * TTL de sessions a KV (30 minuts)
+ */
+const SESSION_TTL_SECONDS = 30 * 60;
 
 /**
  * Màxim de torns a mantenir a l'historial
@@ -38,63 +49,108 @@ const MAX_MENTIONED_PARAGRAPHS = 10;
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Obté o crea una sessió
+ * Obté o crea una sessió (amb KV persistent + cache in-memory)
  * @param {string} sessionId - ID de la sessió
- * @returns {SessionState}
+ * @param {Object} env - Entorn amb SESSIONS KV binding
+ * @returns {Promise<SessionState>}
  */
-function getSession(sessionId) {
+async function getSession(sessionId, env) {
   if (!sessionId) {
     return createSessionState();
   }
 
-  if (!sessionStore.has(sessionId)) {
-    sessionStore.set(sessionId, createSessionState());
-    logDebug('New session created', { sessionId });
+  // 1. Check in-memory cache first (hot path)
+  const cached = sessionCache.get(sessionId);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
+    logDebug('Session from cache', { sessionId: sessionId.slice(0, 8) });
+    return cached.session;
   }
 
-  return sessionStore.get(sessionId);
+  // 2. Try KV storage
+  if (env?.SESSIONS) {
+    try {
+      const stored = await env.SESSIONS.get(sessionId, { type: 'json' });
+      if (stored) {
+        // Update in-memory cache
+        sessionCache.set(sessionId, { session: stored, timestamp: Date.now() });
+        logDebug('Session from KV', { sessionId: sessionId.slice(0, 8) });
+        return stored;
+      }
+    } catch (error) {
+      logError('KV get error', { error: error.message });
+    }
+  }
+
+  // 3. Create new session
+  const newSession = createSessionState();
+  sessionCache.set(sessionId, { session: newSession, timestamp: Date.now() });
+  logDebug('New session created', { sessionId: sessionId.slice(0, 8) });
+  return newSession;
 }
 
 /**
- * Guarda una sessió
+ * Guarda una sessió (a KV + cache)
  * @param {string} sessionId - ID de la sessió
  * @param {SessionState} session - Estat de sessió
+ * @param {Object} env - Entorn amb SESSIONS KV binding
+ * @returns {Promise<void>}
  */
-function saveSession(sessionId, session) {
+async function saveSession(sessionId, session, env) {
   if (!sessionId) return;
-  sessionStore.set(sessionId, session);
+
+  // Update in-memory cache
+  sessionCache.set(sessionId, { session, timestamp: Date.now() });
+
+  // Persist to KV (async, non-blocking)
+  if (env?.SESSIONS) {
+    try {
+      await env.SESSIONS.put(sessionId, JSON.stringify(session), {
+        expirationTtl: SESSION_TTL_SECONDS,
+      });
+      logDebug('Session saved to KV', { sessionId: sessionId.slice(0, 8) });
+    } catch (error) {
+      logError('KV put error', { error: error.message });
+    }
+  }
 }
 
 /**
  * Elimina una sessió
  * @param {string} sessionId - ID de la sessió
+ * @param {Object} env - Entorn amb SESSIONS KV binding
+ * @returns {Promise<void>}
  */
-function deleteSession(sessionId) {
-  if (sessionId) {
-    sessionStore.delete(sessionId);
-    logDebug('Session deleted', { sessionId });
+async function deleteSession(sessionId, env) {
+  if (!sessionId) return;
+
+  sessionCache.delete(sessionId);
+
+  if (env?.SESSIONS) {
+    try {
+      await env.SESSIONS.delete(sessionId);
+      logDebug('Session deleted from KV', { sessionId: sessionId.slice(0, 8) });
+    } catch (error) {
+      logError('KV delete error', { error: error.message });
+    }
   }
 }
 
 /**
- * Neteja sessions expirades (garbage collection)
- * Cridar periòdicament per evitar memory leaks
+ * Neteja el cache in-memory (el KV té TTL automàtic)
  */
 function cleanupExpiredSessions() {
   const now = Date.now();
   let cleaned = 0;
 
-  for (const [sessionId, session] of sessionStore.entries()) {
-    // Si la sessió no té activitat recent (30 min)
-    const lastActivity = session.lastActivity || 0;
-    if (now - lastActivity > 30 * 60 * 1000) {
-      sessionStore.delete(sessionId);
+  for (const [sessionId, cached] of sessionCache.entries()) {
+    if (now - cached.timestamp > CACHE_TTL_MS) {
+      sessionCache.delete(sessionId);
       cleaned++;
     }
   }
 
   if (cleaned > 0) {
-    logInfo('Sessions cleaned up', { count: cleaned });
+    logInfo('In-memory cache cleaned', { count: cleaned });
   }
 }
 

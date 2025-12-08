@@ -28,30 +28,30 @@ const PROVIDERS = {
     name: 'Google Gemini',
     defaultModel: 'gemini-2.0-flash',
     models: {
+      'gemini-3-pro': 'Gemini 3 Pro (Més potent)',
       'gemini-2.0-flash': 'Gemini 2.0 Flash (Recomanat)',
       'gemini-2.0-flash-thinking-exp': 'Gemini 2.0 Flash Thinking',
-      'gemini-1.5-pro-latest': 'Gemini 1.5 Pro',
-      'gemini-1.5-flash-latest': 'Gemini 1.5 Flash'
+      'gemini-1.5-pro-latest': 'Gemini 1.5 Pro'
     }
   },
   openai: {
     name: 'OpenAI',
-    defaultModel: 'gpt-4.1-mini',
+    defaultModel: 'gpt-4o',
     models: {
-      'gpt-4.1': 'GPT-4.1 (Més potent)',
-      'gpt-4.1-mini': 'GPT-4.1 Mini (Recomanat)',
-      'gpt-4o': 'GPT-4o',
+      'chatgpt-5.1': 'ChatGPT 5.1 (Més potent)',
+      'gpt-4o': 'GPT-4o (Recomanat)',
+      'gpt-4o-mini': 'GPT-4o Mini (Ràpid)',
       'o1': 'o1 (Raonament avançat)',
       'o1-mini': 'o1 Mini (Raonament ràpid)'
     }
   },
   claude: {
     name: 'Anthropic Claude',
-    defaultModel: 'claude-sonnet-4-20250514',
+    defaultModel: 'claude-sonnet-4-5-20251101',
     models: {
-      'claude-sonnet-4-20250514': 'Claude Sonnet 4 (Recomanat)',
-      'claude-opus-4-20250514': 'Claude Opus 4 (Més potent)',
-      'claude-3-7-sonnet-20250219': 'Claude 3.7 Sonnet',
+      'claude-opus-4-5-20251101': 'Claude Opus 4.5 (Més potent)',
+      'claude-sonnet-4-5-20251101': 'Claude Sonnet 4.5 (Recomanat)',
+      'claude-sonnet-4-20250514': 'Claude Sonnet 4',
       'claude-3-5-haiku-20241022': 'Claude 3.5 Haiku (Ràpid)'
     }
   },

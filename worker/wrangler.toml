@@ -5,3 +5,8 @@ compatibility_date = "2024-01-01"
 [vars]
 # Defaults - overridden by secrets in production
 SUPABASE_URL = "https://qlvurumbindbykymryim.supabase.co"
+
+# KV Namespaces for persistent storage
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "40fd2f8e64854fb5a7d34b719b11d7e3"

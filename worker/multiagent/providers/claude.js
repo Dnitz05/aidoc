@@ -6,7 +6,7 @@ import { BaseProvider } from './base.js';
 
 export class ClaudeProvider extends BaseProvider {
   static PROVIDER_ID = 'claude';
-  static DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+  static DEFAULT_MODEL = 'claude-sonnet-4-5-20251101';
   static BASE_URL = 'https://api.anthropic.com/v1';
 
   /**
