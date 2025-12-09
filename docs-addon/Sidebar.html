@@ -3259,6 +3259,182 @@
       }
 
       // ═══════════════════════════════════════════════════════════
+      // v9.0: PROACTIVE HIGHLIGHTING SYSTEM
+      // ═══════════════════════════════════════════════════════════
+      // Automatic highlighting of text snippets mentioned by AI
+      // with 5-second auto-clear and click-to-reactivate
+
+      let proactiveHighlightTimer = null;
+      let currentProactiveHighlights = [];
+
+      /**
+       * Process AI response with proactive highlights
+       * Called when we receive a response with proactive_highlights
+       */
+      function handleProactiveHighlights(highlights, appliedCount) {
+        if (!highlights || highlights.length === 0) return;
+
+        currentProactiveHighlights = highlights;
+
+        // v9.2 FIX: Mark only snippets in the LAST message as active (not all messages)
+        // The bubble was just added by addBubbleWithProactiveHighlights, so it's the last child
+        const container = document.getElementById('chatHistory');
+        const lastBubble = container ? container.lastElementChild : null;
+        if (lastBubble) {
+          lastBubble.querySelectorAll('.highlight-snippet').forEach(function(el) {
+            el.classList.add('active');
+          });
+        }
+
+        // Start 5-second timer to clear highlights from document
+        if (proactiveHighlightTimer) {
+          clearTimeout(proactiveHighlightTimer);
+        }
+
+        proactiveHighlightTimer = setTimeout(function() {
+          clearProactiveHighlightsFromDoc();
+
+          // Add fading animation to snippets
+          document.querySelectorAll('.highlight-snippet.active').forEach(function(el) {
+            el.classList.remove('active');
+            el.classList.add('fading');
+            setTimeout(function() {
+              el.classList.remove('fading');
+            }, 500);
+          });
+        }, 5000);  // 5 seconds
+
+        console.log('[Proactive Highlight] Timer started for ' + highlights.length + ' highlights');
+      }
+
+      /**
+       * Clear proactive highlights from document
+       */
+      function clearProactiveHighlightsFromDoc() {
+        google.script.run
+          .withSuccessHandler(function(result) {
+            console.log('[Proactive Highlight] Cleared:', result);
+          })
+          .withFailureHandler(function(err) {
+            console.error('[Proactive Highlight] Clear error:', err);
+          })
+          .clearProactiveHighlights();
+      }
+
+      /**
+       * Reactivate highlight when snippet is clicked
+       * @param {string} text - The text to highlight
+       */
+      function reactivateHighlight(text, snippetEl) {
+        // Clear any existing timer
+        if (proactiveHighlightTimer) {
+          clearTimeout(proactiveHighlightTimer);
+        }
+
+        // Mark this snippet as active
+        document.querySelectorAll('.highlight-snippet.active').forEach(function(el) {
+          el.classList.remove('active');
+        });
+        snippetEl.classList.add('active');
+
+        // Highlight in document
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              // Set new timer
+              proactiveHighlightTimer = setTimeout(function() {
+                clearProactiveHighlightsFromDoc();
+                snippetEl.classList.remove('active');
+                snippetEl.classList.add('fading');
+                setTimeout(function() {
+                  snippetEl.classList.remove('fading');
+                }, 500);
+              }, 5000);
+            } else {
+              showToast('Text no trobat al document', 'warning');
+              snippetEl.classList.remove('active');
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.error('[reactivateHighlight] Error:', err);
+            snippetEl.classList.remove('active');
+          })
+          .highlightTextSnippet(text);
+      }
+
+      /**
+       * Escape special regex characters
+       */
+      function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+
+      /**
+       * Add bubble with proactive highlights (clickable snippets)
+       * @param {string} aiResponse - The AI response text
+       * @param {Array} highlights - Array of highlight objects with text
+       */
+      function addBubbleWithProactiveHighlights(aiResponse, highlights) {
+        const container = document.getElementById('chatHistory');
+        const bubble = document.createElement('div');
+        bubble.className = 'msg ai';
+
+        // v9.0 FIX: Process snippets BEFORE markdown to avoid HTML interference
+        // Step 1: Replace highlight texts with unique placeholders in plain text
+        let processedText = aiResponse;
+        const snippetMap = {};
+
+        if (highlights && highlights.length > 0) {
+          // Sort by text length (longest first) to avoid partial matches
+          const sortedHighlights = highlights.slice().sort(function(a, b) {
+            return (b.text || '').length - (a.text || '').length;
+          });
+
+          sortedHighlights.forEach(function(hl, idx) {
+            if (hl.text && hl.text.length >= 3) {
+              // v9.2 FIX: Use curly braces instead of underscores to avoid markdown interference
+              // Triple underscores were being converted by bold pattern /__(.+?)__/g
+              const placeholder = '{{{SNIPPET_' + idx + '}}}';
+              const escapedText = escapeRegExp(hl.text);
+              const regex = new RegExp(escapedText, 'gi');
+
+              // Only replace first occurrence
+              const match = processedText.match(regex);
+              if (match) {
+                processedText = processedText.replace(match[0], placeholder);
+                snippetMap[placeholder] = {
+                  originalText: match[0],
+                  searchText: hl.text
+                };
+              }
+            }
+          });
+        }
+
+        // Step 2: Render markdown (placeholders survive as plain text)
+        const mdResult = renderMarkdown(processedText);
+        let mdHtml = typeof mdResult === 'object' ? mdResult.html : mdResult;
+
+        // Step 3: Replace placeholders with clickable snippet HTML
+        for (const [placeholder, data] of Object.entries(snippetMap)) {
+          // v9.0 FIX: Escape backslashes, then quotes, then newlines for safe JS string in HTML attribute
+          const escapedSearch = data.searchText
+            .replace(/\\/g, '\\\\')    // Backslashes first
+            .replace(/'/g, "\\'")       // Single quotes
+            .replace(/"/g, '&quot;')    // Double quotes (HTML entity)
+            .replace(/\n/g, '\\n')      // Newlines
+            .replace(/\r/g, '\\r');     // Carriage returns
+          const snippetHtml = '<span class="highlight-snippet" onclick="reactivateHighlight(\'' +
+            escapedSearch + '\', this)">' + escapeHtmlSafe(data.originalText) + '</span>';
+          mdHtml = mdHtml.replace(placeholder, snippetHtml);
+        }
+
+        bubble.innerHTML = '<div class="md-content">' + mdHtml + '</div>';
+        container.appendChild(bubble);
+        container.scrollTop = container.scrollHeight;
+      }
+
+      // ═══════════════════════════════════════════════════════════
       // v11.0: ANNOTATION SYSTEM - Unified Highlights + Changes
       // ═══════════════════════════════════════════════════════════
 
@@ -4599,7 +4775,16 @@
             }
 
             // Normal response handling (chat mode, no edits)
-            addBubble('ai', res.ai_response, false);
+            // v9.0: Handle proactive highlights
+            if (res.proactive_highlights && res.proactive_highlights.length > 0) {
+              // Render response with clickable snippets
+              addBubbleWithProactiveHighlights(res.ai_response, res.proactive_highlights);
+              // Start the 5-second timer
+              handleProactiveHighlights(res.proactive_highlights, res.proactive_applied || 0);
+            } else {
+              addBubble('ai', res.ai_response, false);
+            }
+
             if (res.credits !== undefined) {
               updateCredits(res.credits);
             }

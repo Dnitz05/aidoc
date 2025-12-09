@@ -1025,6 +1025,54 @@ Operacions disponibles:
 - delete_row: Esborra fila (row)
 - update_row: Reescriu fila sencera (row, values)
 Índexs comencen a 0. Fila 0 = capçaleres.
+
+═══════════════════════════════════════════════════════════════
+RESSALTAT PROACTIU (v9.0 - Columna Central del Projecte)
+═══════════════════════════════════════════════════════════════
+
+⚠️ REGLA CRÍTICA: Quan parlis sobre el document, SEMPRE marca els fragments que referencis.
+
+QUAN MARCAR TEXT:
+- Quan citis o referencïs parts específiques del document
+- Quan expliquis o comentes sobre fragments concrets
+- Quan responguis preguntes sobre el contingut del document
+- Quan identifiquis elements rellevants (encara que no siguin errors)
+
+FORMAT DE MARCATGE: [[text exacte del document]]
+- Usa doble claudàtor per marcar el text a ressaltar
+- El text DINS els claudàtors ha de ser EXACTE al document (case-sensitive)
+- Màxim 10-15 paraules per marcatge (prefereix granularitat fina)
+
+GRANULARITAT ADAPTATIVA:
+- Error ortogràfic → Marca només la PARAULA: [[increiblement]]
+- Frase problemàtica → Marca la FRASE: [[Es va decidir per raons diverses]]
+- Concepte clau → Marca el FRAGMENT: [[la teoria de la relativitat]]
+- Secció referenciada → Marca NOMÉS l'inici: [[Capítol 3: Metodologia]]
+
+EXEMPLES D'ÚS CORRECTE:
+
+Usuari: "De què parla el document?"
+Resposta: "El document tracta sobre [[el canvi climàtic i els seus efectes]] a la Mediterrània. A la introducció menciona [[l'augment de temperatures de 1.5°C]] com a punt crític."
+
+Usuari: "Qui és l'autor?"
+Resposta: "L'autor és [[Dr. Maria Garcia]], tal com indica la capçalera del document."
+
+Usuari: "Què significa aquesta part?"  (amb selecció)
+Resposta: "El fragment [[la paradoxa del gat de Schrödinger]] fa referència a un experiment mental de física quàntica..."
+
+Usuari: "Hi ha algun problema amb el text?"
+Resposta: "Sí, detecta algunes qüestions:
+- [[increiblement]] hauria de ser 'increïblement'
+- [[la la casa]] té una repetició
+- [[Es va decidir per raons diverses que no podem explicar aquí]] és una frase massa vaga"
+
+⛔ ERRORS A EVITAR:
+- NO marquis text que NO existeix al document
+- NO marquis la teva pròpia resposta, només text DEL document
+- NO usis marcatge per èmfasi genèric ([[important!]]) - només per text del document
+- NO marquis paràgrafs sencers si pots ser més específic
+
+✅ PRIORITAT: Sempre que parlis d'una part concreta del document → MARCA-LA amb [[]]
 `;
 
   // Style guide
@@ -1768,6 +1816,149 @@ function parseAndValidate(rawText) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// v9.0: PROACTIVE HIGHLIGHT PARSER
+// ═══════════════════════════════════════════════════════════════
+// Extracts [[text]] markers from AI response for document highlighting
+
+function parseProactiveHighlights(response, documentText) {
+  // Extract text field from response (can be chat_response, ai_response, etc.)
+  const responseText = response.chat_response || response.ai_response || '';
+
+  if (!responseText || !documentText) {
+    return { cleanedResponse: responseText, highlights: [] };
+  }
+
+  // Regex to find all [[text]] markers
+  const markerRegex = /\[\[([^\]]+)\]\]/g;
+  const highlights = [];
+  const seenTexts = new Set();
+  let match;
+
+  while ((match = markerRegex.exec(responseText)) !== null) {
+    const markedText = match[1].trim();
+
+    // Skip if empty or already seen (avoid duplicates)
+    if (!markedText || seenTexts.has(markedText.toLowerCase())) {
+      continue;
+    }
+    seenTexts.add(markedText.toLowerCase());
+
+    // Try to find this text in the document
+    // First, try exact match
+    let foundInDoc = documentText.includes(markedText);
+
+    // If not found, try case-insensitive
+    if (!foundInDoc) {
+      foundInDoc = documentText.toLowerCase().includes(markedText.toLowerCase());
+    }
+
+    if (foundInDoc) {
+      // Find which paragraph contains this text
+      const paraMatch = findParagraphForText(documentText, markedText);
+
+      highlights.push({
+        text: markedText,
+        para_id: paraMatch.para_id,
+        start: paraMatch.start,
+        end: paraMatch.end,
+        confidence: paraMatch.confidence,
+        // v9.2 FIX: Propagate normalized_text for fuzzy match fallback in Code.gs
+        normalized_text: paraMatch.normalized_text || null
+      });
+    } else {
+      // Text not found in document - might be AI hallucination or paraphrasing
+      // Still include but mark as low confidence
+      highlights.push({
+        text: markedText,
+        para_id: null,
+        start: null,
+        end: null,
+        confidence: 'low'
+      });
+    }
+  }
+
+  // Clean the response by removing [[ ]] markers but keeping the text
+  const cleanedResponse = responseText.replace(/\[\[([^\]]+)\]\]/g, '$1');
+
+  return {
+    cleanedResponse,
+    highlights: highlights.filter(h => h.para_id !== null) // Only return found highlights
+  };
+}
+
+// Helper: Find paragraph ID and position for a text snippet
+function findParagraphForText(documentText, searchText) {
+  // Document format: {{0}} text {{1}} text {{2}} text...
+  // Parse paragraphs
+  const paraRegex = /\{\{(\d+)\}\}\s*([\s\S]*?)(?=\{\{(?:\d+|T:\d+|TOC:\d+)\}\}|$)/g;
+  let paraMatch;
+
+  while ((paraMatch = paraRegex.exec(documentText)) !== null) {
+    const paraId = parseInt(paraMatch[1], 10);
+    const paraText = paraMatch[2];
+
+    // Try exact match first
+    let pos = paraText.indexOf(searchText);
+    if (pos !== -1) {
+      return {
+        para_id: paraId,
+        start: pos,
+        end: pos + searchText.length,
+        confidence: 'exact'
+      };
+    }
+
+    // Try case-insensitive match
+    pos = paraText.toLowerCase().indexOf(searchText.toLowerCase());
+    if (pos !== -1) {
+      return {
+        para_id: paraId,
+        start: pos,
+        end: pos + searchText.length,
+        confidence: 'case_insensitive'
+      };
+    }
+  }
+
+  // Not found in any paragraph with exact boundaries
+  // Try fuzzy match with normalized whitespace
+  // v9.1 FIX: Keep original case for normalized_text (body.findText is case-sensitive!)
+  const cleanSearchLower = searchText.replace(/\s+/g, ' ').trim().toLowerCase();
+  const cleanSearchOriginal = searchText.replace(/\s+/g, ' ').trim();  // Keep case!
+
+  // Re-scan paragraphs with normalized whitespace
+  paraRegex.lastIndex = 0;  // Reset regex
+  while ((paraMatch = paraRegex.exec(documentText)) !== null) {
+    const paraId = parseInt(paraMatch[1], 10);
+    const originalParaText = paraMatch[2];
+    const normalizedParaText = originalParaText.replace(/\s+/g, ' ').trim().toLowerCase();
+
+    if (normalizedParaText.includes(cleanSearchLower)) {
+      // Found with normalized whitespace
+      // v9.0 FIX: Don't return positions for fuzzy matches - let Code.gs search by text
+      // The positions would be wrong because they're based on normalized text
+      return {
+        para_id: paraId,
+        start: null,  // Force fallback to text search in Code.gs
+        end: null,
+        confidence: 'fuzzy',
+        // v9.1 FIX: Store with ORIGINAL case for body.findText() compatibility
+        normalized_text: cleanSearchOriginal
+      };
+    }
+  }
+
+  // Truly not found
+  return {
+    para_id: null,
+    start: null,
+    end: null,
+    confidence: 'not_found'
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MAIN ENTRY POINT
 // ═══════════════════════════════════════════════════════════════
 
@@ -2007,9 +2198,24 @@ async function handleChat(body, env, corsHeaders) {
 
       console.log(`[Multi-Agent v8.3] ✅ Pipeline completed: ${newPipelineResult.mode}`);
 
+      // v9.0: Proactive highlighting for multi-agent pipeline
+      let pipelineHighlights = [];
+      if (newPipelineResult.mode === 'CHAT_ONLY' || newPipelineResult.mode === 'REFERENCE_HIGHLIGHT') {
+        const highlightResult = parseProactiveHighlights(newPipelineResult, text);
+        if (highlightResult.cleanedResponse) {
+          if (newPipelineResult.chat_response) {
+            newPipelineResult.chat_response = highlightResult.cleanedResponse;
+          } else if (newPipelineResult.ai_response) {
+            newPipelineResult.ai_response = highlightResult.cleanedResponse;
+          }
+        }
+        pipelineHighlights = highlightResult.highlights;
+      }
+
       return new Response(JSON.stringify({
         status: "ok",
         data: newPipelineResult,
+        proactive_highlights: pipelineHighlights,  // v9.0
         credits_remaining: creditsResult.credits_remaining || 0,
         event_id: savedEventId,
         _multiagent: newPipelineResult._multiagent,
@@ -2653,10 +2859,35 @@ IMPORTANT:
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // v9.0: PROACTIVE HIGHLIGHTING - Parse [[text]] markers
+  // ═══════════════════════════════════════════════════════════════
+  let proactiveHighlights = [];
+  if (parsedResponse.mode === 'CHAT_ONLY' || parsedResponse.mode === 'REFERENCE_HIGHLIGHT') {
+    const highlightResult = parseProactiveHighlights(parsedResponse, text);
+
+    // Update response text (remove [[ ]] markers)
+    if (highlightResult.cleanedResponse) {
+      if (parsedResponse.chat_response) {
+        parsedResponse.chat_response = highlightResult.cleanedResponse;
+      } else if (parsedResponse.ai_response) {
+        parsedResponse.ai_response = highlightResult.cleanedResponse;
+      }
+    }
+
+    // Store highlights for frontend
+    proactiveHighlights = highlightResult.highlights;
+
+    if (proactiveHighlights.length > 0) {
+      console.log(`[Proactive Highlight v9.0] Found ${proactiveHighlights.length} markers in response`);
+    }
+  }
+
   // 6. Return response with _meta for quality tracking (v3.1)
   return new Response(JSON.stringify({
     status: "ok",
     data: parsedResponse,
+    proactive_highlights: proactiveHighlights,  // v9.0: Text to highlight in document
     credits_remaining: creditsResult.credits_remaining || 0,
     event_id: savedEventId,  // v3.0: Include event ID for tracking
     auto_ban: autoBanWords,  // v4.0: Words to auto-ban from NL detection

@@ -473,6 +473,84 @@
         margin-top: -8px;
       }
 
+      /* ═══════════════════════════════════════════════════════════
+         v9.0: PROACTIVE HIGHLIGHT SNIPPETS
+         ═══════════════════════════════════════════════════════════ */
+      .highlight-snippet {
+        display: inline;
+        background: linear-gradient(135deg, rgba(179, 224, 255, 0.3) 0%, rgba(138, 180, 248, 0.25) 100%);
+        border-radius: 3px;
+        padding: 1px 4px;
+        margin: 0 1px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-bottom: 2px solid transparent;
+        position: relative;
+      }
+
+      .highlight-snippet:hover {
+        background: linear-gradient(135deg, rgba(179, 224, 255, 0.5) 0%, rgba(138, 180, 248, 0.45) 100%);
+        border-bottom-color: var(--accent);
+      }
+
+      .highlight-snippet:active {
+        transform: scale(0.98);
+      }
+
+      /* Icona del snippet (petita lupa/punt) */
+      .highlight-snippet::before {
+        content: '•';
+        font-size: 8px;
+        margin-right: 2px;
+        color: var(--accent);
+        opacity: 0.6;
+      }
+
+      .highlight-snippet:hover::before {
+        opacity: 1;
+      }
+
+      /* Snippet actiu (ressaltat al document) */
+      .highlight-snippet.active {
+        background: linear-gradient(135deg, rgba(26, 115, 232, 0.25) 0%, rgba(138, 180, 248, 0.35) 100%);
+        border-bottom-color: var(--accent);
+        box-shadow: 0 0 0 1px rgba(26, 115, 232, 0.3);
+      }
+
+      .highlight-snippet.active::before {
+        content: '◆';
+        opacity: 1;
+      }
+
+      /* Dark mode adjustments */
+      [data-theme="dark"] .highlight-snippet {
+        background: linear-gradient(135deg, rgba(138, 180, 248, 0.15) 0%, rgba(138, 180, 248, 0.1) 100%);
+      }
+
+      [data-theme="dark"] .highlight-snippet:hover {
+        background: linear-gradient(135deg, rgba(138, 180, 248, 0.25) 0%, rgba(138, 180, 248, 0.2) 100%);
+      }
+
+      [data-theme="dark"] .highlight-snippet.active {
+        background: linear-gradient(135deg, rgba(138, 180, 248, 0.3) 0%, rgba(138, 180, 248, 0.25) 100%);
+      }
+
+      /* Estat de fade-out (quan expira el timer) */
+      .highlight-snippet.fading {
+        animation: snippetFade 0.5s ease forwards;
+      }
+
+      @keyframes snippetFade {
+        0% {
+          background: linear-gradient(135deg, rgba(26, 115, 232, 0.25) 0%, rgba(138, 180, 248, 0.35) 100%);
+          border-bottom-color: var(--accent);
+        }
+        100% {
+          background: linear-gradient(135deg, rgba(179, 224, 255, 0.3) 0%, rgba(138, 180, 248, 0.25) 100%);
+          border-bottom-color: transparent;
+        }
+      }
+
       .msg.error {
         align-self: flex-start;
         background: var(--error-muted);

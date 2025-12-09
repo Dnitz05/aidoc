@@ -1503,19 +1503,36 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
 
     // --- ROUTER D'INTENCIÓ ---
     if (aiData.mode === 'CHAT_ONLY') {
+      // v9.0: Apply proactive highlights if present
+      let proactiveHighlightResult = null;
+      if (json.proactive_highlights && json.proactive_highlights.length > 0) {
+        try {
+          proactiveHighlightResult = applyProactiveHighlights(json.proactive_highlights);
+          logDiagnostic('PROACTIVE_HIGHLIGHT', {
+            requested: json.proactive_highlights.length,
+            applied: proactiveHighlightResult.applied,
+            not_found: proactiveHighlightResult.notFound ? proactiveHighlightResult.notFound.length : 0
+          });
+        } catch (e) {
+          logDiagnostic('PROACTIVE_HIGHLIGHT_ERROR', { error: e.message });
+        }
+      }
+
       // v3.7: Log resposta CHAT_ONLY
       const responseInfo = {
         mode: 'CHAT_ONLY',
         has_chat_response: !!(aiData.chat_response || aiData.change_summary),
         response_length: (aiData.chat_response || aiData.change_summary || '').length,
-        credits_remaining: json.credits_remaining
+        credits_remaining: json.credits_remaining,
+        proactive_highlights: json.proactive_highlights ? json.proactive_highlights.length : 0
       };
       metrics.setResponseInfo(responseInfo);
       logDiagnostic('RESPONSE', {
         mode: 'CHAT_ONLY',
         response_preview: (aiData.chat_response || aiData.change_summary || '').substring(0, 100),
         doc_was_empty: isDocumentEmpty,
-        user_wanted: userMode
+        user_wanted: userMode,
+        proactive_highlights: json.proactive_highlights ? json.proactive_highlights.length : 0
       });
       metrics.finalize();
 
@@ -1524,6 +1541,9 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
         ai_response: aiData.chat_response || aiData.change_summary,
         credits: json.credits_remaining,
         mode: 'chat',
+        // v9.0: Proactive highlights for frontend rendering
+        proactive_highlights: json.proactive_highlights || [],
+        proactive_applied: proactiveHighlightResult ? proactiveHighlightResult.applied : 0,
         // v3.7: Afegir diagnòstic
         _diag: {
           doc_chars: contentPayload.length,
@@ -5880,6 +5900,295 @@ function clearReferenceHighlights() {
   } catch (e) {
     return { success: false, error: e.message };
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v9.0: PROACTIVE HIGHLIGHTING SYSTEM
+// ═══════════════════════════════════════════════════════════════
+// Highlights text snippets from AI response in the document
+// Uses text search to find exact matches
+
+/**
+ * Color palette for proactive highlights (subtle blue tones)
+ */
+const PROACTIVE_HIGHLIGHT_COLOR = '#b3e0ff';  // Light cyan-blue for proactive highlights
+
+/**
+ * Apply proactive highlights from AI response
+ * @param {Array} highlights - Array of {text, para_id, start, end, confidence}
+ * @returns {Object} - {success, applied, errors}
+ */
+function applyProactiveHighlights(highlights) {
+  try {
+    if (!highlights || !Array.isArray(highlights) || highlights.length === 0) {
+      return { success: true, applied: 0, skipped: 'no highlights' };
+    }
+
+    // v9.0 FIX: Clear any existing proactive highlights before applying new ones
+    // This prevents accumulation if user sends messages quickly
+    try {
+      clearProactiveHighlights();
+    } catch (e) {
+      // Ignore cleanup errors, continue with new highlights
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const results = { applied: 0, errors: [], notFound: [] };
+    const highlightDetails = [];
+
+    // Build element map for para_id lookup
+    const elementsToProcess = getEditableElements(body);
+    let mapIdToElement = {};
+    let currentIndex = 0;
+    for (const el of elementsToProcess) {
+      try {
+        const text = el.asText().getText();
+        if (text.trim().length > 0) {
+          mapIdToElement[currentIndex] = el;
+          currentIndex++;
+        }
+      } catch (e) {}
+    }
+
+    for (const hl of highlights) {
+      try {
+        // Strategy 1: Use para_id + start/end if available (most precise)
+        if (hl.para_id !== null && typeof hl.start === 'number' && typeof hl.end === 'number') {
+          const element = mapIdToElement[hl.para_id];
+          if (element) {
+            const textObj = element.editAsText();
+            const textLength = textObj.getText().length;
+
+            if (textLength > 0) {
+              const startPos = Math.max(0, Math.min(hl.start, textLength - 1));
+              const endPos = Math.max(startPos, Math.min(hl.end - 1, textLength - 1));
+
+              textObj.setBackgroundColor(startPos, endPos, PROACTIVE_HIGHLIGHT_COLOR);
+              highlightDetails.push({
+                para_id: hl.para_id,
+                start: startPos,
+                end: endPos,
+                text: hl.text
+              });
+              results.applied++;
+              continue;
+            }
+          }
+        }
+
+        // Strategy 2: Search by text content (fallback)
+        if (hl.text && hl.text.length >= 3) {
+          // Try original text first, then normalized text for fuzzy matches
+          let searchResult = body.findText(hl.text);
+
+          // v9.0 FIX: If not found and we have normalized_text (fuzzy match), try that
+          if (!searchResult && hl.normalized_text) {
+            searchResult = body.findText(hl.normalized_text);
+          }
+
+          if (searchResult) {
+            const element = searchResult.getElement();
+            const startOffset = searchResult.getStartOffset();
+            const endOffset = searchResult.getEndOffsetInclusive();
+
+            // v9.0 FIX: Use asText() to ensure we have the Text object methods
+            element.asText().setBackgroundColor(startOffset, endOffset, PROACTIVE_HIGHLIGHT_COLOR);
+
+            // Find childIndex for cleanup
+            let childIndex = -1;
+            try {
+              let current = element;
+              while (current.getParent() &&
+                     current.getParent().getType() !== DocumentApp.ElementType.BODY_SECTION) {
+                current = current.getParent();
+              }
+              if (current.getParent()) {
+                childIndex = current.getParent().getChildIndex(current);
+              }
+            } catch (e) {}
+
+            highlightDetails.push({
+              childIndex: childIndex,
+              start: startOffset,
+              end: endOffset,
+              text: hl.text
+            });
+            results.applied++;
+          } else {
+            results.notFound.push(hl.text.substring(0, 30));
+          }
+        }
+
+      } catch (e) {
+        results.errors.push('Error highlighting: ' + e.message);
+      }
+    }
+
+    // Store for cleanup
+    if (highlightDetails.length > 0) {
+      const props = PropertiesService.getDocumentProperties();
+      props.setProperty('proactiveHighlights', JSON.stringify(highlightDetails));
+    }
+
+    // Scroll to first highlight if any applied
+    if (results.applied > 0 && highlightDetails.length > 0) {
+      try {
+        const first = highlightDetails[0];
+        let scrollElement = null;
+
+        // v9.2 FIX: Try para_id first (Strategy 1), then childIndex (Strategy 2)
+        if (first.para_id !== undefined && first.para_id !== null) {
+          scrollElement = mapIdToElement[first.para_id];
+        } else if (first.childIndex !== undefined && first.childIndex >= 0) {
+          scrollElement = body.getChild(first.childIndex);
+        }
+
+        if (scrollElement) {
+          const position = doc.newPosition(scrollElement, 0);
+          doc.setCursor(position);
+        }
+      } catch (scrollErr) {
+        // Ignore scroll errors
+      }
+    }
+
+    results.success = results.applied > 0;
+    return results;
+
+  } catch (e) {
+    console.error('[applyProactiveHighlights] Error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Clear all proactive highlights
+ * @returns {Object} - {success, cleared}
+ */
+function clearProactiveHighlights() {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    const saved = props.getProperty('proactiveHighlights');
+
+    if (!saved) return { success: true, cleared: 0 };
+
+    const details = JSON.parse(saved);
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    let cleared = 0;
+
+    // Rebuild element map for para_id based lookups
+    const elementsToProcess = getEditableElements(body);
+    let mapIdToElement = {};
+    let currentIndex = 0;
+    for (const el of elementsToProcess) {
+      try {
+        const text = el.asText().getText();
+        if (text.trim().length > 0) {
+          mapIdToElement[currentIndex] = el;
+          currentIndex++;
+        }
+      } catch (e) {}
+    }
+
+    for (const detail of details) {
+      try {
+        let element = null;
+        let startPos = detail.start;
+        let endPos = detail.end;
+
+        // Strategy 1: Find element by para_id (most reliable)
+        if (detail.para_id !== undefined && detail.para_id !== null) {
+          element = mapIdToElement[detail.para_id];
+        }
+
+        // Strategy 2: Find by childIndex (less reliable, document may have changed)
+        if (!element && detail.childIndex !== undefined && detail.childIndex >= 0) {
+          if (detail.childIndex < body.getNumChildren()) {
+            element = body.getChild(detail.childIndex);
+          }
+        }
+
+        // Strategy 3: If we have the text, search for it (most robust fallback)
+        if (!element && detail.text && detail.text.length >= 3) {
+          const searchResult = body.findText(detail.text);
+          if (searchResult) {
+            element = searchResult.getElement();
+            startPos = searchResult.getStartOffset();
+            endPos = searchResult.getEndOffsetInclusive();
+          }
+        }
+
+        // Clear the highlight if we found the element
+        if (element) {
+          const textObj = element.editAsText ? element.editAsText() : element.asText();
+          const len = textObj.getText().length;
+
+          if (len > 0) {
+            // If we have specific positions, use them; otherwise clear whole element
+            if (startPos !== undefined && startPos !== null &&
+                endPos !== undefined && endPos !== null) {
+              const safeStart = Math.max(0, Math.min(startPos, len - 1));
+              const safeEnd = Math.max(safeStart, Math.min(endPos, len - 1));
+              textObj.setBackgroundColor(safeStart, safeEnd, null);
+            } else {
+              // Fallback: clear entire element background
+              textObj.setBackgroundColor(0, len - 1, null);
+            }
+            cleared++;
+          }
+        }
+      } catch (e) {
+        // Ignore individual errors - continue with next highlight
+      }
+    }
+
+    props.deleteProperty('proactiveHighlights');
+    return { success: true, cleared: cleared };
+
+  } catch (e) {
+    console.error('[clearProactiveHighlights] Error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Highlight a single text snippet by searching (for click-to-reactivate)
+ * @param {string} text - The text to find and highlight
+ * @returns {Object} - {success, ...}
+ */
+function highlightTextSnippet(text) {
+  // v9.0 FIX: Clear existing proactive highlights before applying new one
+  try {
+    clearProactiveHighlights();
+  } catch (e) {
+    // Ignore cleanup errors
+  }
+
+  // Apply new highlight
+  const result = highlightElement({
+    mode: 'text',
+    value: text,
+    color: PROACTIVE_HIGHLIGHT_COLOR,
+    scroll: true
+  });
+
+  // Store this single highlight for future cleanup
+  if (result.success) {
+    try {
+      const props = PropertiesService.getDocumentProperties();
+      // highlightElement already stores in 'activeHighlight', but we also track as proactive
+      const activeData = props.getProperty('activeHighlight');
+      if (activeData) {
+        props.setProperty('proactiveHighlights', '[' + activeData + ']');
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }
+
+  return result;
 }
 
 /**
