@@ -240,12 +240,16 @@ function buildChatPrompt(intent, documentContext, conversationContext) {
 async function callGeminiChat(userPrompt, apiKey, signal) {
   const url = `${GEMINI.base_url}/models/${GEMINI.model_chat}:generateContent?key=${apiKey}`;
 
+  // v13.5: CRÍTIC - Usar system_instruction per Gemini (NO dins de contents!)
+  // Posar el prompt dins de contents el tracta com a pregunta, no com instruccions
   const requestBody = {
+    system_instruction: {
+      parts: [{ text: CHAT_SYSTEM_PROMPT }]
+    },
     contents: [
       {
         role: 'user',
         parts: [
-          { text: CHAT_SYSTEM_PROMPT },
           { text: userPrompt },
         ],
       },
