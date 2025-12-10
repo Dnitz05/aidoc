@@ -737,6 +737,59 @@
         opacity: 0.8;
       }
 
+      /* v13.0: Sistema Làser de Precisió - Xips de Referència */
+
+      /* Xip clàssic (fallback per [[§ID]] sense text) */
+      .doc-ref-chip {
+        display: inline-block;
+        background-color: var(--accent-muted);
+        color: var(--accent);
+        border-radius: var(--radius-sm);
+        padding: 1px 6px;
+        margin: 0 2px;
+        font-family: var(--font-mono);
+        font-size: 0.88em;
+        font-weight: 500;
+        cursor: pointer;
+        border: 1px solid rgba(26, 115, 232, 0.2);
+        transition: all 0.15s ease;
+        user-select: none;
+      }
+
+      .doc-ref-chip:hover {
+        background-color: var(--accent);
+        color: white;
+        border-color: var(--accent);
+        transform: translateY(-1px);
+      }
+
+      .doc-ref-chip:active {
+        transform: translateY(0);
+      }
+
+      /* Xip Làser - Mostra el TEXT exacte amb subratllat groc */
+      .doc-ref-laser {
+        display: inline;
+        border-bottom: 2px solid #FBC02D;
+        background-color: rgba(255, 245, 157, 0.3);
+        color: inherit;
+        cursor: pointer;
+        padding: 0 2px;
+        border-radius: 2px;
+        transition: all 0.15s ease;
+        font-weight: 500;
+      }
+
+      .doc-ref-laser:hover {
+        background-color: #FFF59D;
+        color: #1a1a1a;
+        border-bottom-color: #F9A825;
+      }
+
+      .doc-ref-laser:active {
+        background-color: #FFEE58;
+      }
+
       /* ═══════════════════════════════════════════════════════════
          MARKDOWN STYLES (v6.5)
          ═══════════════════════════════════════════════════════════ */

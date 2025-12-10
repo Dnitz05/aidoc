@@ -6201,6 +6201,227 @@ function scrollToReference(paragraphIndex, color) {
   return highlightElement({ mode: 'elementId', value: paragraphIndex, color: hexColor });
 }
 
+// ═══════════════════════════════════════════════════════════
+// v13.0: SISTEMA LÀSER DE PRECISIÓ
+// ═══════════════════════════════════════════════════════════
+// Ressalta fragments ESPECÍFICS dins de paràgrafs, no paràgrafs sencers
+
+const LASER_HIGHLIGHT_COLOR = '#FFF59D'; // Groc suau per alta visibilitat
+
+/**
+ * v13.0: Ressalta fragments específics dins de paràgrafs
+ * Format entrada: [{id: 12, text: "50.000€"}, {id: 15, text: "30 dies"}]
+ * @param {Array<{id: number, text: string}>} references - Llista de referències
+ * @returns {Object} - { success, applied, fallbacks }
+ */
+function highlightLaserPrecision(references) {
+  if (!references || references.length === 0) {
+    return { success: false, error: 'No references provided' };
+  }
+
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    const numChildren = body.getNumChildren();
+
+    let applied = 0;
+    let fallbacks = 0;
+    let firstMatchPosition = null;
+    const highlightDetails = [];
+
+    for (const ref of references) {
+      const paraId = ref.id;
+      const searchText = ref.text;
+
+      // Validació de límits
+      if (paraId < 0 || paraId >= numChildren) {
+        continue;
+      }
+
+      try {
+        const element = body.getChild(paraId);
+        if (!element) continue;
+
+        let textObj = null;
+        try {
+          textObj = element.asText();
+        } catch (e) {
+          continue;
+        }
+
+        const fullText = textObj.getText();
+        if (!fullText || fullText.length === 0) continue;
+
+        // Intentar trobar el text exacte dins del paràgraf
+        if (searchText && searchText.length > 0) {
+          const foundIndex = fullText.indexOf(searchText);
+
+          if (foundIndex !== -1) {
+            // PRECISIÓ: Ressaltar NOMÉS el fragment exacte
+            const startOffset = foundIndex;
+            const endOffset = foundIndex + searchText.length - 1;
+
+            textObj.setBackgroundColor(startOffset, endOffset, LASER_HIGHLIGHT_COLOR);
+            applied++;
+
+            // Guardar detalls per netejar
+            highlightDetails.push({
+              childIndex: paraId,
+              start: startOffset,
+              end: endOffset
+            });
+
+            // Guardar posició per scroll (primera trobada)
+            if (!firstMatchPosition) {
+              firstMatchPosition = doc.newPosition(textObj, startOffset);
+            }
+          } else {
+            // FALLBACK: Text no trobat, ressaltar tot el paràgraf
+            textObj.setBackgroundColor(0, fullText.length - 1, LASER_HIGHLIGHT_COLOR);
+            fallbacks++;
+
+            highlightDetails.push({
+              childIndex: paraId,
+              start: 0,
+              end: fullText.length - 1
+            });
+
+            if (!firstMatchPosition) {
+              firstMatchPosition = doc.newPosition(element, 0);
+            }
+          }
+        } else {
+          // Sense text, ressaltar tot el paràgraf
+          textObj.setBackgroundColor(0, fullText.length - 1, LASER_HIGHLIGHT_COLOR);
+          fallbacks++;
+
+          highlightDetails.push({
+            childIndex: paraId,
+            start: 0,
+            end: fullText.length - 1
+          });
+
+          if (!firstMatchPosition) {
+            firstMatchPosition = doc.newPosition(element, 0);
+          }
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    // Guardar per netejar després
+    if (highlightDetails.length > 0) {
+      const props = PropertiesService.getDocumentProperties();
+      props.setProperty('laserHighlights', JSON.stringify(highlightDetails));
+    }
+
+    // Scroll a la primera coincidència
+    if (firstMatchPosition) {
+      try {
+        doc.setCursor(firstMatchPosition);
+      } catch (e) {
+        // Fallback amb Range
+        try {
+          if (highlightDetails.length > 0) {
+            const firstChild = body.getChild(highlightDetails[0].childIndex);
+            const rangeBuilder = doc.newRange();
+            rangeBuilder.addElement(firstChild);
+            doc.setSelection(rangeBuilder.build());
+          }
+        } catch (e2) {
+          // Ignorar
+        }
+      }
+    }
+
+    return {
+      success: true,
+      applied: applied,
+      fallbacks: fallbacks,
+      total: references.length
+    };
+
+  } catch (e) {
+    console.error('[highlightLaserPrecision] Error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * v13.0: Neteja tots els ressaltats làser
+ * @returns {Object} - { success, cleared }
+ */
+function clearLaserHighlights() {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    const saved = props.getProperty('laserHighlights');
+
+    if (!saved) {
+      return { success: true, cleared: 0 };
+    }
+
+    const highlightDetails = JSON.parse(saved);
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+    let cleared = 0;
+
+    for (const detail of highlightDetails) {
+      try {
+        if (detail.childIndex >= 0 && detail.childIndex < body.getNumChildren()) {
+          const element = body.getChild(detail.childIndex);
+          const textObj = element.asText();
+          const text = textObj.getText();
+
+          if (text && text.length > 0) {
+            const endPos = Math.min(detail.end, text.length - 1);
+            textObj.setBackgroundColor(detail.start, endPos, null);
+            cleared++;
+          }
+        }
+      } catch (e) {
+        // Ignorar errors individuals
+      }
+    }
+
+    props.deleteProperty('laserHighlights');
+    return { success: true, cleared: cleared };
+
+  } catch (e) {
+    console.error('[clearLaserHighlights] Error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * v13.0: Focus manual en un element específic (per clics als xips del xat)
+ * @param {number} id - ID del paràgraf (0-indexed)
+ * @param {string} text - Text exacte a ressaltar
+ * @returns {Object} - { success }
+ */
+function focusLaserElement(id, text) {
+  // Netejar ressaltats anteriors
+  clearLaserHighlights();
+
+  // Ressaltar el nou element
+  return highlightLaserPrecision([{ id: id, text: text }]);
+}
+
+// Aliases per compatibilitat amb codi anterior
+function highlightInteractiveBatch(ids) {
+  // Convertir format antic a nou (sense text específic = fallback)
+  const refs = ids.map(id => ({ id: id, text: null }));
+  return highlightLaserPrecision(refs);
+}
+
+function clearInteractiveBatch() {
+  return clearLaserHighlights();
+}
+
+function focusSingleParagraph(id) {
+  return focusLaserElement(id, null);
+}
+
 // --- CONTEXT SUMMARY (v2.5) ---
 
 /**

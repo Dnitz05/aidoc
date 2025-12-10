@@ -2276,6 +2276,11 @@
         // v10.2: No mostrar badge antic - ara tot passa per preview
         addBubble('ai', res.ai_response, false);
 
+        // v10.0: Activar Pantalla Interactiva si hi ha referències [[§ID]]
+        if (res.mode === 'chat' && res.ai_response) {
+          triggerInteractiveScreen(res.ai_response);
+        }
+
         // v3.7: Log estadístiques d'edició per debugging
         if (res.edit_stats) {
           console.log('[Edit Stats]', res.edit_stats);
@@ -2941,19 +2946,38 @@
       function parseDocumentReferences(html) {
         let firstRef = null;
 
-        // v12.1: Primer processar [[§ID]] - format cita amb número de paràgraf
-        // Pattern: [[§número]] o [[\u00a7número]] (unicode § = \u00a7)
-        const paragraphRefPattern = /\[\[§(\d+)\]\]/g;
+        // v13.0: Primer processar [[§ID|text]] - format làser de precisió
+        // Pattern: [[§número|text_exacte]]
+        const laserRefPattern = /\[\[§(\d+)\|(.+?)\]\]/g;
 
-        let result = html.replace(paragraphRefPattern, function(match, paraNum) {
+        let result = html.replace(laserRefPattern, function(match, paraNum, textSnippet) {
           const paraId = parseInt(paraNum, 10) - 1; // Convertir a 0-indexed
+          if (!firstRef) {
+            firstRef = '__LASER_' + paraId + '_' + textSnippet + '__';
+          }
+          // Escapar cometes per a l'onclick
+          const safeText = textSnippet
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '&quot;');
+          // v13.0: Xip làser que mostra el TEXT i ressalta precisament
+          return '<span class="doc-ref-laser" onclick="focusLaserElement(' + paraId + ', \'' + safeText + '\')" ' +
+                 'title="Anar a §' + paraNum + ': ' + textSnippet.substring(0, 30) + (textSnippet.length > 30 ? '...' : '') + '">' +
+                 escapeHtmlSafe(textSnippet) + '</span>';
+        });
+
+        // v13.0: Fallback per format antic [[§ID]] sense text
+        const oldRefPattern = /\[\[§(\d+)\]\](?!\|)/g;
+
+        result = result.replace(oldRefPattern, function(match, paraNum) {
+          const paraId = parseInt(paraNum, 10) - 1;
           if (!firstRef) {
             firstRef = '__PARA_' + paraId + '__';
           }
-          // Link clicable que navega al paràgraf
-          return '<a href="#" class="para-ref-link" onclick="navigateToParagraph(' + paraId + '); return false;" ' +
+          // Xip clàssic que ressalta tot el paràgraf
+          return '<span class="doc-ref-chip" onclick="focusLaserElement(' + paraId + ', null)" ' +
                  'title="Anar al paràgraf ' + paraNum + '">' +
-                 '<span class="para-ref-icon">§</span>' + paraNum + '</a>';
+                 '§' + paraNum + '</span>';
         });
 
         // v6.8: Després processar [[text]] - text literal per buscar
@@ -3432,6 +3456,153 @@
         bubble.innerHTML = '<div class="md-content">' + mdHtml + '</div>';
         container.appendChild(bubble);
         container.scrollTop = container.scrollHeight;
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // v13.0: SISTEMA LÀSER DE PRECISIÓ
+      // ═══════════════════════════════════════════════════════════
+      // Ressalta fragments ESPECÍFICS dins de paràgrafs (no paràgrafs sencers)
+      // Format: [[§ID|text_exacte]]
+
+      let activeLaserRefs = [];
+      let laserCleanupBound = false;
+
+      /**
+       * v13.0: Trigger proactiu - Analitza resposta i activa ressaltat làser
+       * Detecta format [[§ID|text]] i ressalta NOMÉS el text dins del paràgraf
+       * @param {string} responseText - Text de la resposta AI
+       */
+      function triggerInteractiveScreen(responseText) {
+        if (!responseText) return;
+
+        // Regex per nou format: [[§ID|text]]
+        // Grup 1 = ID, Grup 2 = Text exacte
+        const regex = /\[\[§(\d+)\|(.+?)\]\]/g;
+        const references = [];
+        let match;
+
+        while ((match = regex.exec(responseText)) !== null) {
+          references.push({
+            id: parseInt(match[1], 10) - 1, // Convertir a 0-indexed
+            text: match[2]
+          });
+        }
+
+        // Fallback: també detectar format antic [[§ID]] (sense text)
+        const oldRegex = /\[\[§(\d+)\]\](?!\|)/g;
+        while ((match = oldRegex.exec(responseText)) !== null) {
+          references.push({
+            id: parseInt(match[1], 10) - 1,
+            text: null // Sense text = ressaltar paràgraf sencer
+          });
+        }
+
+        console.log('[Laser Precision] Found references:', references);
+
+        if (references.length === 0) return;
+
+        // Netejar ressaltats anteriors
+        if (activeLaserRefs.length > 0) {
+          clearInteractiveScreen(true);
+        }
+
+        // Guardar noves referències
+        activeLaserRefs = references;
+
+        // Activar ressaltat làser al document
+        google.script.run
+          .withSuccessHandler(function(result) {
+            console.log('[Laser Precision] Result:', result);
+            if (result && result.applied > 0) {
+              const msg = result.fallbacks > 0
+                ? result.applied + ' fragments ressaltats (' + result.fallbacks + ' fallbacks)'
+                : result.applied + ' fragments ressaltats';
+              showToast(msg, 'info');
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.error('[Laser Precision] Error:', err);
+          })
+          .highlightLaserPrecision(references);
+
+        // Bind cleanup listener
+        bindLaserCleanup();
+      }
+
+      /**
+       * v13.0: Neteja automàtica dels ressaltats làser
+       * @param {boolean} silent - Si true, no mostra toast
+       */
+      function clearInteractiveScreen(silent) {
+        if (activeLaserRefs.length === 0) return;
+
+        activeLaserRefs = []; // Reset estat local
+
+        // Netejar al document
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (!silent && result && result.cleared > 0) {
+              console.log('[Laser Precision] Cleared:', result.cleared);
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.error('[Laser Precision] Clear error:', err);
+          })
+          .clearLaserHighlights();
+      }
+
+      /**
+       * v13.0: Bind listeners per neteja automàtica
+       */
+      function bindLaserCleanup() {
+        if (laserCleanupBound) return;
+
+        const input = document.getElementById('user-input');
+        if (input) {
+          input.addEventListener('focus', function() {
+            clearInteractiveScreen(true);
+          });
+          input.addEventListener('keydown', function() {
+            clearInteractiveScreen(true);
+          });
+        }
+
+        laserCleanupBound = true;
+      }
+
+      /**
+       * v13.0: Reactivar un element específic (per clics als xips del xat)
+       * @param {number} paraId - ID del paràgraf (0-indexed)
+       * @param {string} text - Text exacte a ressaltar
+       */
+      function focusLaserElement(paraId, text) {
+        // Netejar ressaltats anteriors
+        if (activeLaserRefs.length > 0) {
+          clearInteractiveScreen(true);
+        }
+
+        // Guardar nova referència
+        activeLaserRefs = [{ id: paraId, text: text }];
+
+        // Ressaltar al document
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              showToast('Navegant al fragment', 'success');
+            }
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error navegant', 'error');
+          })
+          .focusLaserElement(paraId, text);
+
+        // Bind cleanup
+        bindLaserCleanup();
+      }
+
+      // Alias per compatibilitat
+      function focusInteractiveParagraph(paraId) {
+        focusLaserElement(paraId, null);
       }
 
       // ═══════════════════════════════════════════════════════════
