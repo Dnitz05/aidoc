@@ -855,17 +855,26 @@ Triggers OBLIGATORIS (usa SEMPRE REFERENCE_HIGHLIGHT):
 ✅ CORRECTE: Usar mode REFERENCE_HIGHLIGHT amb array "highlights".
 
 Acció: Marca parts del document amb colors i explica. NO edites res.
+
+⚠️ REGLES PER ai_response:
+- Frase CURTA i NETA: "He trobat X errors." o "He detectat els següents problemes:"
+- MAI repeteixis el text dels errors a ai_response (ja surt als highlights!)
+- MAI repeteixis els snippets ni les correccions a ai_response
+- Usa singular/plural correcte: "1 error" (NO "1 errors")
+
 Format:
 {
   "thought": "[Anàlisi: quines parts destaco i per què]",
   "mode": "REFERENCE_HIGHLIGHT",
-  "ai_response": "Explicació en llenguatge natural amb context",
+  "ai_response": "He trobat 2 errors ortogràfics.",
   "highlights": [
-    {"para_id": 5, "color": "orange", "reason": "error ortogràfic: 'increiblement'", "snippet": "...és increiblement...", "start": 15, "end": 28},
-    {"para_id": 12, "color": "yellow", "reason": "repetició: 'important' x3", "snippet": "Això és important..."},
-    {"para_id": 8, "color": "purple", "reason": "frase ambigua", "snippet": "Es podria interpretar..."}
+    {"para_id": 5, "color": "orange", "reason": "'increiblement' → 'increïblement'", "snippet": "...és increiblement...", "start": 15, "end": 28},
+    {"para_id": 12, "color": "orange", "reason": "'inportant' → 'important'", "snippet": "...molt inportant...", "start": 8, "end": 16}
   ]
 }
+
+⛔ ai_response INCORRECTE: "He trobat 1 error: 'documentafció' hauria de ser 'documentació'" ← REPETEIX INFO!
+✅ ai_response CORRECTE: "He trobat 1 error ortogràfic." ← NET!
 
 Camps dels highlights:
 - para_id: Índex del paràgraf ({{0}}, {{1}}, etc.) - OBLIGATORI
@@ -891,7 +900,7 @@ EXEMPLE COMPLET AMB GRANULARITAT - Usuari pregunta "veus errors ortogràfics?":
 {
   "thought": "L'usuari demana detectar errors. Trobo 'tramet' ({{4}} posició 13-19), 'edn' ({{6}} posició 8-11). Uso REFERENCE_HIGHLIGHT amb posicions exactes.",
   "mode": "REFERENCE_HIGHLIGHT",
-  "ai_response": "He detectat els següents errors ortogràfics:",
+  "ai_response": "He trobat 2 errors ortogràfics.",
   "highlights": [
     {"para_id": 4, "color": "orange", "reason": "'tramet' → 'trametre'", "snippet": "...tramet...", "start": 13, "end": 19},
     {"para_id": 6, "color": "orange", "reason": "'edn' → 'en'", "snippet": "...edn el...", "start": 8, "end": 11}
