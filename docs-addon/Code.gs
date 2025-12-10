@@ -6206,7 +6206,8 @@ function scrollToReference(paragraphIndex, color) {
 // ═══════════════════════════════════════════════════════════
 // Ressalta fragments ESPECÍFICS dins de paràgrafs, no paràgrafs sencers
 
-const LASER_HIGHLIGHT_COLOR = '#FFF59D'; // Groc suau per alta visibilitat
+const LASER_HIGHLIGHT_COLOR = '#FFF59D'; // Groc intens per coincidència exacta
+const LASER_FALLBACK_COLOR = '#FFF9C4';  // Groc suau per fallback a paràgraf
 
 /**
  * v13.0: Ressalta fragments específics dins de paràgrafs
@@ -6252,14 +6253,25 @@ function highlightLaserPrecision(references) {
         const fullText = textObj.getText();
         if (!fullText || fullText.length === 0) continue;
 
-        // Intentar trobar el text exacte dins del paràgraf
+        // Intentar trobar el text dins del paràgraf
         if (searchText && searchText.length > 0) {
-          const foundIndex = fullText.indexOf(searchText);
+          // 1. Cerca EXACTA
+          let foundIndex = fullText.indexOf(searchText);
+          let matchedText = searchText;
+
+          // 2. Si falla, cerca CASE-INSENSITIVE
+          if (foundIndex === -1) {
+            foundIndex = fullText.toLowerCase().indexOf(searchText.toLowerCase());
+            if (foundIndex !== -1) {
+              // Usar el text real del document (preservar majúscules originals)
+              matchedText = fullText.substring(foundIndex, foundIndex + searchText.length);
+            }
+          }
 
           if (foundIndex !== -1) {
             // PRECISIÓ: Ressaltar NOMÉS el fragment exacte
             const startOffset = foundIndex;
-            const endOffset = foundIndex + searchText.length - 1;
+            const endOffset = foundIndex + matchedText.length - 1;
 
             textObj.setBackgroundColor(startOffset, endOffset, LASER_HIGHLIGHT_COLOR);
             applied++;
@@ -6276,8 +6288,8 @@ function highlightLaserPrecision(references) {
               firstMatchPosition = doc.newPosition(textObj, startOffset);
             }
           } else {
-            // FALLBACK: Text no trobat, ressaltar tot el paràgraf
-            textObj.setBackgroundColor(0, fullText.length - 1, LASER_HIGHLIGHT_COLOR);
+            // FALLBACK: Text no trobat, ressaltar tot el paràgraf amb color suau
+            textObj.setBackgroundColor(0, fullText.length - 1, LASER_FALLBACK_COLOR);
             fallbacks++;
 
             highlightDetails.push({
