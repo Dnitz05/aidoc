@@ -1816,8 +1816,12 @@ function parseAndValidate(rawText) {
         }
       }
 
-      // Remove orphan "X errors" at end (duplicated count)
-      cleanedAiResponse = cleanedAiResponse.replace(/\s*\d+\s+errors?\s*$/gi, '');
+      // Remove orphan "X errors" patterns (duplicated count)
+      // Only remove when after period/newline (not "He trobat 1 error" which is valid)
+      cleanedAiResponse = cleanedAiResponse.replace(/[.\n]\s*\d+\s+errors?\b/gi, '.');
+
+      // Remove newlines that might separate duplicated content
+      cleanedAiResponse = cleanedAiResponse.replace(/\n+/g, ' ');
 
       // Clean up multiple spaces, orphan punctuation, trailing dots
       cleanedAiResponse = cleanedAiResponse
@@ -1825,6 +1829,7 @@ function parseAndValidate(rawText) {
         .replace(/\s{2,}/g, ' ')                // Multiple spaces
         .replace(/\s+\./g, '.')                 // Space before dot
         .replace(/\.{2,}/g, '.')                // Multiple dots
+        .replace(/\.\s*$/g, '.')                // Ensure ends with single dot
         .trim();
 
       // If cleaned to almost nothing, use a default
