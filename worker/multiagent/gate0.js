@@ -150,6 +150,53 @@ function checkFarewell(normalized, language) {
 }
 
 /**
+ * v13.1: Fast path per peticions de revisió d'errors/faltes
+ * Va directament a REFERENCE_HIGHLIGHT sense passar pel classifier
+ * @param {string} normalized - Instrucció normalitzada
+ * @param {string} language - Idioma detectat
+ * @param {string} original - Instrucció original
+ * @returns {FastPathResult}
+ */
+function checkErrorsRequest(normalized, language, original) {
+  // Patrons que indiquen petició de revisió d'errors
+  const patterns = [
+    /\b(hi ha|tens?|troba|busca|detecta)\s*(faltes?|errors?)\b/i,
+    /\b(faltes?|errors?)\s*(ortogr[aà]fi[cq]u?e?s?|gramaticals?)?\s*(al|del|en el)?\s*document\b/i,
+    /\b(revisa|corregeix|comprova)\s*(les?\s*)?(faltes?|errors?|ortografia)\b/i,
+    /\brevisió\s*(ortogr[aà]fica|d.?errors?)\b/i,
+    /\b(errors?|faltes?)\s*\?/i,
+  ];
+
+  for (const pattern of patterns) {
+    if (pattern.test(normalized)) {
+      logInfo('Fast path matched: errors_request', { pattern: pattern.toString() });
+
+      // Retornar mergedIntent per executar REFERENCE_HIGHLIGHT directament
+      return {
+        matched: true,
+        type: 'errors_request',
+        response: null,  // No resposta directa, anem a l'executor
+        mergedIntent: {
+          mode: Mode.REFERENCE_HIGHLIGHT,
+          confidence: 0.95,
+          strategy: 'errors',
+          scope: 'document',
+          target_paragraphs: [],  // Tot el document
+          original_instruction: original,
+          language: language,
+          _meta: {
+            fast_path: 'errors_request',
+            from_clarification: true,  // Per saltar validacions
+          },
+        },
+      };
+    }
+  }
+
+  return { matched: false, type: null, response: null, mergedIntent: null };
+}
+
+/**
  * Comprova si el document està buit
  * @param {Object} documentContext - Context del document
  * @param {string} language - Idioma detectat
@@ -388,6 +435,12 @@ function checkFastPaths(sanitizedInput, documentContext, sessionState) {
   const farewellResult = checkFarewell(normalized, language);
   if (farewellResult.matched) {
     return farewellResult;
+  }
+
+  // 7. v13.1: Comprovar peticions d'errors/faltes → directament a REFERENCE_HIGHLIGHT
+  const errorsResult = checkErrorsRequest(normalized, language, sanitizedInput.original);
+  if (errorsResult.matched) {
+    return errorsResult;
   }
 
   // Cap fast path matched
