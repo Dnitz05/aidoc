@@ -23,15 +23,35 @@ import { logInfo, logError, logDebug } from './telemetry.js';
 // CLASSIFIER SYSTEM PROMPT
 // ═══════════════════════════════════════════════════════════════
 
-const CLASSIFIER_SYSTEM_PROMPT = `Ets el Router d'Intencions de Docmile v12.1. Retorna JSON estricte.
+const CLASSIFIER_SYSTEM_PROMPT = `Ets el Router d'Intencions de Docmile v13.5. Retorna JSON estricte.
+
+## ⚠️ REGLA SUPREMA: PREGUNTES = CHAT_ONLY (SENSE EXCEPCIONS) ⚠️
+
+PRIMER: Detecta si la instrucció és una PREGUNTA sobre el contingut del document.
+Indicadors de pregunta factual:
+- Comença amb: "Qui", "Què", "Quan", "On", "Quin/Quina", "Quants", "Per què", "Com"
+- Conté interrogant "?"
+- Demana informació específica del document
+
+SI ÉS PREGUNTA → mode = "CHAT_ONLY" OBLIGATÒRIAMENT
+NO importa si sembla que vol buscar/ressaltar. Una pregunta és CHAT_ONLY.
+
+EXEMPLES CRÍTICS:
+| Instrucció | Mode | Per què |
+|------------|------|---------|
+| "Qui signa l'informe?" | CHAT_ONLY | Pregunta factual, vol resposta |
+| "Qui és l'autor?" | CHAT_ONLY | Pregunta factual |
+| "On apareix el pressupost?" | CHAT_ONLY | Pregunta factual (no "busca") |
+| "Quin és l'import?" | CHAT_ONLY | Pregunta factual |
+| "busca 'pressupost'" | REFERENCE_HIGHLIGHT | Ordre de buscar/ressaltar |
+| "ressalta errors" | REFERENCE_HIGHLIGHT | Ordre de ressaltar |
 
 ## MATRIU DE DECISIÓ (ORDRE DE PRIORITAT ESTRICTE)
 
-### PRIORITAT 0: PREGUNTA FACTUAL (OVERRIDE ABSOLUT - ignora ui_mode)
-Patrons interrogatius: "Qui...", "Quan...", "On...", "Quin és...", "Quina és...",
-"De què parla...", "Explica...", "Què diu...", "Què significa...", "Quants...",
-"Per què...", "Com...", "Quines..."
-ACCIÓ: mode = "CHAT_ONLY" (IGNORA ui_mode encara que sigui EDIT)
+### PRIORITAT 0: PREGUNTA FACTUAL (OVERRIDE ABSOLUT)
+Patrons: "Qui...", "Quan...", "On...", "Quin/Quina...", "Què...", "Quants...",
+"Per què...", "Com...", "De què parla...", "Explica...", "Què diu/significa..."
+ACCIÓ: mode = "CHAT_ONLY" (SEMPRE, sense excepcions)
 response_style:
 - Si conté "resumeix/resum/sintetitza" → "bullet_points"
 - Si conté "explica/analitza/detalla" → "detailed"
