@@ -105,12 +105,14 @@ async function processInstruction(request, env, provider = null) {
       cursorPosition: selectedParagraphIds[0] ?? null,
       recentlyMentioned: session.conversation?.mentioned_paragraphs || [],
       selectedText,
+      instruction: sanitizedInput.original,  // v8.4: Per detectar mode full doc
     });
 
     telemetry.checkpoint('context_end');
     logDebug('Document context built', {
       included: documentContext.includedParagraphs,
       total: documentContext.totalParagraphs,
+      isFullDoc: documentContext.isFullDoc,  // v8.4: Indicar mode
     });
 
     // ═══════════════════════════════════════════════════════════

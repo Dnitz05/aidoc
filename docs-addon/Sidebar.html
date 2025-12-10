@@ -2946,9 +2946,9 @@
       function parseDocumentReferences(html) {
         let firstRef = null;
 
-        // v13.0: Primer processar [[§ID|text]] - format làser de precisió
-        // Pattern: [[§número|text_exacte]]
-        const laserRefPattern = /\[\[§(\d+)\|(.+?)\]\]/g;
+        // v13.1: Primer processar [[§ID|text]] - format làser de precisió
+        // Pattern tolerant: [[ §número | text_exacte ]] (espais opcionals)
+        const laserRefPattern = /\[\[\s*§(\d+)\s*\|\s*(.+?)\s*\]\]/g;
 
         let result = html.replace(laserRefPattern, function(match, paraNum, textSnippet) {
           const paraId = parseInt(paraNum, 10) - 1; // Convertir a 0-indexed
@@ -3475,16 +3475,20 @@
       function triggerInteractiveScreen(responseText) {
         if (!responseText) return;
 
-        // Regex per nou format: [[§ID|text]]
+        // v13.1: Regex tolerant amb espais opcionals \s*
+        // Format: [[§ID|text]] o [[ §ID | text ]]
         // Grup 1 = ID, Grup 2 = Text exacte
-        const regex = /\[\[§(\d+)\|(.+?)\]\]/g;
+        const regex = /\[\[\s*§(\d+)\s*\|\s*(.+?)\s*\]\]/g;
         const references = [];
         let match;
+
+        // Debug per veure què envia exactament la IA
+        console.log('[Laser Debug] Raw response:', responseText.substring(0, 200));
 
         while ((match = regex.exec(responseText)) !== null) {
           references.push({
             id: parseInt(match[1], 10) - 1, // Convertir a 0-indexed
-            text: match[2]
+            text: match[2].trim() // Netejar espais sobrants
           });
         }
 

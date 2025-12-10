@@ -18,34 +18,57 @@ import { logDebug } from './telemetry.js';
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Configuració del windowing
+ * Configuració del windowing v8.4
+ *
+ * v8.4: Límits augmentats per millor context en CHAT
  */
 const WINDOW_CONFIG = {
-  // Màxim de paràgrafs a incloure en el context
-  max_paragraphs: 30,
+  // Màxim de paràgrafs a incloure en el context (augmentat de 30 a 50)
+  max_paragraphs: 50,
 
   // Paràgrafs abans/després de la selecció
   selection_window_before: 3,
   selection_window_after: 3,
 
-  // Màxim de caràcters per paràgraf (truncar si excedeix)
-  max_chars_per_paragraph: 500,
+  // Màxim de caràcters per paràgraf (augmentat de 500 a 800)
+  max_chars_per_paragraph: 800,
 
-  // Màxim de caràcters totals pel context del document
-  max_total_chars: 8000,
+  // Màxim de caràcters totals pel context del document (augmentat de 8000 a 16000)
+  max_total_chars: 16000,
 
   // Paràgrafs mínims a incloure sempre (inici del document)
   min_header_paragraphs: 2,
 
-  // Pes per prioritzar paràgrafs
+  // Pes per prioritzar paràgrafs (heading reduït de 2 a 1)
   weights: {
     selected: 10,
     cursor_adjacent: 5,
     recently_mentioned: 3,
-    has_heading: 2,
+    has_heading: 1,  // v8.4: Reduït per no sobre-prioritzar títols
     default: 1,
   },
 };
+
+/**
+ * Configuració per mode document complet
+ * Per preguntes que necessiten veure tot el document
+ */
+const FULL_DOC_CONFIG = {
+  max_paragraphs: 100,
+  max_total_chars: 32000,
+  max_chars_per_paragraph: 1000,
+};
+
+/**
+ * Patrons que indiquen necessitat de document complet
+ */
+const FULL_DOC_PATTERNS = [
+  /\b(faltes?|errors?|ortogr[aà]fi[ac]|revisar?|corregi[rx])\b/i,
+  /\b(resum(eix)?|resumir|síntesi|sintetitz)\b/i,
+  /\b(tot el document|document sencer|complet)\b/i,
+  /\b(quants?|compta|nombre de)\b/i,
+  /\b(estructura|organitz|seccions)\b/i,
+];
 
 // ═══════════════════════════════════════════════════════════════
 // PARAGRAPH UTILITIES
@@ -148,12 +171,15 @@ function calculatePriority(paraId, context) {
  * Selecciona els paràgrafs més rellevants per incloure en el context
  * @param {Array<Object>} paragraphs - Tots els paràgrafs
  * @param {Object} selectionContext - Context de selecció
+ * @param {number} maxParagraphs - Màxim de paràgrafs (opcional, per defecte WINDOW_CONFIG)
  * @returns {Array<number>} - IDs dels paràgrafs seleccionats
  */
-function selectRelevantParagraphs(paragraphs, selectionContext = {}) {
+function selectRelevantParagraphs(paragraphs, selectionContext = {}, maxParagraphs = null) {
   if (!paragraphs || paragraphs.length === 0) {
     return [];
   }
+
+  const limit = maxParagraphs || WINDOW_CONFIG.max_paragraphs;
 
   const {
     selectedParagraphs = [],
@@ -162,7 +188,7 @@ function selectRelevantParagraphs(paragraphs, selectionContext = {}) {
   } = selectionContext;
 
   // Si el document és petit, incloure'l tot
-  if (paragraphs.length <= WINDOW_CONFIG.max_paragraphs) {
+  if (paragraphs.length <= limit) {
     return paragraphs.map((_, i) => i);
   }
 
@@ -191,7 +217,7 @@ function selectRelevantParagraphs(paragraphs, selectionContext = {}) {
 
   // Afegir paràgrafs per prioritat fins al màxim
   for (const item of priorities) {
-    if (selected.size >= WINDOW_CONFIG.max_paragraphs) break;
+    if (selected.size >= limit) break;
     selected.add(item.id);
   }
 
@@ -204,6 +230,16 @@ function selectRelevantParagraphs(paragraphs, selectionContext = {}) {
 // ═══════════════════════════════════════════════════════════════
 
 /**
+ * Detecta si una instrucció necessita veure el document complet
+ * @param {string} instruction - Instrucció de l'usuari
+ * @returns {boolean}
+ */
+function needsFullDocument(instruction) {
+  if (!instruction) return false;
+  return FULL_DOC_PATTERNS.some(pattern => pattern.test(instruction));
+}
+
+/**
  * Construeix el context de document optimitzat
  *
  * @param {Array<Object>} paragraphs - Paràgrafs del document
@@ -212,6 +248,7 @@ function selectRelevantParagraphs(paragraphs, selectionContext = {}) {
  * @param {number} options.cursorPosition - Posició del cursor
  * @param {Array<number>} options.recentlyMentioned - Paràgrafs mencionats recentment
  * @param {string} options.selectedText - Text seleccionat
+ * @param {string} options.instruction - Instrucció original (per detectar mode full doc)
  * @returns {Object} - Context optimitzat
  */
 function buildWindowedContext(paragraphs, options = {}) {
@@ -223,6 +260,7 @@ function buildWindowedContext(paragraphs, options = {}) {
       totalParagraphs: 0,
       includedParagraphs: 0,
       isComplete: true,
+      isFullDoc: false,
     };
   }
 
@@ -231,35 +269,47 @@ function buildWindowedContext(paragraphs, options = {}) {
     cursorPosition = null,
     recentlyMentioned = [],
     selectedText = null,
+    instruction = '',
   } = options;
 
-  // Seleccionar paràgrafs rellevants
+  // v8.4: Detectar si necessitem document complet
+  const useFullDoc = needsFullDocument(instruction);
+  const config = useFullDoc ? FULL_DOC_CONFIG : WINDOW_CONFIG;
+
+  if (useFullDoc) {
+    logDebug('Using FULL_DOC mode for instruction', {
+      instruction: instruction.substring(0, 50),
+    });
+  }
+
+  // Seleccionar paràgrafs rellevants (amb límits adaptats)
   const relevantIds = selectRelevantParagraphs(paragraphs, {
     selectedParagraphs,
     cursorPosition,
     recentlyMentioned,
-  });
+  }, config.max_paragraphs);
 
   // Construir context amb truncament
   let totalChars = 0;
   const windowedParagraphs = [];
 
   for (const id of relevantIds) {
-    if (totalChars >= WINDOW_CONFIG.max_total_chars) {
+    if (totalChars >= config.max_total_chars) {
       logDebug('Context truncated due to max_total_chars', {
         totalChars,
         includedCount: windowedParagraphs.length,
+        mode: useFullDoc ? 'full_doc' : 'windowed',
       });
       break;
     }
 
     const para = paragraphs[id];
-    const text = truncateParagraph(para.text || para);
+    const text = truncateParagraph(para.text || para, config.max_chars_per_paragraph);
     const charCount = text.length;
 
-    if (totalChars + charCount > WINDOW_CONFIG.max_total_chars) {
+    if (totalChars + charCount > config.max_total_chars) {
       // Últim paràgraf, truncar més agressivament
-      const remaining = WINDOW_CONFIG.max_total_chars - totalChars;
+      const remaining = config.max_total_chars - totalChars;
       if (remaining > 100) {
         windowedParagraphs.push({
           id,
@@ -288,6 +338,7 @@ function buildWindowedContext(paragraphs, options = {}) {
     included: windowedParagraphs.length,
     chars: totalChars,
     isComplete,
+    isFullDoc: useFullDoc,
   });
 
   return {
@@ -297,6 +348,7 @@ function buildWindowedContext(paragraphs, options = {}) {
     totalParagraphs: paragraphs.length,
     includedParagraphs: windowedParagraphs.length,
     isComplete,
+    isFullDoc: useFullDoc,
   };
 }
 
@@ -447,10 +499,13 @@ function findSection(paraId, sections) {
 export {
   // Configuration
   WINDOW_CONFIG,
+  FULL_DOC_CONFIG,
+  FULL_DOC_PATTERNS,
 
   // Window selection
   selectRelevantParagraphs,
   calculatePriority,
+  needsFullDocument,
 
   // Context building
   buildWindowedContext,
