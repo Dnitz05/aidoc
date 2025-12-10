@@ -6202,18 +6202,26 @@ function scrollToReference(paragraphIndex, color) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// v13.0: SISTEMA LÀSER DE PRECISIÓ
+// v13.4: SISTEMA LÀSER DE PRECISIÓ AMB TRIPLE FALLBACK
 // ═══════════════════════════════════════════════════════════
 // Ressalta fragments ESPECÍFICS dins de paràgrafs, no paràgrafs sencers
 
 const LASER_HIGHLIGHT_COLOR = '#FFF59D'; // Groc intens per coincidència exacta
+const LASER_WORD_COLOR = '#FFE082';      // Groc mig per coincidència de paraula
 const LASER_FALLBACK_COLOR = '#FFF9C4';  // Groc suau per fallback a paràgraf
 
 /**
- * v13.0: Ressalta fragments específics dins de paràgrafs
+ * v13.4: Ressalta fragments específics dins de paràgrafs
  * Format entrada: [{id: 12, text: "50.000€"}, {id: 15, text: "30 dies"}]
+ *
+ * TRIPLE FALLBACK:
+ * 1. Cerca EXACTA → groc intens
+ * 2. Cerca CASE-INSENSITIVE → groc intens
+ * 3. Cerca per PARAULES clau → groc mig
+ * 4. Fallback a paràgraf sencer → groc suau
+ *
  * @param {Array<{id: number, text: string}>} references - Llista de referències
- * @returns {Object} - { success, applied, fallbacks }
+ * @returns {Object} - { success, applied, wordMatches, fallbacks }
  */
 function highlightLaserPrecision(references) {
   if (!references || references.length === 0) {
@@ -6226,6 +6234,7 @@ function highlightLaserPrecision(references) {
     const numChildren = body.getNumChildren();
 
     let applied = 0;
+    let wordMatches = 0;
     let fallbacks = 0;
     let firstMatchPosition = null;
     const highlightDetails = [];
@@ -6236,6 +6245,7 @@ function highlightLaserPrecision(references) {
 
       // Validació de límits
       if (paraId < 0 || paraId >= numChildren) {
+        console.log('[Laser] Skip: paraId ' + paraId + ' out of bounds (max: ' + numChildren + ')');
         continue;
       }
 
@@ -6255,16 +6265,36 @@ function highlightLaserPrecision(references) {
 
         // Intentar trobar el text dins del paràgraf
         if (searchText && searchText.length > 0) {
-          // 1. Cerca EXACTA
-          let foundIndex = fullText.indexOf(searchText);
+          let foundIndex = -1;
           let matchedText = searchText;
+          let matchType = 'exact';
+
+          // 1. Cerca EXACTA
+          foundIndex = fullText.indexOf(searchText);
 
           // 2. Si falla, cerca CASE-INSENSITIVE
           if (foundIndex === -1) {
             foundIndex = fullText.toLowerCase().indexOf(searchText.toLowerCase());
             if (foundIndex !== -1) {
-              // Usar el text real del document (preservar majúscules originals)
               matchedText = fullText.substring(foundIndex, foundIndex + searchText.length);
+              matchType = 'case-insensitive';
+            }
+          }
+
+          // 3. Si encara falla, cerca per PARAULES clau (mín 3 caràcters)
+          if (foundIndex === -1) {
+            const words = searchText.split(/\s+/).filter(function(w) { return w.length > 2; });
+            for (let i = 0; i < words.length; i++) {
+              const word = words[i];
+              const wordLower = word.toLowerCase();
+              const fullTextLower = fullText.toLowerCase();
+              const wordIndex = fullTextLower.indexOf(wordLower);
+              if (wordIndex !== -1) {
+                foundIndex = wordIndex;
+                matchedText = fullText.substring(wordIndex, wordIndex + word.length);
+                matchType = 'word';
+                break;
+              }
             }
           }
 
@@ -6272,9 +6302,15 @@ function highlightLaserPrecision(references) {
             // PRECISIÓ: Ressaltar NOMÉS el fragment exacte
             const startOffset = foundIndex;
             const endOffset = foundIndex + matchedText.length - 1;
+            const highlightColor = matchType === 'word' ? LASER_WORD_COLOR : LASER_HIGHLIGHT_COLOR;
 
-            textObj.setBackgroundColor(startOffset, endOffset, LASER_HIGHLIGHT_COLOR);
-            applied++;
+            textObj.setBackgroundColor(startOffset, endOffset, highlightColor);
+
+            if (matchType === 'word') {
+              wordMatches++;
+            } else {
+              applied++;
+            }
 
             // Guardar detalls per netejar
             highlightDetails.push({
@@ -6287,6 +6323,8 @@ function highlightLaserPrecision(references) {
             if (!firstMatchPosition) {
               firstMatchPosition = doc.newPosition(textObj, startOffset);
             }
+
+            console.log('[Laser] Match (' + matchType + '): "' + matchedText + '" at para ' + paraId);
           } else {
             // FALLBACK: Text no trobat, ressaltar tot el paràgraf amb color suau
             textObj.setBackgroundColor(0, fullText.length - 1, LASER_FALLBACK_COLOR);
@@ -6301,6 +6339,8 @@ function highlightLaserPrecision(references) {
             if (!firstMatchPosition) {
               firstMatchPosition = doc.newPosition(element, 0);
             }
+
+            console.log('[Laser] Fallback: "' + searchText + '" not found in para ' + paraId);
           }
         } else {
           // Sense text, ressaltar tot el paràgraf
@@ -6318,6 +6358,7 @@ function highlightLaserPrecision(references) {
           }
         }
       } catch (e) {
+        console.error('[Laser] Error processing para ' + paraId + ':', e);
         continue;
       }
     }
@@ -6350,6 +6391,7 @@ function highlightLaserPrecision(references) {
     return {
       success: true,
       applied: applied,
+      wordMatches: wordMatches,
       fallbacks: fallbacks,
       total: references.length
     };
@@ -6361,7 +6403,7 @@ function highlightLaserPrecision(references) {
 }
 
 /**
- * v13.0: Neteja tots els ressaltats làser
+ * v13.4: Neteja tots els ressaltats làser
  * @returns {Object} - { success, cleared }
  */
 function clearLaserHighlights() {

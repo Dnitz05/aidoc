@@ -374,12 +374,13 @@ function formatContextForPrompt(windowedContext) {
     lines.push('');
   }
 
-  // Paràgrafs (v12.1: IDs 1-indexed per consistència amb UI)
+  // Paràgrafs v13.5: Format {{N}} per connexió explícita amb resposta [[§N|...]]
+  // La IA veu {{5}} i sap que ha d'escriure §5 a la resposta
+  // IMPORTANT: Format simple sense [HEADING] per coherència amb l'exemple del prompt
   for (const para of windowedContext.paragraphs) {
     const prefix = para.isSelected ? '>>> ' : '';
-    const headingMarker = para.isHeading ? ' [HEADING]' : '';
-    // Mostrar ID + 1 per UI (l'usuari veu §1, §2... no §0, §1...)
-    lines.push(`§${para.id + 1}${headingMarker}: ${prefix}${para.text}`);
+    // Format: {{ID}} text (la IA veu el número explícitament)
+    lines.push(`{{${para.id + 1}}} ${prefix}${para.text}`);
   }
 
   // Text seleccionat si n'hi ha

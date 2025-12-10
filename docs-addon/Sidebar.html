@@ -3516,11 +3516,14 @@
         // Activar ressaltat làser al document
         google.script.run
           .withSuccessHandler(function(result) {
-            console.log('[Laser Precision] Result:', result);
-            if (result && result.applied > 0) {
-              const msg = result.fallbacks > 0
-                ? result.applied + ' fragments ressaltats (' + result.fallbacks + ' fallbacks)'
-                : result.applied + ' fragments ressaltats';
+            console.log('[Laser Precision v13.4] Result:', result);
+            if (result && (result.applied > 0 || result.wordMatches > 0 || result.fallbacks > 0)) {
+              // v13.4: Mostrar resum de tots els tipus de coincidència
+              const parts = [];
+              if (result.applied > 0) parts.push(result.applied + ' exactes');
+              if (result.wordMatches > 0) parts.push(result.wordMatches + ' parcials');
+              if (result.fallbacks > 0) parts.push(result.fallbacks + ' paràgrafs');
+              const msg = parts.length > 0 ? parts.join(', ') : 'Ressaltat actiu';
               showToast(msg, 'info');
             }
           })

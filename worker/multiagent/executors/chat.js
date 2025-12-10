@@ -1,9 +1,10 @@
 /**
- * CHAT_ONLY Executor v12.3
+ * CHAT_ONLY Executor v13.4
  *
  * Executor per respondre preguntes i conversar sense modificar el document.
  * Utilitza el context del document per donar respostes contextualitzades.
  *
+ * v13.4: Prompt militar amb format {{N}} coherent amb context
  * v12.3: Consistència obligatòria en format de llistes
  * v12.2: Format markdown millorat
  * v12.1: Format de cita [[§ID]] clicable + response_style templates
@@ -15,7 +16,7 @@ import { logInfo, logDebug, logError } from '../telemetry.js';
 import { formatContextForPrompt } from '../context.js';
 
 // ═══════════════════════════════════════════════════════════════
-// SYSTEM PROMPT
+// SYSTEM PROMPT v13.4 - MILITAR AMB FORMAT {{N}}
 // ═══════════════════════════════════════════════════════════════
 
 /**
@@ -27,64 +28,73 @@ const RESPONSE_STYLES = {
   direct: {
     maxSentences: 2,
     format: 'inline',
-    example: '[[§15]] Aitor Gilabert Juan, Arquitecte Municipal.',
+    example: '[[§15|Joan Garcia]]',
   },
   // Pregunta d'ubicació → Referència amb snippet
   location: {
     maxSentences: 3,
     format: 'quote',
-    example: 'Es menciona a [[§7]]: «El termini d\'execució serà de 12 mesos».',
+    example: 'Es menciona a [[§7|12 mesos]]',
   },
   // Pregunta de resum → Punts principals
   summary: {
     maxPoints: 5,
     format: 'bullets',
-    example: '• Objectiu: rehabilitació [[§2]]\n• Termini: 12 mesos [[§7]]',
+    example: '- Objectiu: [[§2|rehabilitació]]\n- Termini: [[§7|12 mesos]]',
   },
   // Pregunta exploratòria → Explicació breu
   exploratory: {
     maxSentences: 4,
     format: 'paragraph',
-    example: 'El document estableix... [[§3]] i desenvolupa... [[§8]].',
+    example: 'El document estableix [[§3|...]] i desenvolupa [[§8|...]].',
   },
 };
 
-const CHAT_SYSTEM_PROMPT = `Ets un Assistent Documental. La teva feina és crear ENLLAÇOS VISUALS al document.
+const CHAT_SYSTEM_PROMPT = `Ets el Motor de Navegació Visual de Docmile.
+La teva missió és respondre la pregunta de l'usuari I SIMULTÀNIAMENT guiar la seva vista pel document.
 
-## INSTRUCCIÓ CRÍTICA: FORMAT DE RESPOSTA
-Quan citis dades, noms o frases del document, USA SEMPRE aquesta sintaxi:
+## ⚠️ PROTOCOL DE NAVEGACIÓ (STRICT MODE) ⚠️
 
-[[§ID|TEXT_EXACTE]]
+### FORMAT ÚNIC ACCEPTAT:
+[[§N|text_exacte]]
 
 On:
-- §ID: El número que veus al principi de cada paràgraf (§1, §2, §3...)
-- TEXT_EXACTE: Còpia LITERAL del text que vols il·luminar
+- N = número del paràgraf (el número dins de {{N}} al context)
+- text_exacte = còpia LITERAL del document (2-6 paraules clau)
 
-## EXEMPLE D'ENTRENAMENT (Input → Output)
+### EXEMPLE COMPLET D'ENTRENAMENT
 
-CONTEXT REBUT:
-§1: ACTA DE REUNIÓ
-§2: Assistents: Joan Garcia i Maria Serra.
-§3: Es va acordar un pressupost de 5.000€ per la fase inicial.
+INPUT (Context que reps):
+{{1}} ACTA DE REUNIÓ - Ajuntament de Barcelona
+{{2}} Data: 15 de març de 2024. Lloc: Sala de Plens.
+{{3}} Assistents: Maria López (alcaldessa), Joan Garcia (regidor), Anna Puig (secretària).
+{{4}} Es va aprovar el pressupost de 50.000€ per la rehabilitació de la façana.
+{{5}} El termini d'execució serà de 6 mesos a partir de la signatura.
 
-PREGUNTA: "Qui va assistir i quin pressupost?"
+PREGUNTA: "Qui va assistir i quin és el pressupost?"
 
-✅ RESPOSTA CORRECTA:
-"Van assistir [[§2|Joan Garcia]] i [[§2|Maria Serra]].
-El pressupost aprovat és de [[§3|5.000€]]."
+OUTPUT CORRECTE:
+Van assistir [[§3|Maria López]], [[§3|Joan Garcia]] i [[§3|Anna Puig]].
+El pressupost aprovat és de [[§4|50.000€]] per [[§4|rehabilitació de la façana]].
 
-❌ FORMATS PROHIBITS (NO facis això MAI):
-- "|Joan Garcia|" → Falta l'ID i els claudàtors
-- "Joan Garcia [[§2]]" → No marca el text específic
-- "[[§2]]" → Falta el text
-- "Joan Garcia" → Sense cap referència
+### ❌ ERRORS FATALS (PROHIBIT):
+- |Maria López| → MAI barres soles
+- Maria López [[§3]] → El text va DINS
+- [[§3]] → Falta el text a ressaltar
+- [[Maria López]] → Falta el §N
+
+### ✅ BONES PRÀCTIQUES:
+- Copia el text EXACTAMENT com apareix al document
+- Selecciona 2-6 paraules clau (no frases senceres)
+- Cada dada important → una referència
+- El número §N ha de coincidir amb {{N}} del context
 
 ## REGLES FINALS
-1. El §ID ha de correspondre al número de paràgraf del context
-2. El TEXT dins | ha de ser IDÈNTIC al document
-3. MAI usis barres | fora dels claudàtors [[...]]
-4. Usa markdown: **negreta**, *cursiva*, llistes amb -
-5. NO inventis informació que no estigui al document`;
+1. SEMPRE usa [[§N|text]] quan citis informació del document
+2. El text dins | ha de ser IDÈNTIC al document (còpia literal)
+3. Respon de forma natural, però amb enllaços visuals
+4. Si no trobes informació al document, digues-ho clarament
+5. NO inventis dades que no estiguin al context`;
 
 // ═══════════════════════════════════════════════════════════════
 // EXECUTOR IMPLEMENTATION
