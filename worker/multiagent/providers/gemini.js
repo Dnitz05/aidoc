@@ -33,8 +33,9 @@ export class GeminiProvider extends BaseProvider {
     };
 
     // Add system instruction if provided
+    // IMPORTANT: Gemini API uses snake_case "system_instruction", NOT camelCase!
     if (systemPrompt) {
-      requestBody.systemInstruction = {
+      requestBody.system_instruction = {
         parts: [{ text: systemPrompt }],
       };
     }
