@@ -1795,6 +1795,47 @@ function parseAndValidate(rawText) {
     } else {
       // Ensure ai_response exists
       parsed.ai_response = parsed.ai_response || parsed.chat_response || "He identificat les següents seccions:";
+
+      // v9.5 FIX: Clean ai_response - remove duplicated content from highlights
+      // AI often repeats snippets/reasons in ai_response which causes ugly duplication
+      const escapeRx = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      let cleanedAiResponse = parsed.ai_response;
+
+      // Remove snippets and reasons that appear in highlights
+      for (const hl of parsed.highlights) {
+        if (hl.snippet) {
+          // Remove quoted snippets like "documentafció" or 'documentafció'
+          const snippetClean = hl.snippet.replace(/\.\.\./g, '').trim();
+          if (snippetClean.length > 2) {
+            cleanedAiResponse = cleanedAiResponse.replace(new RegExp('["\']?' + escapeRx(snippetClean) + '["\']?', 'gi'), '');
+          }
+        }
+        if (hl.reason) {
+          // Remove reason patterns like 'word' → 'correction'
+          cleanedAiResponse = cleanedAiResponse.replace(new RegExp(escapeRx(hl.reason), 'gi'), '');
+        }
+      }
+
+      // Remove orphan "X errors" at end (duplicated count)
+      cleanedAiResponse = cleanedAiResponse.replace(/\s*\d+\s+errors?\s*$/gi, '');
+
+      // Clean up multiple spaces, orphan punctuation, trailing dots
+      cleanedAiResponse = cleanedAiResponse
+        .replace(/\s*[,;:]\s*[,;:]\s*/g, ' ')  // Multiple punctuation
+        .replace(/\s{2,}/g, ' ')                // Multiple spaces
+        .replace(/\s+\./g, '.')                 // Space before dot
+        .replace(/\.{2,}/g, '.')                // Multiple dots
+        .trim();
+
+      // If cleaned to almost nothing, use a default
+      if (cleanedAiResponse.length < 10) {
+        const count = parsed.highlights.length;
+        cleanedAiResponse = count === 1
+          ? "He trobat 1 error."
+          : `He trobat ${count} errors.`;
+      }
+
+      parsed.ai_response = cleanedAiResponse;
     }
   }
 
