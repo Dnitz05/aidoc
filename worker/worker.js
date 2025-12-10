@@ -776,6 +776,9 @@ QUAN HI HA SELECCIÓ (⟦SEL⟧ present):
 REGLA D'OR: Mode EDIT + Selecció + Verb de Transformació = SEMPRE UPDATE_BY_ID
 
 MAI inventis informació que no apareix al text proporcionat.
+⚠️ PERÒ pots i HAURIES d'analitzar to, sentiment, connotacions, estil i qualitat del text.
+Preguntes com "quina paraula és més positiva/negativa?", "quin to té?", "és formal?"
+→ RESPON amb la teva anàlisi basada en el text. Això NO és inventar, és ANALITZAR.
 
 ═══════════════════════════════════════════════════════════════
 CLASSIFICACIÓ D'INSTRUCCIONS (v6.7)
@@ -1071,6 +1074,10 @@ Resposta: "Sí, detecta algunes qüestions:
 - NO marquis la teva pròpia resposta, només text DEL document
 - NO usis marcatge per èmfasi genèric ([[important!]]) - només per text del document
 - NO marquis paràgrafs sencers si pots ser més específic
+- ⚠️ MAI usis símbols de secció (§) ni numeració de paràgrafs (§1, §2). SEMPRE usa el TEXT EXACTE dins [[]]
+
+✅ FORMAT CORRECTE: [[text exacte copiat del document]]
+⛔ FORMAT INCORRECTE: §1, §2, [1], [§1], (paràgraf 1) - NO USAR MAI
 
 ✅ PRIORITAT: Sempre que parlis d'una part concreta del document → MARCA-LA amb [[]]
 `;
@@ -1089,6 +1096,7 @@ ${styleGuide}
   if (strictMode) {
     prompt += `
 ⚠️ MODE ESTRICTE ACTIU: Respon NOMÉS amb informació verificable del context/fitxer. NO inventis dades.
+(L'anàlisi de to, sentiment i estil SÍ està permesa - això és interpretar, no inventar.)
 `;
   }
 
@@ -1879,7 +1887,13 @@ function parseProactiveHighlights(response, documentText) {
   }
 
   // Clean the response by removing [[ ]] markers but keeping the text
-  const cleanedResponse = responseText.replace(/\[\[([^\]]+)\]\]/g, '$1');
+  let cleanedResponse = responseText.replace(/\[\[([^\]]+)\]\]/g, '$1');
+
+  // v9.3 FIX: Remove raw §ID references that AI might generate despite instructions
+  // Pattern: §1, §12, §123 (section symbols with numbers) - these should NOT appear
+  cleanedResponse = cleanedResponse.replace(/§\d+/g, '');
+  // Also clean up orphaned punctuation after removal (e.g., ", ," or "  ")
+  cleanedResponse = cleanedResponse.replace(/\s+,/g, ',').replace(/\s{2,}/g, ' ').trim();
 
   return {
     cleanedResponse,
