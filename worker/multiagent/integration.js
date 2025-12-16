@@ -190,6 +190,10 @@ function convertToLegacyResponse(newResponse) {
       // v14.1: Passar també l'array changes complet per processChangesV14 a Code.gs
       legacyResponse.changes = newResponse.changes;
       legacyResponse.modification_type = newResponse.modification_type || newResponse._meta?.modification_type;
+      // v14.2: Passar highlights per ressaltar els fragments a modificar al document
+      if (newResponse.highlights && newResponse.highlights.length > 0) {
+        legacyResponse.highlights = convertHighlightsToLegacy(newResponse.highlights);
+      }
       break;
 
     case Mode.REWRITE:

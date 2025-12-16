@@ -38,14 +38,14 @@ CHAT_ONLY només per preguntes SENSE relació amb el document.
 ### EXEMPLES CRÍTICS:
 | Instrucció | Mode | Per què |
 |------------|------|---------|
-| "Qui signa l'informe?" | REFERENCE_HIGHLIGHT | Pot senyalar on apareix el signant |
-| "Qui és l'autor?" | REFERENCE_HIGHLIGHT | Pot senyalar on apareix l'autor |
+| "Qui signa l'informe?" | REFERENCE_HIGHLIGHT | Localitzar ON apareix el signant |
 | "On apareix el pressupost?" | REFERENCE_HIGHLIGHT | Explícitament vol localitzar |
-| "Quin és l'import?" | REFERENCE_HIGHLIGHT | Pot senyalar on apareix l'import |
-| "De què parla el document?" | REFERENCE_HIGHLIGHT | Pot senyalar les parts principals |
-| "Resumeix el document" | REFERENCE_HIGHLIGHT | Pot senyalar els punts clau |
+| "Busca 'PAE'" | REFERENCE_HIGHLIGHT | Buscar un terme específic |
+| "Revisa l'ortografia" | REFERENCE_HIGHLIGHT | Detectar i marcar errors |
+| "De què parla el document?" | CHAT_ONLY | Explicació general, resposta al xat |
+| "Resumeix el document" | CHAT_ONLY | Resum textual, resposta al xat |
+| "Explica el contingut" | CHAT_ONLY | Explicació, resposta al xat |
 | "Què és un framework?" | CHAT_ONLY | Pregunta general, no relacionada amb el doc |
-| "Com es diu el president de França?" | CHAT_ONLY | No té relació amb el document |
 | "Hola, com estàs?" | CHAT_ONLY | Conversa social |
 
 ## MATRIU DE DECISIÓ (ORDRE DE PRIORITAT ESTRICTE)
@@ -143,6 +143,14 @@ Instrucció: "Resumeix el document"
 ### Fes un resum → CHAT_ONLY
 Instrucció: "Fes un resum del text"
 {"thought":"Demana resum, resposta al xat sense tocar el document","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":true,"risk_level":"none"}
+
+### Explica el contingut → CHAT_ONLY
+Instrucció: "Explica el contingut d'aquest text"
+{"thought":"Demana explicació del contingut, resposta textual al xat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"detailed","is_question":true,"risk_level":"none"}
+
+### Explica destacant idees → CHAT_ONLY (NO ressaltar)
+Instrucció: "Explica el contingut d'aquest text de forma clara, destacant les idees principals"
+{"thought":"'Destacant' aquí significa 'emfatitzant' en l'explicació, NO ressaltar al document. Resposta al xat.","mode":"CHAT_ONLY","confidence":0.95,"response_style":"detailed","is_question":true,"risk_level":"none"}
 
 ### Pregunta general (NO relacionada amb el document) → CHAT_ONLY
 Instrucció: "Què és un blockchain?"

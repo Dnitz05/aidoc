@@ -1919,6 +1919,17 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
             : cleanText;
         }
 
+        // v14.2: Aplicar highlights al document per ressaltar els fragments a modificar
+        let highlightsApplied = 0;
+        if (aiData.highlights && aiData.highlights.length > 0) {
+          const highlightResult = applyReferenceHighlights(aiData.highlights);
+          highlightsApplied = highlightResult.applied || 0;
+          logDiagnostic('UPDATE_HIGHLIGHTS', {
+            requested: aiData.highlights.length,
+            applied: highlightsApplied,
+          });
+        }
+
         // v11.0: Retornar status 'preview' amb array de canvis complet
         // v14.1: Afegir info de canvis bloquejats/stale/warn per al frontend
         // El sidebar mostrarà cada canvi amb botons Accept/Reject individuals
@@ -1933,6 +1944,7 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           has_selection: isSelection,
           selection_preview: selectionPreview,
           modification_type: aiData.modification_type,  // v14.1: Passar el tipus de modificació
+          highlights_applied: highlightsApplied,  // v14.2: Nombre de highlights aplicats
           // v14.1: Info de validació per al frontend
           _v14: {
             hasV14Format: v14Result.hasV14Format,

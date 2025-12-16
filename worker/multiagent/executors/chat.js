@@ -50,51 +50,53 @@ const RESPONSE_STYLES = {
   },
 };
 
-const CHAT_SYSTEM_PROMPT = `Ets el Motor de Navegació Visual de Docmile.
-La teva missió és respondre la pregunta de l'usuari I SIMULTÀNIAMENT guiar la seva vista pel document.
+const CHAT_SYSTEM_PROMPT = `Ets l'assistent de Docmile. Respon les preguntes de l'usuari basant-te en el document.
 
-## ⚠️ PROTOCOL DE NAVEGACIÓ (STRICT MODE) ⚠️
+## COM RESPONDRE
 
-### FORMAT ÚNIC ACCEPTAT:
-[[§N|text_exacte]]
+### Format de resposta
+- Usa **markdown** per estructurar: negretes, llistes, títols
+- Organitza la informació de forma clara i visual
+- Destaca els punts clau amb **negreta**
+- Usa llistes amb guions (-) per enumerar elements
+- Si hi ha molts punts, agrupa'ls per categories
 
-On:
-- N = número del paràgraf (el número dins de {{N}} al context)
-- text_exacte = còpia LITERAL del document (2-6 paraules clau)
+### Estil
+- Respostes concises però completes
+- Llenguatge professional i amable
+- Adapta la longitud a la complexitat de la pregunta
+- Respon en el mateix idioma que l'usuari
 
-### EXEMPLE COMPLET D'ENTRENAMENT
+### ⚠️ PROHIBIT
+- NO usis barres verticals | per ressaltar
+- NO usis claudàtors dobles [[ ]]
+- NO usis símbols § ni altres marques estranyes
+- NO posis |text| per destacar (usa **text** en lloc)
 
-INPUT (Context que reps):
-{{1}} ACTA DE REUNIÓ - Ajuntament de Barcelona
-{{2}} Data: 15 de març de 2024. Lloc: Sala de Plens.
-{{3}} Assistents: Maria López (alcaldessa), Joan Garcia (regidor), Anna Puig (secretària).
-{{4}} Es va aprovar el pressupost de 50.000€ per la rehabilitació de la façana.
-{{5}} El termini d'execució serà de 6 mesos a partir de la signatura.
+## EXEMPLES DE FORMAT
 
-PREGUNTA: "Qui va assistir i quin és el pressupost?"
+**Pregunta simple:**
+El responsable del projecte és **Joan Pérez**, segons consta a l'inici del document.
 
-OUTPUT CORRECTE:
-Van assistir [[§3|Maria López]], [[§3|Joan Garcia]] i [[§3|Anna Puig]].
-El pressupost aprovat és de [[§4|50.000€]] per [[§4|rehabilitació de la façana]].
+**Resum curt:**
+Aquest document és un **informe tècnic** que avalua les condicions d'un projecte. Conclou que és **viable** amb certes condicions.
 
-### ❌ ERRORS FATALS (PROHIBIT):
-- |Maria López| → MAI barres soles
-- Maria López [[§3]] → El text va DINS
-- [[§3]] → Falta el text a ressaltar
-- [[Maria López]] → Falta el §N
+**Resum estructurat:**
+El document tracta els següents punts:
 
-### ✅ BONES PRÀCTIQUES:
-- Copia el text EXACTAMENT com apareix al document
-- Selecciona 2-6 paraules clau (no frases senceres)
-- Cada dada important → una referència
-- El número §N ha de coincidir amb {{N}} del context
+- **Objectiu:** Descripció del que es vol aconseguir
+- **Situació actual:** Estat de les coses avui
+- **Proposta:** Accions recomanades
+- **Conclusions:** Valoració final
 
-## REGLES FINALS
-1. SEMPRE usa [[§N|text]] quan citis informació del document
-2. El text dins | ha de ser IDÈNTIC al document (còpia literal)
-3. Respon de forma natural, però amb enllaços visuals
-4. Si no trobes informació al document, digues-ho clarament
-5. NO inventis dades que no estiguin al context`;
+**Llista d'elements:**
+Els participants són:
+- **Nom 1** - Càrrec o rol
+- **Nom 2** - Càrrec o rol
+- **Nom 3** - Càrrec o rol
+
+**Explicació:**
+El document estableix que **X** és necessari per aconseguir **Y**. Això implica que cal fer **Z** com a primer pas.`;
 
 // ═══════════════════════════════════════════════════════════════
 // EXECUTOR IMPLEMENTATION
@@ -147,14 +149,18 @@ async function executeChatOnly(intent, documentContext, conversationContext, opt
       response = await callGeminiChat(userPrompt, apiKey, signal);
     }
 
+    // v13.6: Netejar barres verticals i altres marques que el model pugui afegir
+    const cleanedResponse = cleanChatResponse(response);
+
     logDebug('CHAT_ONLY completed', {
-      response_length: response.length,
+      response_length: cleanedResponse.length,
       provider: provider?.name || 'gemini-legacy',
+      had_pipes: response !== cleanedResponse,
     });
 
     return {
       mode: Mode.CHAT_ONLY,
-      chat_response: response,
+      chat_response: cleanedResponse,
       _meta: {
         executor: 'chat',
         provider: provider?.name || 'gemini',
@@ -186,6 +192,45 @@ async function executeChatOnly(intent, documentContext, conversationContext, opt
       },
     };
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RESPONSE CLEANING v13.6
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Neteja la resposta del model eliminant marques no desitjades
+ * v13.6: Elimina barres verticals i altres símbols que el model afegeix
+ *
+ * @param {string} response - Resposta del model
+ * @returns {string} - Resposta netejada
+ */
+function cleanChatResponse(response) {
+  if (!response) return '';
+
+  let cleaned = response;
+
+  // Eliminar barres verticals usades com a marcadors (|text|)
+  // Però mantenir barres en taules markdown (| col1 | col2 |)
+  // Patró: | seguit/precedit de text sense espais (marcador) vs amb espais (taula)
+  cleaned = cleaned.replace(/\|([^|\s][^|]*[^|\s])\|/g, '$1');
+
+  // Eliminar barres soltes al principi de paraula
+  cleaned = cleaned.replace(/\|(\w)/g, '$1');
+
+  // Eliminar referències [[§N|text]] que puguin quedar
+  cleaned = cleaned.replace(/\[\[§?\d+\|([^\]]+)\]\]/g, '$1');
+
+  // Eliminar [[§N]] buits
+  cleaned = cleaned.replace(/\[\[§?\d+\]\]/g, '');
+
+  // Eliminar claudàtors dobles buits
+  cleaned = cleaned.replace(/\[\[\]\]/g, '');
+
+  // Netejar espais dobles
+  cleaned = cleaned.replace(/  +/g, ' ');
+
+  return cleaned.trim();
 }
 
 // ═══════════════════════════════════════════════════════════════

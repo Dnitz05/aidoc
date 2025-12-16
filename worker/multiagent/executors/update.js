@@ -331,9 +331,13 @@ async function executeUpdateById(intent, documentContext, conversationContext, o
     // Construir resposta
     const chatResponse = buildUpdateChatResponse(validatedChanges, modificationType, language);
 
+    // v14.2: Generar highlights per mostrar on són els canvis al document
+    const highlights = generateHighlightsFromChanges(validatedChanges, documentContext);
+
     return {
       mode: Mode.UPDATE_BY_ID,
       changes: validatedChanges,
+      highlights: highlights,  // v14.2: Ressaltar fragments a modificar
       chat_response: chatResponse,
       // v12.1: modification_type a nivell superior per router híbrid del frontend
       modification_type: modificationType,
@@ -343,6 +347,7 @@ async function executeUpdateById(intent, documentContext, conversationContext, o
         provider: provider?.name || 'gemini',
         model: provider?.model || GEMINI.model_update,
         paragraphs_modified: validatedChanges.length,
+        highlights_count: highlights.length,
         tokens_input: usage?.input,
         tokens_output: usage?.output,
       },
@@ -632,6 +637,67 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
   }
 
   return validated;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HIGHLIGHT GENERATION v14.2
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Genera highlights per mostrar al document els fragments que es modificaran
+ * v14.2: L'usuari veu ressaltat el text ABANS d'acceptar els canvis
+ *
+ * @param {Array} changes - Canvis validats
+ * @param {Object} documentContext - Context del document
+ * @returns {Array} - Highlights per al frontend
+ */
+function generateHighlightsFromChanges(changes, documentContext) {
+  const highlights = [];
+
+  for (const change of changes) {
+    const paraId = change.paragraph_id;
+    const para = documentContext.paragraphs[paraId];
+    const paraText = para?.text || para || '';
+
+    // Determinar el text a ressaltar
+    // Per mode FIX: ressaltar el fragment "find"/"original"
+    // Per altres modes: ressaltar tot el paràgraf o el text original
+    const textToHighlight = change.original || change.find || paraText;
+
+    // Trobar posició del text dins del paràgraf
+    let start = 0;
+    let end = paraText.length;
+
+    if (textToHighlight && textToHighlight !== paraText) {
+      const pos = paraText.indexOf(textToHighlight);
+      if (pos !== -1) {
+        start = pos;
+        end = pos + textToHighlight.length;
+      }
+    }
+
+    // Determinar color segons el tipus de canvi
+    let color = 'warning';  // Groc per defecte (canvi proposat)
+    if (change.reason === 'typo' || change.reason === 'accent') {
+      color = 'error';  // Taronja per errors ortogràfics
+    } else if (change.reason === 'grammar') {
+      color = 'warning';  // Groc per gramàtica
+    }
+
+    highlights.push({
+      para_id: paraId,
+      paragraph_id: paraId,  // Compatibilitat amb dos formats
+      start: start,
+      end: end,
+      text: textToHighlight,
+      matched_text: textToHighlight,  // Compatibilitat
+      color: color,
+      reason: change.explanation || change.reason || 'Canvi proposat',
+      change_id: change.id,  // v14.2: Vincular highlight amb el canvi
+    });
+  }
+
+  return highlights;
 }
 
 // ═══════════════════════════════════════════════════════════════
