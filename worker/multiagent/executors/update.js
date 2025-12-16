@@ -10,10 +10,11 @@
  * - translate: Traduir a un altre idioma
  */
 
-import { Mode, ActionType } from '../types.js';
+import { Mode, ActionType, generateItemId } from '../types.js';
 import { GEMINI, TIMEOUTS, TEMPERATURES } from '../config.js';
 import { logInfo, logDebug, logError, logWarn } from '../telemetry.js';
 import { formatContextForExecutor } from '../context.js';
+import { sha256Sync, validateChangesV14 } from '../validator.js';
 
 // ═══════════════════════════════════════════════════════════════
 // SYSTEM PROMPTS PER TIPUS
@@ -524,13 +525,14 @@ function parseUpdateResponse(responseText, modificationType = 'improve') {
 
 /**
  * Valida els canvis proposats
- * v12.1: Suporta mode FIX amb hallucination checks
+ * v14.1: Format unificat amb before_text, before_hash, _status
  */
 function validateChanges(changes, documentContext, validTargets, modificationType = 'improve') {
   if (!Array.isArray(changes)) return [];
 
   const targetSet = new Set(validTargets);
   const validated = [];
+  let changeIndex = 0;
 
   for (const change of changes) {
     // Validar paragraph_id
@@ -541,6 +543,10 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
 
     const original = documentContext.paragraphs[change.paragraph_id];
     const originalText = original.text || original;
+
+    // v14.1: before_text és el text complet del paràgraf
+    const before_text = originalText;
+    const before_hash = sha256Sync(before_text);
 
     // v12.1: Validació específica per mode FIX (find/replace)
     if (modificationType === 'fix') {
@@ -566,15 +572,21 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
         continue;
       }
 
+      // v14.1: Format unificat amb original/replacement (find/replace → original/replacement)
       validated.push({
+        id: generateItemId('c', changeIndex++),
         paragraph_id: change.paragraph_id,
+        original: change.find,           // v14: 'original' en lloc de 'find'
+        replacement: change.replace,     // v14: 'replacement' en lloc de 'replace'
+        before_text,                     // v14: text complet del paràgraf
+        before_hash,                     // v14: hash per detecció STALE
+        reason: change.reason || 'fix',
+        explanation: `"${change.find}" → "${change.replace}" (${change.reason || 'fix'})`,
+        // Camps legacy per compatibilitat frontend
         find: change.find,
         replace: change.replace,
-        reason: change.reason || 'fix',
-        // Per compatibilitat amb el frontend, també incloure format antic
         original_text: originalText,
         new_text: originalText.replace(change.find, change.replace),
-        explanation: `"${change.find}" → "${change.replace}" (${change.reason || 'fix'})`,
       });
       continue;
     }
@@ -591,17 +603,32 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
       continue;
     }
 
-    // Guardar text original si no estava
-    if (!change.original_text) {
-      change.original_text = originalText;
+    // v14.1: Format unificat per modes non-FIX (improve, expand, simplify, translate)
+    validated.push({
+      id: generateItemId('c', changeIndex++),
+      paragraph_id: change.paragraph_id,
+      original: originalText,            // v14: text original complet
+      replacement: change.new_text,      // v14: text nou complet
+      before_text,                       // v14: igual que original per full-replace
+      before_hash,                       // v14: hash per detecció STALE
+      explanation: change.explanation || null,
+      // Camps legacy per compatibilitat frontend
+      original_text: originalText,
+      new_text: change.new_text,
+    });
+  }
+
+  // v14.1: Aplicar validació v14 per obtenir _status
+  if (validated.length > 0) {
+    // Construir mapa de hashes actuals per validació STALE
+    const currentHashes = {};
+    for (const change of validated) {
+      currentHashes[change.paragraph_id] = change.before_hash;
     }
 
-    validated.push({
-      paragraph_id: change.paragraph_id,
-      original_text: change.original_text,
-      new_text: change.new_text,
-      explanation: change.explanation || null,
-    });
+    // Validar i obtenir _status per cada canvi
+    const result = validateChangesV14(validated, documentContext, modificationType, currentHashes);
+    return result.validatedChanges;
   }
 
   return validated;

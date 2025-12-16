@@ -8,7 +8,18 @@
  * - Fallback cascade quan la validació falla
  */
 
-import { Mode, RiskLevel, createDefaultIntent, validateIntentPayload } from './types.js';
+import {
+  Mode,
+  RiskLevel,
+  createDefaultIntent,
+  validateIntentPayload,
+  // v14.1: Validation Status Enums
+  ChangeStatus,
+  BlockReason,
+  WarnReason,
+  createValidationSummary,
+  generateItemId,
+} from './types.js';
 import { CONFIDENCE_THRESHOLDS, LENGTH_THRESHOLDS } from './config.js';
 import { logWarn, logError, logDebug, logInfo as logInfoTelemetry } from './telemetry.js';
 
@@ -918,6 +929,413 @@ function logInfo(message, data) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// v14.1: VALIDATOR AMB BLOCK/WARN/STALE
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Calcula SHA256 hash d'un string
+ * @param {string} text - Text a hashejar
+ * @returns {Promise<string>} - Hash en hexadecimal
+ */
+async function sha256(text) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Versió síncrona de sha256 per compatibilitat
+ * Usa un hash simple si crypto.subtle no està disponible
+ * @param {string} text - Text a hashejar
+ * @returns {string} - Hash
+ */
+function sha256Sync(text) {
+  // Protecció contra null/undefined
+  if (!text) return '00000000';
+
+  // Simple hash per entorns sense crypto.subtle
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16).padStart(8, '0');
+}
+
+/**
+ * Calcula la distància de Levenshtein entre dos strings
+ * @param {string} a - Primer string
+ * @param {string} b - Segon string
+ * @returns {number} - Distància d'edició
+ */
+function levenshtein(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  // Optimització: limitar a primers 1000 chars per evitar O(n²) en textos llargs
+  const maxLen = 1000;
+  const strA = a.length > maxLen ? a.substring(0, maxLen) : a;
+  const strB = b.length > maxLen ? b.substring(0, maxLen) : b;
+
+  const matrix = [];
+
+  // Inicialitzar primera columna
+  for (let i = 0; i <= strA.length; i++) {
+    matrix[i] = [i];
+  }
+
+  // Inicialitzar primera fila
+  for (let j = 0; j <= strB.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Omplir la matriu
+  for (let i = 1; i <= strA.length; i++) {
+    for (let j = 1; j <= strB.length; j++) {
+      if (strA.charAt(i - 1) === strB.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitució
+          matrix[i][j - 1] + 1,     // inserció
+          matrix[i - 1][j] + 1      // eliminació
+        );
+      }
+    }
+  }
+
+  return matrix[strA.length][strB.length];
+}
+
+/**
+ * Clamp un valor entre min i max
+ * @param {number} value - Valor a limitar
+ * @param {number} min - Mínim
+ * @param {number} max - Màxim
+ * @returns {number}
+ */
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Thresholds per validació de canvis
+ * v14.1: Valors de la Mode Policy revisada
+ */
+const V14_THRESHOLDS = {
+  // FIX (quirúrgic estricte): ed <= clamp(0.18 * len, min=3, max=120)
+  fix: {
+    ratio: 0.18,
+    min: 3,
+    max: 120,
+  },
+  // UPDATE (quirúrgic flexible): ed <= clamp(0.35 * len, min=12, max=250)
+  update: {
+    ratio: 0.35,
+    min: 12,
+    max: 250,
+  },
+  // Límits per request
+  max_changes_per_request: 20,
+  max_highlights_per_request: 30,
+};
+
+/**
+ * Valida un canvi individual segons v14.1
+ * Retorna l'status (OK, BLOCK, WARN, STALE) i el motiu
+ *
+ * @param {Object} change - Canvi a validar
+ * @param {Object} documentContext - Context del document
+ * @param {string} modificationType - Tipus de modificació (fix, improve, etc.)
+ * @param {string} [currentHash] - Hash actual del paràgraf (per detectar STALE)
+ * @returns {Object} - { status, reason, edit_distance }
+ */
+function validateChangeV14(change, documentContext, modificationType = 'improve', currentHash = null) {
+  const paragraphs = documentContext?.paragraphs || [];
+  const paraId = change.paragraph_id;
+
+  // BLOCK: paragraph_id fora de rang
+  if (typeof paraId !== 'number' || paraId < 0 || paraId >= paragraphs.length) {
+    return {
+      status: ChangeStatus.BLOCK,
+      reason: BlockReason.PARAGRAPH_OUT_OF_RANGE,
+      edit_distance: null,
+    };
+  }
+
+  const paragraph = paragraphs[paraId];
+  const paragraphText = paragraph?.text || paragraph || '';
+
+  // BLOCK: find/original no existeix al paràgraf (per FIX)
+  if (modificationType === 'fix' && change.original) {
+    if (!paragraphText.includes(change.original)) {
+      return {
+        status: ChangeStatus.BLOCK,
+        reason: BlockReason.FIND_NOT_FOUND,
+        edit_distance: null,
+      };
+    }
+  }
+
+  // STALE: before_hash no coincideix amb hash actual
+  if (change.before_hash && currentHash && change.before_hash !== currentHash) {
+    return {
+      status: ChangeStatus.STALE,
+      reason: 'document_changed',
+      edit_distance: null,
+    };
+  }
+
+  // Calcular edit distance
+  const beforeText = change.before_text || paragraphText;
+  let afterText;
+
+  if (change.replacement !== undefined) {
+    // Mode find/replace
+    afterText = beforeText.replace(change.original, change.replacement);
+  } else if (change.new_text !== undefined) {
+    // Mode paràgraf complet
+    afterText = change.new_text;
+  } else {
+    return {
+      status: ChangeStatus.BLOCK,
+      reason: BlockReason.INVALID_CHANGE,
+      edit_distance: null,
+    };
+  }
+
+  const ed = levenshtein(beforeText, afterText);
+
+  // Obtenir thresholds segons el mode
+  const thresholds = modificationType === 'fix' ? V14_THRESHOLDS.fix : V14_THRESHOLDS.update;
+  const limit = clamp(Math.round(thresholds.ratio * beforeText.length), thresholds.min, thresholds.max);
+
+  // WARN: edit distance supera el límit (però no BLOCK, només no auto-aplicar)
+  if (ed > limit) {
+    return {
+      status: ChangeStatus.WARN,
+      reason: WarnReason.BIG_CHANGE,
+      edit_distance: ed,
+    };
+  }
+
+  // OK: tot correcte
+  return {
+    status: ChangeStatus.OK,
+    reason: null,
+    edit_distance: ed,
+  };
+}
+
+/**
+ * Valida un highlight individual segons v14.1
+ *
+ * @param {Object} highlight - Highlight a validar
+ * @param {Object} documentContext - Context del document
+ * @returns {Object} - { status, reason }
+ */
+function validateHighlightV14(highlight, documentContext) {
+  const paragraphs = documentContext?.paragraphs || [];
+  const paraId = highlight.paragraph_id;
+
+  // BLOCK: paragraph_id fora de rang
+  if (typeof paraId !== 'number' || paraId < 0 || paraId >= paragraphs.length) {
+    return {
+      status: ChangeStatus.BLOCK,
+      reason: BlockReason.PARAGRAPH_OUT_OF_RANGE,
+    };
+  }
+
+  const paragraph = paragraphs[paraId];
+  const paragraphText = paragraph?.text || paragraph || '';
+
+  // BLOCK: text no existeix al paràgraf
+  if (highlight.text && !paragraphText.includes(highlight.text)) {
+    // Intentar cerca fuzzy
+    const normalizedPara = paragraphText.replace(/\s+/g, ' ').trim();
+    const normalizedHighlight = highlight.text.replace(/\s+/g, ' ').trim();
+
+    if (!normalizedPara.includes(normalizedHighlight)) {
+      return {
+        status: ChangeStatus.BLOCK,
+        reason: BlockReason.FIND_NOT_FOUND,
+      };
+    }
+  }
+
+  return {
+    status: ChangeStatus.OK,
+    reason: null,
+  };
+}
+
+/**
+ * Valida un array de canvis i retorna amb status
+ * v14.1: Afegeix _status, _block_reason, _edit_distance a cada canvi
+ *
+ * @param {Array} changes - Array de canvis
+ * @param {Object} documentContext - Context del document
+ * @param {string} modificationType - Tipus de modificació
+ * @param {Object} [currentHashes] - Mapa de { paragraph_id: hash_actual }
+ * @returns {Object} - { validatedChanges, summary }
+ */
+function validateChangesV14(changes, documentContext, modificationType = 'improve', currentHashes = {}) {
+  const summary = createValidationSummary();
+  const validatedChanges = [];
+  const editDistances = [];
+
+  if (!Array.isArray(changes)) {
+    return { validatedChanges: [], summary };
+  }
+
+  summary.total_changes = changes.length;
+
+  changes.forEach((change, index) => {
+    const currentHash = currentHashes[change.paragraph_id] || null;
+    const result = validateChangeV14(change, documentContext, modificationType, currentHash);
+
+    // Afegir ID si no en té (0-indexed per coherència amb executors)
+    const id = change.id || generateItemId('c', index);
+
+    // Afegir before_text si no en té
+    let beforeText = change.before_text;
+    if (!beforeText && documentContext?.paragraphs?.[change.paragraph_id]) {
+      const para = documentContext.paragraphs[change.paragraph_id];
+      beforeText = para?.text || para || '';
+    }
+
+    // Afegir before_hash si no en té
+    let beforeHash = change.before_hash;
+    if (!beforeHash && beforeText) {
+      beforeHash = sha256Sync(beforeText);
+    }
+
+    const validatedChange = {
+      ...change,
+      id,
+      before_text: beforeText,
+      before_hash: beforeHash,
+      _status: result.status,
+      _block_reason: result.status === ChangeStatus.BLOCK ? result.reason : null,
+      _warn_reason: result.status === ChangeStatus.WARN ? result.reason : null,
+      _edit_distance: result.edit_distance,
+    };
+
+    validatedChanges.push(validatedChange);
+
+    // Actualitzar summary
+    switch (result.status) {
+      case ChangeStatus.OK:
+        summary.ok_count++;
+        break;
+      case ChangeStatus.BLOCK:
+        summary.blocked_count++;
+        break;
+      case ChangeStatus.WARN:
+        summary.warned_count++;
+        break;
+      case ChangeStatus.STALE:
+        summary.stale_count++;
+        break;
+    }
+
+    if (result.edit_distance !== null) {
+      editDistances.push(result.edit_distance);
+    }
+  });
+
+  // Calcular estadístiques d'edit distance
+  if (editDistances.length > 0) {
+    summary.ed_min = Math.min(...editDistances);
+    summary.ed_max = Math.max(...editDistances);
+    summary.ed_avg = editDistances.reduce((a, b) => a + b, 0) / editDistances.length;
+  }
+
+  return { validatedChanges, summary };
+}
+
+/**
+ * Valida un array de highlights i retorna amb status
+ * v14.1: Afegeix _status, _block_reason a cada highlight
+ *
+ * @param {Array} highlights - Array de highlights
+ * @param {Object} documentContext - Context del document
+ * @returns {Object} - { validatedHighlights, summary }
+ */
+function validateHighlightsV14(highlights, documentContext) {
+  const summary = createValidationSummary();
+  const validatedHighlights = [];
+
+  if (!Array.isArray(highlights)) {
+    return { validatedHighlights: [], summary };
+  }
+
+  summary.total_highlights = highlights.length;
+
+  highlights.forEach((highlight, index) => {
+    const result = validateHighlightV14(highlight, documentContext);
+
+    // Afegir ID si no en té (0-indexed per coherència amb executors)
+    const id = highlight.id || generateItemId('h', index);
+
+    const validatedHighlight = {
+      ...highlight,
+      id,
+      _status: result.status,
+      _block_reason: result.status === ChangeStatus.BLOCK ? result.reason : null,
+    };
+
+    validatedHighlights.push(validatedHighlight);
+
+    // Actualitzar summary
+    if (result.status === ChangeStatus.OK) {
+      summary.ok_count++;
+    } else if (result.status === ChangeStatus.BLOCK) {
+      summary.blocked_count++;
+    }
+  });
+
+  return { validatedHighlights, summary };
+}
+
+/**
+ * Determina si cal activar Quality Loop basant-se en els resultats de validació
+ * v14.1: Segueix la Mode Policy revisada
+ *
+ * @param {string} intentMode - Mode de l'intent (REWRITE, UPDATE_BY_ID, etc.)
+ * @param {number} confidence - Confiança del classifier
+ * @param {Object} validationSummary - Resum de validació
+ * @returns {boolean}
+ */
+function shouldTriggerQualityLoop(intentMode, confidence, validationSummary) {
+  // Sempre per REWRITE
+  if (intentMode === 'REWRITE') {
+    return true;
+  }
+
+  // Si confidence és baixa
+  if (intentMode === 'UPDATE_BY_ID' && confidence < 0.70) {
+    return true;
+  }
+
+  // Si massa rebutjos
+  const totalItems = validationSummary.total_changes + validationSummary.total_highlights;
+  const rejectedCount = validationSummary.blocked_count + validationSummary.stale_count;
+  const rejectedRatio = totalItems > 0 ? rejectedCount / totalItems : 0;
+
+  // rejected_count >= 2 AND rejected_ratio >= 0.15
+  // OR rejected_count >= 5
+  if ((rejectedCount >= 2 && rejectedRatio >= 0.15) || rejectedCount >= 5) {
+    return true;
+  }
+
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════
 
@@ -940,4 +1358,16 @@ export {
   validateConfidence,
   validateCrossReferences,
   validateSafety,
+
+  // v14.1: New validators
+  sha256,
+  sha256Sync,
+  levenshtein,
+  clamp,
+  validateChangeV14,
+  validateHighlightV14,
+  validateChangesV14,
+  validateHighlightsV14,
+  shouldTriggerQualityLoop,
+  V14_THRESHOLDS,
 };

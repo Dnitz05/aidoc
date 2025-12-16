@@ -14,11 +14,11 @@
  * - Estructures o patrons
  */
 
-import { Mode, HighlightStrategy, createErrorResult } from '../types.js';
+import { Mode, HighlightStrategy, createErrorResult, generateItemId } from '../types.js';
 import { GEMINI, TIMEOUTS, TEMPERATURES } from '../config.js';
 import { logInfo, logDebug, logError, logWarn } from '../telemetry.js';
 import { formatContextForPrompt, formatContextForExecutor } from '../context.js';
-import { isLikelyProperNoun } from '../validator.js';
+import { isLikelyProperNoun, sha256Sync, validateHighlightsV14 } from '../validator.js';
 
 // ═══════════════════════════════════════════════════════════════
 // CONSTANTS PER WORD BOUNDARY MULTILINGÜE
@@ -550,10 +550,11 @@ function extractHighlightsFromText(text, documentContext) {
 
 /**
  * Valida, filtra i calcula posicions exactes per als highlights
+ * v14.1: Afegeix id, before_text, before_hash per cada highlight
  * Gestiona múltiples ocurrències de la mateixa paraula al mateix paràgraf
  * @param {Array} highlights - Highlights retornats per l'AI
  * @param {Object} documentContext - Context del document
- * @returns {Array} - Highlights validats amb start/end exactes
+ * @returns {Array} - Highlights validats amb start/end exactes i format v14
  */
 function validateHighlights(highlights, documentContext) {
   // DEBUG: Log entrada
@@ -577,6 +578,7 @@ function validateHighlights(highlights, documentContext) {
   const usedPositions = new Map();
 
   let index = 0;
+  let highlightIndex = 0;  // v14.1: per generar IDs únics
   for (const h of highlights) {
     index++;
     logInfo(`🔍 [DEBUG] Processant highlight ${index}/${highlights.length}`, {
@@ -641,15 +643,24 @@ function validateHighlights(highlights, documentContext) {
       ? h.severity
       : 'info';
 
-    // Construir highlight amb format correcte (para_id, start, end)
+    // v14.1: Calcular before_text i before_hash
+    const before_text = paraText;
+    const before_hash = sha256Sync(before_text);
+
+    // v14.1: Construir highlight amb format unificat
     validated.push({
+      id: generateItemId('h', highlightIndex++),  // v14: ID únic (h_001, h_002...)
       para_id: paraId,
+      paragraph_id: paraId,                       // v14: alias per compatibilitat
       start: position.start,
       end: position.end,
+      text: position.matched_text,               // v14: text destacat
+      before_text,                               // v14: text complet del paràgraf
+      before_hash,                               // v14: hash per detecció STALE
       color: severityToColor(severity),
       reason: h.comment || '',
       severity,
-      matched_text: position.matched_text,
+      matched_text: position.matched_text,       // legacy
       _meta: position._meta || {},
     });
   }
@@ -666,6 +677,12 @@ function validateHighlights(highlights, documentContext) {
       para: v.para_id
     }))
   });
+
+  // v14.1: Aplicar validació v14 per obtenir _status
+  if (validated.length > 0) {
+    const result = validateHighlightsV14(validated, documentContext);
+    return result.validatedHighlights;
+  }
 
   return validated;
 }

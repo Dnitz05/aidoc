@@ -2164,21 +2164,36 @@
 
         // v11.0: Handle Preview Mode response with Unified Annotations
         // v12.1: Afegit suport per modification_type i find/replace per mode FIX
+        // v14.1: Afegit suport per _status, _warn_reason i info de canvis bloquejats/stale
         if (res.status === 'preview' && res.changes && res.changes.length > 0) {
+          // v14.1: Mostrar avís si hi ha canvis bloquejats o stale
+          if (res._v14) {
+            if (res._v14.staleChanges && res._v14.staleChanges.length > 0) {
+              addBubble('system', icon('alertTriangle', 'i--sm i--warning') + ' ' + res._v14.staleChanges.length + ' canvi(s) no s\'han pogut aplicar perquè el document ha canviat.');
+            }
+            if (res._v14.blockedChanges && res._v14.blockedChanges.length > 0) {
+              addBubble('system', icon('alertCircle', 'i--sm i--muted') + ' ' + res._v14.blockedChanges.length + ' canvi(s) han estat bloquejats per validació.');
+            }
+          }
+
           // Convertir changes a annotations per la nova UI unificada
           const annotations = res.changes.map(function(c, i) {
             return {
-              id: 'change-' + i,
+              id: c.id || ('change-' + i),
               type: 'change',
-              para_id: parseInt(c.targetId),
+              para_id: parseInt(c.targetId !== undefined ? c.targetId : c.paragraph_id),
               originalText: c.originalText,
               proposedText: c.proposedText,
               // v12.1: Camps per mode FIX (find/replace natiu)
-              find: c.find || null,
-              replace: c.replace || null,
+              find: c.find || c.original || null,
+              replace: c.replace || c.replacement || null,
               context: c.context || null,
-              reason: c.reason || 'Canvi proposat',
-              status: 'pending'
+              reason: c.reason || c.explanation || 'Canvi proposat',
+              status: 'pending',
+              // v14.1: Camps de validació
+              _status: c._status || 'OK',
+              _warn_reason: c._warn_reason || null,
+              _edit_distance: c._edit_distance || null,
             };
           });
 
@@ -2313,33 +2328,14 @@
       // ═══════════════════════════════════════════════════════════
 
       function showSaveIndicator(state) {
+        // v14.1: Silent save - no text shown to user (just logs)
         console.log('[v5.2] showSaveIndicator:', state);
         const indicator = document.getElementById('saveIndicator');
-        if (!indicator) {
-          console.warn('[v5.2] saveIndicator element not found!');
-          return;
-        }
+        if (!indicator) return;
 
+        // Keep class for potential CSS styling but no text
         indicator.className = 'save-indicator ' + state;
-        switch (state) {
-          case 'saving':
-            indicator.textContent = 'Guardant...';
-            break;
-          case 'saved':
-            indicator.textContent = 'Guardat';
-            setTimeout(() => {
-              if (indicator.classList.contains('saved')) {
-                indicator.textContent = '';
-                indicator.className = 'save-indicator';
-              }
-            }, 2000);
-            break;
-          case 'error':
-            indicator.textContent = 'Error';
-            break;
-          default:
-            indicator.textContent = '';
-        }
+        indicator.textContent = '';
       }
 
       function queueMessageForSave(userMessage, aiResponse, mode) {
@@ -3671,17 +3667,36 @@
 
       /**
        * Renderitza una anotació de canvi (amb botons Accept/Reject)
+       * v14.1: Afegit suport per indicadors WARN
        */
       function renderChangeAnnotation(ann) {
         const diffHtml = ann.diffHtml || computeDiffHtml(ann.originalText || '', ann.proposedText || '');
         const statusClass = 'data-status="' + (ann.status || 'pending') + '"';
 
-        let html = '<div class="annotation-item change-item" data-id="' + ann.id + '" ' + statusClass + '>';
+        // v14.1: Afegir classe especial si és WARN
+        const warnClass = ann._status === 'WARN' ? ' warn-change' : '';
+
+        let html = '<div class="annotation-item change-item' + warnClass + '" data-id="' + ann.id + '" ' + statusClass + '>';
         html += '<div class="annotation-header">';
         html += '<span class="annotation-location">§' + (parseInt(ann.para_id) + 1) + '</span>';
+
+        // v14.1: Mostrar badge WARN si aplica
+        if (ann._status === 'WARN') {
+          html += '<span class="annotation-warn-badge" title="' + escapeHtmlSafe(ann._warn_reason || 'Canvi gran que requereix revisió') + '">';
+          html += icon('alertTriangle', 'i--sm i--warning') + ' Reviseu';
+          html += '</span>';
+        }
+
         html += '<span class="annotation-reason">' + escapeHtmlSafe(ann.reason || 'Canvi proposat') + '</span>';
         html += '</div>';
         html += '<div class="annotation-diff">' + diffHtml + '</div>';
+
+        // v14.1: Mostrar info d'edit distance si és WARN
+        if (ann._status === 'WARN' && ann._edit_distance) {
+          html += '<div class="annotation-warn-info">';
+          html += icon('info', 'i--xs i--muted') + ' Distància d\'edició: ' + ann._edit_distance + ' caràcters';
+          html += '</div>';
+        }
 
         // Botons d'acció (es mostren segons status via CSS)
         html += '<div class="annotation-actions">';

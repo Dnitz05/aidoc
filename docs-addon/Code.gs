@@ -595,6 +595,178 @@ function cleanMarkdown(text) {
     .replace(/\*(.*?)\*/g, '$1');
 }
 
+// ═══════════════════════════════════════════════════════════════
+// v14.1: FUNCIONS DE VALIDACIÓ I PROCESSAMENT DE CANVIS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Calcula un hash simple d'un string (equivalent a sha256Sync del worker)
+ * @param {string} text - Text a hashejar
+ * @returns {string} - Hash en hexadecimal
+ */
+function simpleHash(text) {
+  if (!text) return '00000000';
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16).padStart(8, '0');
+}
+
+/**
+ * Status constants per v14.1
+ */
+const ChangeStatus = {
+  OK: 'OK',
+  BLOCK: 'BLOCK',
+  WARN: 'WARN',
+  STALE: 'STALE',
+};
+
+/**
+ * Processa canvis en format v14 i els converteix al format antic si cal
+ * Implementa validació de before_hash per detectar STALE
+ *
+ * @param {Object} aiData - Dades de l'AI (pot tenir .changes o .updates)
+ * @param {Object} mapIdToElement - Mapa d'IDs a elements del document
+ * @returns {Object} - { updates: {...}, processedChanges: [...], stalChanges: [...], blockedChanges: [...] }
+ */
+function processChangesV14(aiData, mapIdToElement) {
+  const result = {
+    updates: {},              // Format antic per compatibilitat
+    processedChanges: [],     // Canvis que es poden aplicar (OK o WARN acceptat)
+    staleChanges: [],         // Canvis amb document modificat
+    blockedChanges: [],       // Canvis bloquejats
+    warnChanges: [],          // Canvis que requereixen confirmació
+    hasV14Format: false,      // Si la resposta ve en format v14
+  };
+
+  // Cas 1: Format antic (aiData.updates objecte)
+  if (aiData.updates && typeof aiData.updates === 'object' && !Array.isArray(aiData.updates)) {
+    result.updates = aiData.updates;
+    result.hasV14Format = false;
+    return result;
+  }
+
+  // Cas 2: Format v14 (aiData.changes array)
+  if (aiData.changes && Array.isArray(aiData.changes)) {
+    result.hasV14Format = true;
+
+    for (const change of aiData.changes) {
+      const paraId = change.paragraph_id;
+      const targetElement = mapIdToElement[paraId];
+
+      // Si no trobem l'element, bloquejar
+      if (!targetElement) {
+        result.blockedChanges.push({
+          ...change,
+          _block_reason: 'paragraph_not_found',
+        });
+        continue;
+      }
+
+      // Obtenir text actual del paràgraf
+      let currentText = '';
+      try {
+        currentText = targetElement.asText().getText();
+      } catch (e) {
+        result.blockedChanges.push({
+          ...change,
+          _block_reason: 'cannot_read_paragraph',
+        });
+        continue;
+      }
+
+      // Verificar before_hash per detectar STALE (document ha canviat)
+      if (change.before_hash) {
+        const currentHash = simpleHash(currentText);
+        if (change.before_hash !== currentHash) {
+          result.staleChanges.push({
+            ...change,
+            _current_hash: currentHash,
+            _stale_reason: 'document_changed_since_analysis',
+          });
+          continue;
+        }
+      }
+
+      // Processar segons _status
+      const status = change._status || ChangeStatus.OK;
+
+      if (status === ChangeStatus.BLOCK) {
+        result.blockedChanges.push(change);
+        continue;
+      }
+
+      if (status === ChangeStatus.STALE) {
+        result.staleChanges.push(change);
+        continue;
+      }
+
+      if (status === ChangeStatus.WARN) {
+        result.warnChanges.push(change);
+        // També afegir a processedChanges però marcat com WARN
+        // El frontend decidirà si mostrar confirmació
+      }
+
+      // Determinar el text nou
+      let newText;
+      if (change.replacement !== undefined) {
+        // Mode find/replace
+        if (change.original && currentText.includes(change.original)) {
+          newText = currentText.replace(change.original, change.replacement);
+        } else {
+          newText = change.replacement;
+        }
+      } else if (change.new_text !== undefined) {
+        // Mode paràgraf complet
+        newText = change.new_text;
+      } else {
+        result.blockedChanges.push({
+          ...change,
+          _block_reason: 'no_replacement_text',
+        });
+        continue;
+      }
+
+      // Afegir al format antic per compatibilitat
+      result.updates[paraId] = newText;
+
+      // Afegir als canvis processats amb info completa
+      result.processedChanges.push({
+        ...change,
+        targetId: paraId,
+        originalText: currentText,
+        proposedText: cleanMarkdown(newText),
+        _validated: true,
+      });
+    }
+
+    return result;
+  }
+
+  // Cas 3: Ni updates ni changes - retornar buit
+  return result;
+}
+
+/**
+ * Obté el text actual d'un paràgraf per ID
+ * @param {number} paraId - ID del paràgraf
+ * @param {Object} mapIdToElement - Mapa d'IDs a elements
+ * @returns {string|null} - Text del paràgraf o null si no existeix
+ */
+function getParagraphTextById(paraId, mapIdToElement) {
+  const element = mapIdToElement[paraId];
+  if (!element) return null;
+  try {
+    return element.asText().getText();
+  } catch (e) {
+    return null;
+  }
+}
+
 /**
  * Reverteix l'últim canvi fet (v2.6, v6.0 fix)
  * Retorna { success: true } o { success: false, error: string }
@@ -1249,6 +1421,14 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
   // v3.7: Iniciar col·lector de mètriques
   const metrics = createMetricsCollector();
 
+  // v13.6: Netejar TOTS els highlights anteriors abans de processar nou missatge
+  // Això fa que els ressaltats siguin temporals i desapareguin amb cada nova acció
+  try {
+    clearAllHighlights();
+  } catch (e) {
+    // Ignorar errors de neteja - no ha de bloquejar el flux principal
+  }
+
   const doc = DocumentApp.getActiveDocument();
   const selection = doc.getSelection();
   const body = doc.getBody();
@@ -1642,38 +1822,72 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
     let editDuration = 0;
 
     if (aiData.mode === 'UPDATE_BY_ID') {
+      // v14.1: Processar canvis amb validació v14 (suporta format antic i nou)
+      const v14Result = processChangesV14(aiData, mapIdToElement);
+
       // v3.8: Preview Mode - IN-DOCUMENT preview (Track Changes style)
       if (previewMode) {
-        const changes = [];
+        let changes = [];
 
-        for (const [id, newText] of Object.entries(aiData.updates)) {
-          const targetElement = mapIdToElement[id];
-          if (targetElement) {
-            const currentDocText = targetElement.asText().getText();
-            const cleanNewText = cleanMarkdown(newText);
-            changes.push({
-              targetId: id,
-              originalText: currentDocText,
-              proposedText: cleanNewText
+        // v14.1: Si tenim format v14, usar processedChanges directament
+        if (v14Result.hasV14Format) {
+          changes = v14Result.processedChanges;
+
+          // Log si hi ha canvis bloquejats o stale
+          if (v14Result.blockedChanges.length > 0 || v14Result.staleChanges.length > 0) {
+            logDiagnostic('V14_VALIDATION', {
+              processed: v14Result.processedChanges.length,
+              blocked: v14Result.blockedChanges.length,
+              stale: v14Result.staleChanges.length,
+              warned: v14Result.warnChanges.length,
             });
+          }
+        } else {
+          // Format antic: convertir a array de canvis
+          for (const [id, newText] of Object.entries(v14Result.updates)) {
+            const targetElement = mapIdToElement[id];
+            if (targetElement) {
+              const currentDocText = targetElement.asText().getText();
+              const cleanNewText = cleanMarkdown(newText);
+              changes.push({
+                targetId: id,
+                originalText: currentDocText,
+                proposedText: cleanNewText
+              });
+            }
           }
         }
 
         // If no changes found (IDs don't match), return error - no fallback to direct mode
         if (changes.length === 0) {
+          // v14.1: Millorar missatge d'error si hi ha canvis bloquejats/stale
+          let previewError = 'No he pogut identificar els paràgrafs a modificar. Prova a seleccionar el text específic.';
+          if (v14Result.staleChanges.length > 0) {
+            previewError = 'El document ha canviat des de l\'última anàlisi. Actualitza el document i torna a provar.';
+          } else if (v14Result.blockedChanges.length > 0) {
+            previewError = 'Els canvis proposats no s\'han pogut validar. Torna a provar.';
+          }
+
           logDiagnostic('WARNING', {
             issue: 'PREVIEW_NO_CHANGES',
-            updates_from_ai: Object.keys(aiData.updates).length,
-            map_ids_available: Object.keys(mapIdToElement).length
+            updates_from_ai: aiData.changes ? aiData.changes.length : Object.keys(v14Result.updates).length,
+            map_ids_available: Object.keys(mapIdToElement).length,
+            blocked: v14Result.blockedChanges.length,
+            stale: v14Result.staleChanges.length,
           });
           // v10.2: No fall through - retornar error en lloc d'aplicar directament
           return {
             ok: true,
             status: 'in_doc_preview_error',
-            ai_response: aiData.change_summary,
+            ai_response: aiData.change_summary || aiData.chat_response,
             credits: json.credits_remaining,
-            preview_error: 'No he pogut identificar els paràgrafs a modificar. Prova a seleccionar el text específic.',
-            mode: 'edit'
+            preview_error: previewError,
+            mode: 'edit',
+            // v14.1: Afegir info de canvis bloquejats per debug
+            _v14: {
+              blocked: v14Result.blockedChanges.length,
+              stale: v14Result.staleChanges.length,
+            }
           };
         }
 
@@ -1691,7 +1905,8 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           sub_mode: 'UNIFIED_PREVIEW',
           changes: changes.length,
           doc_was_empty: isDocumentEmpty,
-          user_wanted: userMode
+          user_wanted: userMode,
+          v14_format: v14Result.hasV14Format,
         });
         metrics.finalize();
 
@@ -1705,17 +1920,26 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
         }
 
         // v11.0: Retornar status 'preview' amb array de canvis complet
+        // v14.1: Afegir info de canvis bloquejats/stale/warn per al frontend
         // El sidebar mostrarà cada canvi amb botons Accept/Reject individuals
         return {
           ok: true,
           status: 'preview',  // v11.0: Unified Annotations
           changes: changes,   // Array complet per accept/reject individual
-          ai_response: aiData.change_summary,
+          ai_response: aiData.change_summary || aiData.chat_response,
           credits: json.credits_remaining,
           thought: aiData.thought,
           mode: 'edit',
           has_selection: isSelection,
           selection_preview: selectionPreview,
+          modification_type: aiData.modification_type,  // v14.1: Passar el tipus de modificació
+          // v14.1: Info de validació per al frontend
+          _v14: {
+            hasV14Format: v14Result.hasV14Format,
+            warnChanges: v14Result.warnChanges,
+            blockedChanges: v14Result.blockedChanges,
+            staleChanges: v14Result.staleChanges,
+          },
           _diag: {
             doc_chars: contentPayload.length,
             doc_empty: isDocumentEmpty,
@@ -1726,11 +1950,21 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
 
       // Normal mode - Apply changes directly
       // v3.7: Robust execution with error handling and validation
+      // v14.1: Usar v14Result.updates (ja processat amb validació)
       let capturedLastEdit = null;
       const existingLastEdit = loadLastEdit(); // v2.6.1: Carregar ABANS del loop
       const editStartTime = Date.now();
 
-      for (const [id, newText] of Object.entries(aiData.updates)) {
+      // v14.1: Log si hi ha canvis bloquejats/stale (no s'aplicaran)
+      if (v14Result.blockedChanges.length > 0 || v14Result.staleChanges.length > 0) {
+        logDiagnostic('V14_DIRECT_MODE_FILTERED', {
+          will_apply: Object.keys(v14Result.updates).length,
+          blocked: v14Result.blockedChanges.length,
+          stale: v14Result.staleChanges.length,
+        });
+      }
+
+      for (const [id, newText] of Object.entries(v14Result.updates)) {
         try {
           const targetElement = mapIdToElement[id];
 
@@ -1842,13 +2076,16 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
       }
 
       // v3.7: Log timing i estadístiques d'execució
+      // v14.1: Usar v14Result.updates per el comptatge
       editDuration = Date.now() - editStartTime;
       logDiagnostic('EDIT_EXECUTION', {
-        total_updates: Object.keys(aiData.updates).length,
+        total_updates: Object.keys(v14Result.updates).length,
         edits_applied: editsApplied,
         edits_skipped: editsSkipped,
         edit_errors: editErrors.length,
-        duration_ms: editDuration
+        duration_ms: editDuration,
+        v14_blocked: v14Result.blockedChanges.length,
+        v14_stale: v14Result.staleChanges.length,
       });
       if (capturedLastEdit) {
         saveLastEdit(capturedLastEdit);
@@ -1962,7 +2199,9 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
     }
 
     // v3.7: Log resposta EDIT aplicada
-    const updatesApplied = aiData.updates ? Object.keys(aiData.updates).length : 0;
+    // v14.1: Comptar updates del v14Result si existeix, sinó format antic
+    // NOTA: v14Result només existeix per mode UPDATE_BY_ID
+    const updatesApplied = (typeof v14Result !== 'undefined' && v14Result) ? Object.keys(v14Result.updates).length : (aiData.updates ? Object.keys(aiData.updates).length : 0);
     const responseInfo = {
       mode: aiData.mode,
       sub_mode: 'APPLIED',
@@ -2006,12 +2245,15 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
       last_edit_word: lastEditWord, // v2.8: Per al botó "Prohibir"
       undo_snapshot: undoSnapshot,  // v2.6: Per Optimistic UI Undo
       // v3.7: Estadístiques d'execució
+      // v14.1: Usar v14Result si existeix (només per UPDATE_BY_ID)
       edit_stats: {
-        total_requested: aiData.updates ? Object.keys(aiData.updates).length : 0,
+        total_requested: (typeof v14Result !== 'undefined' && v14Result) ? Object.keys(v14Result.updates).length : (aiData.updates ? Object.keys(aiData.updates).length : 0),
         applied: editsApplied || 0,
         skipped: editsSkipped || 0,
         errors: editErrors ? editErrors.length : 0,
-        duration_ms: editDuration || 0
+        duration_ms: editDuration || 0,
+        v14_blocked: (typeof v14Result !== 'undefined' && v14Result) ? v14Result.blockedChanges.length : 0,
+        v14_stale: (typeof v14Result !== 'undefined' && v14Result) ? v14Result.staleChanges.length : 0,
       },
       // v3.7: Diagnòstic
       _diag: {
@@ -6443,6 +6685,54 @@ function clearLaserHighlights() {
 
   } catch (e) {
     console.error('[clearLaserHighlights] Error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * v13.6: Neteja TOTS els tipus de highlights del document
+ * Cridat automàticament quan l'usuari envia un nou missatge
+ * @returns {Object} - {success, cleared}
+ */
+function clearAllHighlights() {
+  let totalCleared = 0;
+  const errors = [];
+
+  try {
+    // 1. Netejar highlights de referència (REFERENCE_HIGHLIGHT mode)
+    try {
+      const ref = clearReferenceHighlights();
+      if (ref.cleared) totalCleared += ref.cleared;
+    } catch (e) {
+      errors.push('ref: ' + e.message);
+    }
+
+    // 2. Netejar highlights proactius (CHAT_ONLY mode)
+    try {
+      const proactive = clearProactiveHighlights();
+      if (proactive.cleared) totalCleared += proactive.cleared;
+    } catch (e) {
+      errors.push('proactive: ' + e.message);
+    }
+
+    // 3. Netejar highlights laser (clics interactius)
+    try {
+      const laser = clearLaserHighlights();
+      if (laser.cleared) totalCleared += laser.cleared;
+    } catch (e) {
+      errors.push('laser: ' + e.message);
+    }
+
+    // 4. Netejar highlight actiu unificat
+    try {
+      clearHighlight();
+    } catch (e) {
+      errors.push('unified: ' + e.message);
+    }
+
+    return { success: true, cleared: totalCleared, errors: errors.length > 0 ? errors : null };
+  } catch (e) {
+    console.error('[clearAllHighlights] Error:', e);
     return { success: false, error: e.message };
   }
 }

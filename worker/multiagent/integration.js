@@ -187,6 +187,9 @@ function convertToLegacyResponse(newResponse) {
     case Mode.UPDATE_BY_ID:
       legacyResponse.updates = convertChangesToUpdates(newResponse.changes);
       legacyResponse.change_summary = buildChangeSummary(newResponse.changes, 'ca');
+      // v14.1: Passar també l'array changes complet per processChangesV14 a Code.gs
+      legacyResponse.changes = newResponse.changes;
+      legacyResponse.modification_type = newResponse.modification_type || newResponse._meta?.modification_type;
       break;
 
     case Mode.REWRITE:
@@ -261,14 +264,19 @@ function severityToColor(severity) {
 
 /**
  * Converteix changes a updates (format legacy)
+ * v14.1: Afegit fallback a 'replacement' per compatibilitat amb format v14
  */
 function convertChangesToUpdates(changes) {
   if (!changes || !Array.isArray(changes)) return {};
 
   const updates = {};
   for (const change of changes) {
-    if (change.paragraph_id !== undefined && change.new_text) {
-      updates[change.paragraph_id] = change.new_text;
+    if (change.paragraph_id !== undefined) {
+      // v14.1: Prioritat: new_text > replacement > proposedText
+      const newText = change.new_text || change.replacement || change.proposedText;
+      if (newText) {
+        updates[change.paragraph_id] = newText;
+      }
     }
   }
   return updates;

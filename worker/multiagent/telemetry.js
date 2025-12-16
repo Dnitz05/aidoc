@@ -120,6 +120,28 @@ class TelemetryCollector {
   }
 
   /**
+   * v14.1: Registra la validació v14 amb estadístiques de canvis
+   * @param {Object} validationSummary - Summary de la validació v14
+   */
+  setValidationV14(validationSummary) {
+    this.log.v14_total_changes = validationSummary.total || 0;
+    this.log.v14_ok_count = validationSummary.ok_count || 0;
+    this.log.v14_blocked_count = validationSummary.blocked_count || 0;
+    this.log.v14_warned_count = validationSummary.warned_count || 0;
+    this.log.v14_stale_count = validationSummary.stale_count || 0;
+    this.log.v14_block_rate = validationSummary.total > 0
+      ? ((validationSummary.blocked_count || 0) / validationSummary.total * 100).toFixed(1)
+      : 0;
+    this.checkpoint('validation_v14_done', {
+      total: validationSummary.total,
+      ok: validationSummary.ok_count,
+      blocked: validationSummary.blocked_count,
+      warned: validationSummary.warned_count,
+      stale: validationSummary.stale_count,
+    });
+  }
+
+  /**
    * Registra el resultat final
    * @param {string} mode
    * @param {number|null} highlights_count
@@ -267,6 +289,11 @@ const metrics = {
   fallbacks: 0,
   latency_sum: 0,
   latency_count: 0,
+  // v14.1: Mètriques de validació
+  v14_total_changes: 0,
+  v14_blocked_changes: 0,
+  v14_warned_changes: 0,
+  v14_stale_changes: 0,
 };
 
 /**
@@ -316,6 +343,14 @@ function updateMetrics(finalizedLog) {
     metrics.latency_sum += finalizedLog.total_latency_ms;
     metrics.latency_count++;
   }
+
+  // v14.1: Mètriques de validació
+  if (finalizedLog.v14_total_changes) {
+    metrics.v14_total_changes += finalizedLog.v14_total_changes;
+    metrics.v14_blocked_changes += finalizedLog.v14_blocked_count || 0;
+    metrics.v14_warned_changes += finalizedLog.v14_warned_count || 0;
+    metrics.v14_stale_changes += finalizedLog.v14_stale_count || 0;
+  }
 }
 
 /**
@@ -335,11 +370,23 @@ function getMetrics() {
     ? (metrics.errors / metrics.total_requests * 100).toFixed(2)
     : 0;
 
+  // v14.1: Calcular block rate
+  const v14BlockRate = metrics.v14_total_changes > 0
+    ? (metrics.v14_blocked_changes / metrics.v14_total_changes * 100).toFixed(1)
+    : 0;
+
+  const v14StaleRate = metrics.v14_total_changes > 0
+    ? (metrics.v14_stale_changes / metrics.v14_total_changes * 100).toFixed(1)
+    : 0;
+
   return {
     ...metrics,
     avg_latency_ms: avgLatency,
     cache_hit_rate_percent: parseFloat(cacheHitRate),
     error_rate_percent: parseFloat(errorRate),
+    // v14.1: Mètriques de validació
+    v14_block_rate_percent: parseFloat(v14BlockRate),
+    v14_stale_rate_percent: parseFloat(v14StaleRate),
   };
 }
 
@@ -389,6 +436,26 @@ function checkAlerts(finalizedLog) {
       severity: 'warning',
       message: `Cache hit rate is ${currentMetrics.cache_hit_rate_percent}% (threshold: 25%)`,
       value: currentMetrics.cache_hit_rate_percent,
+    });
+  }
+
+  // v14.1: Alerta: Block rate alt (molts canvis bloquejats indica problema amb l'LLM)
+  if (currentMetrics.v14_total_changes > 50 && currentMetrics.v14_block_rate_percent > 15) {
+    alerts.push({
+      type: 'HIGH_V14_BLOCK_RATE',
+      severity: 'warning',
+      message: `V14 block rate is ${currentMetrics.v14_block_rate_percent}% (threshold: 15%)`,
+      value: currentMetrics.v14_block_rate_percent,
+    });
+  }
+
+  // v14.1: Alerta: Stale rate alt (indica problema de timing/race conditions)
+  if (currentMetrics.v14_total_changes > 50 && currentMetrics.v14_stale_rate_percent > 10) {
+    alerts.push({
+      type: 'HIGH_V14_STALE_RATE',
+      severity: 'warning',
+      message: `V14 stale rate is ${currentMetrics.v14_stale_rate_percent}% (threshold: 10%)`,
+      value: currentMetrics.v14_stale_rate_percent,
     });
   }
 
