@@ -3742,6 +3742,9 @@
         const ann = pendingAnnotations.find(a => a.id === annotationId);
         if (!ann || ann.status !== 'pending') return;
 
+        // v14.1: Netejar highlights anteriors quan l'usuari interactua
+        clearAllHighlights(true);
+
         // Actualitzar UI immediatament (optimistic)
         const el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
         if (el) {
@@ -3801,6 +3804,9 @@
         const ann = pendingAnnotations.find(a => a.id === annotationId);
         if (!ann || ann.status !== 'pending') return;
 
+        // v14.1: Netejar highlights anteriors quan l'usuari interactua
+        clearAllHighlights(true);
+
         ann.status = 'rejected';
         updateAnnotationUI(annotationId, 'rejected');
         updateBulkActionsBar();
@@ -3814,6 +3820,9 @@
       function acceptAllAnnotations() {
         const pending = pendingAnnotations.filter(a => a.type === 'change' && a.status === 'pending');
         if (pending.length === 0) return;
+
+        // v14.1: Netejar highlights anteriors quan l'usuari interactua
+        clearAllHighlights(true);
 
         showToast('Aplicant ' + pending.length + ' canvis...', 'info');
 
