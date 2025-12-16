@@ -124,9 +124,13 @@ response_style:
 Instrucció: "Qui signa l'informe?"
 {"thought":"Pregunta sobre el document, cal ressaltar on apareix el signant","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"mentions","is_question":true,"risk_level":"none"}
 
-### Resumeix → REFERENCE_HIGHLIGHT (amb ressaltat dels punts clau)
+### Resumeix → CHAT_ONLY (resposta al xat, NO ressaltar)
 Instrucció: "Resumeix el document"
-{"thought":"Demana resum, ressaltar els punts principals del document","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"structure","is_question":false,"risk_level":"none"}
+{"thought":"Demana resum, és una pregunta/consulta que requereix resposta textual al xat, NO modificar ni ressaltar","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":true,"risk_level":"none"}
+
+### Fes un resum → CHAT_ONLY
+Instrucció: "Fes un resum del text"
+{"thought":"Demana resum, resposta al xat sense tocar el document","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":true,"risk_level":"none"}
 
 ### Pregunta general (NO relacionada amb el document) → CHAT_ONLY
 Instrucció: "Què és un blockchain?"
