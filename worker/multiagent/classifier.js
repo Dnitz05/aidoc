@@ -120,9 +120,21 @@ response_style:
 
 ## EXEMPLES
 
-### Pregunta sobre el document → REFERENCE_HIGHLIGHT (amb ressaltat)
+### Pregunta general sobre el document → CHAT_ONLY (resposta al xat)
+Instrucció: "De què va el document?"
+{"thought":"Pregunta general sobre el contingut, requereix resposta textual sense ressaltar","mode":"CHAT_ONLY","confidence":0.95,"response_style":"concise","is_question":true,"risk_level":"none"}
+
+### Pregunta general sobre el contingut → CHAT_ONLY
+Instrucció: "Què diu aquest text?"
+{"thought":"Demana explicació del contingut, resposta al xat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"concise","is_question":true,"risk_level":"none"}
+
+### Pregunta específica que requereix LOCALITZAR text → REFERENCE_HIGHLIGHT
 Instrucció: "Qui signa l'informe?"
-{"thought":"Pregunta sobre el document, cal ressaltar on apareix el signant","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"mentions","is_question":true,"risk_level":"none"}
+{"thought":"Pregunta específica que requereix trobar i ressaltar ON apareix la informació","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"mentions","is_question":true,"risk_level":"none"}
+
+### On apareix X → REFERENCE_HIGHLIGHT (localitzar)
+Instrucció: "On parla de pressupost?"
+{"thought":"Demana localitzar on apareix un tema, cal ressaltar","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"mentions","keywords":["pressupost"],"is_question":true,"risk_level":"none"}
 
 ### Resumeix → CHAT_ONLY (resposta al xat, NO ressaltar)
 Instrucció: "Resumeix el document"
