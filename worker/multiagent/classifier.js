@@ -98,6 +98,21 @@ response_style:
 - "Revisa X" → REFERENCE_HIGHLIGHT (només marca, no modifica)
 - "Corregeix X" → UPDATE_BY_ID (modifica el document)
 
+### ⚠️ REGLA CRÍTICA: "Resumeix/Explica/De què va" segons MODE i SELECCIÓ
+
+Consulta el camp "MODE DE L'USUARI" del prompt:
+
+| Mode | Selecció | "Resumeix/Explica" | Acció |
+|------|----------|-------------------|-------|
+| CHAT | Qualsevol | Sempre resposta | CHAT_ONLY |
+| EDIT | PARCIAL | Escurçar el text seleccionat | UPDATE_BY_ID (simplify) |
+| EDIT | TOT/CAP | Resposta + oferir aplicar | CHAT_ONLY + suggested_followup |
+
+Exemples segons context:
+- Mode CHAT + "resumeix" → CHAT_ONLY (l'usuari NO vol modificar)
+- Mode EDIT + selecció parcial + "resumeix" → UPDATE_BY_ID (simplify)
+- Mode EDIT + tot document + "resumeix" → CHAT_ONLY amb suggested_followup: "Vols que escurci el document?"
+
 ### Extracció de keywords
 - Entre cometes → terme EXACTE: "busca 'la'" → ["la"]
 - Sense cometes → últim substantiu: "on apareix PAE" → ["PAE"]
@@ -115,7 +130,8 @@ response_style:
   "scope": "selection|paragraph|document",
   "requires_confirmation": false,
   "risk_level": "none|low|medium|high",
-  "is_question": true|false
+  "is_question": true|false,
+  "suggested_followup": "<text del botó si cal oferir acció posterior, ex: 'Vols que escurci el document?'> | null"
 }
 
 ## EXEMPLES
@@ -136,13 +152,19 @@ Instrucció: "Qui signa l'informe?"
 Instrucció: "On parla de pressupost?"
 {"thought":"Demana localitzar on apareix un tema, cal ressaltar","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"mentions","keywords":["pressupost"],"is_question":true,"risk_level":"none"}
 
-### Resumeix → CHAT_ONLY (resposta al xat, NO ressaltar)
+### Resumeix (Mode CHAT o tot document) → CHAT_ONLY
+Context: Mode CHAT o selecció = TOT/CAP
 Instrucció: "Resumeix el document"
-{"thought":"Demana resum, és una pregunta/consulta que requereix resposta textual al xat, NO modificar ni ressaltar","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":true,"risk_level":"none"}
+{"thought":"Mode CHAT o sense selecció parcial: resposta al xat sense modificar","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":true,"risk_level":"none","suggested_followup":"Vols que escurci el document?"}
 
-### Fes un resum → CHAT_ONLY
+### Resumeix (Mode EDIT + selecció parcial) → UPDATE_BY_ID (simplify)
+Context: Mode EDIT + selecció = PARCIAL
+Instrucció: "Resumeix això"
+{"thought":"Mode EDIT amb selecció parcial: l'usuari vol escurçar el text seleccionat","mode":"UPDATE_BY_ID","confidence":0.95,"modification_type":"simplify","scope":"selection","is_question":false,"risk_level":"medium"}
+
+### Fes un resum → CHAT_ONLY (quan no hi ha selecció clara)
 Instrucció: "Fes un resum del text"
-{"thought":"Demana resum, resposta al xat sense tocar el document","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":true,"risk_level":"none"}
+{"thought":"Demana resum, resposta al xat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":true,"risk_level":"none","suggested_followup":"Vols que escurci el document?"}
 
 ### Explica el contingut → CHAT_ONLY
 Instrucció: "Explica el contingut d'aquest text"
@@ -176,6 +198,10 @@ function buildUserPrompt(sanitizedInput, documentContext, conversationContext) {
 
 ## IDIOMA DETECTAT
 ${sanitizedInput.language}
+
+## MODE DE L'USUARI
+- Mode: ${documentContext?.userMode === 'chat' ? 'CHAT (l\'usuari NO vol modificacions)' : 'EDIT (l\'usuari permet modificacions)'}
+- Selecció: ${documentContext?.hasSelection ? (documentContext?.isPartialSelection ? 'PARCIAL (paràgrafs específics seleccionats)' : 'TOT EL DOCUMENT o molt extensa') : 'CAP (sense selecció)'}
 `;
 
   // Afegir context del document si disponible

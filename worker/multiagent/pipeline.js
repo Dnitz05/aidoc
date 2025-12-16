@@ -57,6 +57,10 @@ async function processInstruction(request, env, provider = null) {
     selectedText = null,
     sessionId = null,
     documentId = null,
+    // v14.3: Info de mode i selecció per decisió resumeix/explica
+    userMode = 'edit',
+    hasSelection = false,
+    isPartialSelection = false,
   } = request;
 
   // BYOK: Usar provider si s'ha proporcionat, sinó fallback a apiKey central
@@ -106,6 +110,10 @@ async function processInstruction(request, env, provider = null) {
       recentlyMentioned: session.conversation?.mentioned_paragraphs || [],
       selectedText,
       instruction: sanitizedInput.original,  // v8.4: Per detectar mode full doc
+      // v14.3: Info de mode per decisió resumeix/explica
+      userMode,
+      hasSelection,
+      isPartialSelection,
     });
 
     telemetry.checkpoint('context_end');

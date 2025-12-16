@@ -50,6 +50,11 @@ function convertLegacyRequest(legacyBody) {
   // Construir historial de conversa
   const conversationHistory = convertChatHistory(chat_history);
 
+  // v14.3: Calcular si la selecció és parcial (no tot el document)
+  const totalParagraphs = paragraphs.length;
+  const selectedCount = selectedParagraphIds.length;
+  const isPartialSelection = has_selection && selectedCount > 0 && selectedCount < totalParagraphs * 0.5;
+
   return {
     instruction: user_instruction || '',
     paragraphs,
@@ -57,6 +62,10 @@ function convertLegacyRequest(legacyBody) {
     selectedText,
     sessionId: doc_metadata?.doc_id || null,
     documentId: doc_metadata?.doc_id || null,
+    // v14.3: Passar user_mode i has_selection al nivell superior
+    userMode: user_mode || 'edit',  // 'edit' o 'chat'
+    hasSelection: has_selection || false,
+    isPartialSelection,  // true si selecció < 50% del document
     // Metadata addicional
     _legacy: {
       has_selection,
@@ -177,6 +186,10 @@ function convertToLegacyResponse(newResponse) {
     case Mode.CHAT_ONLY:
       legacyResponse.chat_response = newResponse.chat_response || '';
       legacyResponse.change_summary = 'Resposta de xat';
+      // v14.3: Passar suggested_followup per mostrar botó d'acció
+      if (newResponse.suggested_followup) {
+        legacyResponse.suggested_followup = newResponse.suggested_followup;
+      }
       break;
 
     case Mode.REFERENCE_HIGHLIGHT:
@@ -301,15 +314,16 @@ function convertChangesToBlocks(changes) {
 
 /**
  * Construeix un resum dels canvis
+ * v14.4: Missatges de proposta, no d'acció completada
  */
 function buildChangeSummary(changes, language) {
   if (!changes || changes.length === 0) return 'Cap canvi';
 
   const count = changes.length;
   const summaries = {
-    ca: `${count} paràgraf${count !== 1 ? 's' : ''} modificat${count !== 1 ? 's' : ''}`,
-    es: `${count} párrafo${count !== 1 ? 's' : ''} modificado${count !== 1 ? 's' : ''}`,
-    en: `${count} paragraph${count !== 1 ? 's' : ''} modified`,
+    ca: count === 1 ? '1 canvi proposat' : `${count} canvis proposats`,
+    es: count === 1 ? '1 cambio propuesto' : `${count} cambios propuestos`,
+    en: count === 1 ? '1 proposed change' : `${count} proposed changes`,
   };
   return summaries[language] || summaries.ca;
 }

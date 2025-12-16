@@ -79,6 +79,7 @@ PROTOCOL:
 ## OUTPUT JSON
 \`\`\`json
 {
+  "response": "<resposta breu i natural a l'usuari sobre què has fet/trobat>",
   "changes": [
     {
       "paragraph_id": <número>,
@@ -90,7 +91,10 @@ PROTOCOL:
 }
 \`\`\`
 
-Si no hi ha errors: {"changes": [], "message": "Cap error detectat"}`,
+El camp "response" ha de ser una frase natural i breu (1-2 frases) que respongui a la petició de l'usuari.
+Exemples: "He revisat el text i he trobat 3 errors ortogràfics.", "Tot correcte! No he detectat cap error."
+
+Si no hi ha errors: {"response": "He revisat el text i no he trobat cap error.", "changes": []}`,
 
   improve: `EDITOR DE MILLORES CONSERVATIVES
 Objectiu: Millorar claredat i fluïdesa SENSE canviar significat ni to.
@@ -118,6 +122,7 @@ Objectiu: Millorar claredat i fluïdesa SENSE canviar significat ni to.
 ## OUTPUT
 \`\`\`json
 {
+  "response": "<resposta breu i natural a l'usuari>",
   "changes": [
     {
       "paragraph_id": <número>,
@@ -129,7 +134,10 @@ Objectiu: Millorar claredat i fluïdesa SENSE canviar significat ni to.
 }
 \`\`\`
 
-Si el text ja és clar, retornar: {"changes": [], "message": "El text ja és adequat"}`,
+El camp "response" ha de ser natural i contextualitzat a la petició de l'usuari.
+Exemples: "He simplificat algunes frases massa llargues.", "Proposo millorar la fluïdesa d'un paràgraf."
+
+Si el text ja és clar: {"response": "El text ja està ben escrit, no cal fer canvis.", "changes": []}`,
 
   expand: `DESENVOLUPADOR DE CONTINGUT
 Objectiu: Expandir text afegint detalls, exemples o explicacions rellevants.
@@ -157,6 +165,7 @@ Objectiu: Expandir text afegint detalls, exemples o explicacions rellevants.
 ## OUTPUT
 \`\`\`json
 {
+  "response": "<resposta breu i natural a l'usuari>",
   "changes": [
     {
       "paragraph_id": <número>,
@@ -166,7 +175,9 @@ Objectiu: Expandir text afegint detalls, exemples o explicacions rellevants.
     }
   ]
 }
-\`\`\``,
+\`\`\`
+
+El camp "response" ha de ser natural. Exemple: "He desenvolupat el paràgraf afegint més detalls sobre el tema."`,
 
   simplify: `SIMPLIFICADOR DE TEXT
 Objectiu: Fer el text més accessible mantenint la informació essencial.
@@ -194,6 +205,7 @@ Objectiu: Fer el text més accessible mantenint la informació essencial.
 ## OUTPUT
 \`\`\`json
 {
+  "response": "<resposta breu i natural a l'usuari>",
   "changes": [
     {
       "paragraph_id": <número>,
@@ -203,7 +215,9 @@ Objectiu: Fer el text més accessible mantenint la informació essencial.
     }
   ]
 }
-\`\`\``,
+\`\`\`
+
+El camp "response" ha de ser natural. Exemple: "He simplificat el text usant frases més curtes i directes."`,
 
   translate: `TRADUCTOR PROFESSIONAL
 Objectiu: Traduir preservant significat, to i estil.
@@ -228,6 +242,7 @@ Objectiu: Traduir preservant significat, to i estil.
 ## OUTPUT
 \`\`\`json
 {
+  "response": "<resposta breu i natural a l'usuari>",
   "changes": [
     {
       "paragraph_id": <número>,
@@ -238,7 +253,9 @@ Objectiu: Traduir preservant significat, to i estil.
     }
   ]
 }
-\`\`\``,
+\`\`\`
+
+El camp "response" ha de ser natural. Exemple: "Aquí tens el text traduït al castellà."`,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -326,10 +343,11 @@ async function executeUpdateById(intent, documentContext, conversationContext, o
     logDebug('UPDATE_BY_ID completed', {
       changes_count: validatedChanges.length,
       modification_type: modificationType,
+      has_ai_response: !!parsedResponse.response,
     });
 
-    // Construir resposta
-    const chatResponse = buildUpdateChatResponse(validatedChanges, modificationType, language);
+    // v14.4: Usar resposta de la IA si existeix, fallback a missatge genèric
+    const chatResponse = parsedResponse.response || buildUpdateChatResponse(validatedChanges, modificationType, language);
 
     // v14.2: Generar highlights per mostrar on són els canvis al document
     const highlights = generateHighlightsFromChanges(validatedChanges, documentContext);
@@ -477,6 +495,7 @@ async function callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal, modifi
 /**
  * Parseja la resposta de Gemini
  * v12.1: Suporta format find/replace per mode FIX
+ * v14.4: Extreu camp "response" per resposta natural de la IA
  */
 function parseUpdateResponse(responseText, modificationType = 'improve') {
   // Buscar JSON
@@ -494,11 +513,14 @@ function parseUpdateResponse(responseText, modificationType = 'improve') {
   try {
     const parsed = JSON.parse(jsonStr);
     const changes = parsed.changes || [];
+    // v14.4: Extreure resposta natural de la IA
+    const aiResponse = parsed.response || null;
 
     // v12.1: Per mode FIX, assegurar format find/replace
     // IMPORTANT: LLM retorna 1-indexed (§1, §2...), convertir a 0-indexed
     if (modificationType === 'fix') {
       return {
+        response: aiResponse,
         changes: changes.map(c => ({
           paragraph_id: c.paragraph_id - 1,  // v12.1: 1-indexed → 0-indexed
           find: c.find || c.original_text,  // Fallback a format antic
@@ -513,6 +535,7 @@ function parseUpdateResponse(responseText, modificationType = 'improve') {
 
     // v12.1: Convertir paragraph_id a 0-indexed per modes no-FIX
     return {
+      response: aiResponse,
       changes: changes.map(c => ({
         ...c,
         paragraph_id: c.paragraph_id - 1,  // v12.1: 1-indexed → 0-indexed
@@ -520,7 +543,7 @@ function parseUpdateResponse(responseText, modificationType = 'improve') {
     };
   } catch (error) {
     logWarn('Failed to parse update response as JSON', { error: error.message });
-    return { changes: [] };
+    return { changes: [], response: null };
   }
 }
 
@@ -640,12 +663,13 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HIGHLIGHT GENERATION v14.2
+// HIGHLIGHT GENERATION v14.4
 // ═══════════════════════════════════════════════════════════════
 
 /**
  * Genera highlights per mostrar al document els fragments que es modificaran
  * v14.2: L'usuari veu ressaltat el text ABANS d'acceptar els canvis
+ * v14.4: Ressalta només el text específic que canvia, no tot el paràgraf
  *
  * @param {Array} changes - Canvis validats
  * @param {Object} documentContext - Context del document
@@ -659,20 +683,41 @@ function generateHighlightsFromChanges(changes, documentContext) {
     const para = documentContext.paragraphs[paraId];
     const paraText = para?.text || para || '';
 
-    // Determinar el text a ressaltar
-    // Per mode FIX: ressaltar el fragment "find"/"original"
-    // Per altres modes: ressaltar tot el paràgraf o el text original
-    const textToHighlight = change.original || change.find || paraText;
-
-    // Trobar posició del text dins del paràgraf
+    // v14.4: Determinar el text específic a ressaltar
+    let textToHighlight;
     let start = 0;
     let end = paraText.length;
 
-    if (textToHighlight && textToHighlight !== paraText) {
+    // Mode FIX: ressaltar el fragment "find"
+    if (change.find) {
+      textToHighlight = change.find;
       const pos = paraText.indexOf(textToHighlight);
       if (pos !== -1) {
         start = pos;
         end = pos + textToHighlight.length;
+      }
+    }
+    // Altres modes: trobar la diferència entre original i new
+    else if (change.original_text && change.new_text) {
+      const diff = findTextDifference(change.original_text, change.new_text);
+      if (diff) {
+        textToHighlight = diff.originalFragment;
+        start = diff.start;
+        end = diff.end;
+      } else {
+        // Si no es pot determinar la diferència, ressaltar tot
+        textToHighlight = paraText;
+      }
+    }
+    // Fallback
+    else {
+      textToHighlight = change.original || paraText;
+      if (textToHighlight !== paraText) {
+        const pos = paraText.indexOf(textToHighlight);
+        if (pos !== -1) {
+          start = pos;
+          end = pos + textToHighlight.length;
+        }
       }
     }
 
@@ -700,47 +745,133 @@ function generateHighlightsFromChanges(changes, documentContext) {
   return highlights;
 }
 
+/**
+ * v14.4: Troba la diferència entre dos textos
+ * Retorna el fragment del text original que ha canviat
+ */
+function findTextDifference(original, modified) {
+  if (!original || !modified) return null;
+  if (original === modified) return null;
+
+  // Trobar prefix comú
+  let prefixLen = 0;
+  const minLen = Math.min(original.length, modified.length);
+  while (prefixLen < minLen && original[prefixLen] === modified[prefixLen]) {
+    prefixLen++;
+  }
+
+  // Trobar suffix comú (des del final)
+  let suffixLen = 0;
+  while (
+    suffixLen < minLen - prefixLen &&
+    original[original.length - 1 - suffixLen] === modified[modified.length - 1 - suffixLen]
+  ) {
+    suffixLen++;
+  }
+
+  // Calcular el fragment que canvia
+  const start = prefixLen;
+  const end = original.length - suffixLen;
+
+  // Si el canvi és massa gran (>80% del text), no ressaltar fragment específic
+  const changeLen = end - start;
+  if (changeLen > original.length * 0.8) {
+    return null;
+  }
+
+  const originalFragment = original.substring(start, end);
+
+  // Si el fragment és molt curt, expandir una mica per donar context
+  if (originalFragment.length < 5 && original.length > 10) {
+    const expandStart = Math.max(0, start - 10);
+    const expandEnd = Math.min(original.length, end + 10);
+    return {
+      start: expandStart,
+      end: expandEnd,
+      originalFragment: original.substring(expandStart, expandEnd),
+    };
+  }
+
+  return {
+    start,
+    end,
+    originalFragment,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════
 // RESPONSE BUILDING
 // ═══════════════════════════════════════════════════════════════
 
 /**
  * Construeix la resposta de chat
+ * v14.4: Missatges més naturals - propostes pendents d'aprovació
  */
 function buildUpdateChatResponse(changes, modificationType, language) {
   const count = changes.length;
 
+  // v14.4: Missatges que indiquen proposta (no acció completada)
   const templates = {
     ca: {
-      fix: `He corregit ${count} paràgraf${count !== 1 ? 's' : ''}.`,
-      improve: `He millorat ${count} paràgraf${count !== 1 ? 's' : ''}.`,
-      expand: `He expandit ${count} paràgraf${count !== 1 ? 's' : ''}.`,
-      simplify: `He simplificat ${count} paràgraf${count !== 1 ? 's' : ''}.`,
-      translate: `He traduït ${count} paràgraf${count !== 1 ? 's' : ''}.`,
+      fix: count === 1
+        ? 'He trobat una correcció a fer:'
+        : `He trobat ${count} correccions a fer:`,
+      improve: count === 1
+        ? 'Proposo una millora:'
+        : `Proposo ${count} millores:`,
+      expand: count === 1
+        ? 'Proposo expandir aquest fragment:'
+        : `Proposo expandir ${count} fragments:`,
+      simplify: count === 1
+        ? 'Proposo simplificar aquest fragment:'
+        : `Proposo simplificar ${count} fragments:`,
+      translate: count === 1
+        ? 'Aquí tens la traducció:'
+        : `Aquí tens ${count} traduccions:`,
     },
     es: {
-      fix: `He corregido ${count} párrafo${count !== 1 ? 's' : ''}.`,
-      improve: `He mejorado ${count} párrafo${count !== 1 ? 's' : ''}.`,
-      expand: `He expandido ${count} párrafo${count !== 1 ? 's' : ''}.`,
-      simplify: `He simplificado ${count} párrafo${count !== 1 ? 's' : ''}.`,
-      translate: `He traducido ${count} párrafo${count !== 1 ? 's' : ''}.`,
+      fix: count === 1
+        ? 'He encontrado una corrección:'
+        : `He encontrado ${count} correcciones:`,
+      improve: count === 1
+        ? 'Propongo una mejora:'
+        : `Propongo ${count} mejoras:`,
+      expand: count === 1
+        ? 'Propongo expandir este fragmento:'
+        : `Propongo expandir ${count} fragmentos:`,
+      simplify: count === 1
+        ? 'Propongo simplificar este fragmento:'
+        : `Propongo simplificar ${count} fragmentos:`,
+      translate: count === 1
+        ? 'Aquí tienes la traducción:'
+        : `Aquí tienes ${count} traducciones:`,
     },
     en: {
-      fix: `I've corrected ${count} paragraph${count !== 1 ? 's' : ''}.`,
-      improve: `I've improved ${count} paragraph${count !== 1 ? 's' : ''}.`,
-      expand: `I've expanded ${count} paragraph${count !== 1 ? 's' : ''}.`,
-      simplify: `I've simplified ${count} paragraph${count !== 1 ? 's' : ''}.`,
-      translate: `I've translated ${count} paragraph${count !== 1 ? 's' : ''}.`,
+      fix: count === 1
+        ? 'I found one correction:'
+        : `I found ${count} corrections:`,
+      improve: count === 1
+        ? 'I suggest an improvement:'
+        : `I suggest ${count} improvements:`,
+      expand: count === 1
+        ? 'I suggest expanding this section:'
+        : `I suggest expanding ${count} sections:`,
+      simplify: count === 1
+        ? 'I suggest simplifying this section:'
+        : `I suggest simplifying ${count} sections:`,
+      translate: count === 1
+        ? 'Here\'s the translation:'
+        : `Here are ${count} translations:`,
     },
   };
 
   const t = templates[language] || templates.ca;
   let response = t[modificationType] || t.improve;
 
-  // Afegir detalls dels canvis
+  // v14.4: Afegir explicacions dels canvis si n'hi ha
   if (changes.length <= 3) {
     const details = changes.map(c => {
-      if (c.explanation) return `\n• §${c.paragraph_id + 1}: ${c.explanation}`;  // v12.1: 0-indexed → 1-indexed per display
+      if (c.explanation) return `\n• ${c.explanation}`;
       return '';
     }).filter(Boolean);
     if (details.length > 0) {

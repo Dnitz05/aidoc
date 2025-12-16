@@ -1814,6 +1814,11 @@
             .withSuccessHandler(function(info) {
               selectionRequestPending = false;
 
+              // v14.4: Si s'han netejat highlights, actualitzar UI de les anotacions
+              if (info && info.highlightsCleared) {
+                onHighlightsCleared();
+              }
+
               // Chat indicator
               const indicator = document.getElementById('selectionIndicator');
               const preview = document.getElementById('selectionPreview');
@@ -2291,6 +2296,18 @@
         // v10.2: No mostrar badge antic - ara tot passa per preview
         addBubble('ai', res.ai_response, false);
 
+        // v14.3: Mostrar botó de suggested_followup si existeix
+        if (res.suggested_followup && res.suggested_followup.available) {
+          const followupHtml = `
+            <div class="suggested-followup">
+              <button class="btn-followup" onclick="handleFollowup('${res.suggested_followup.would_become_mode}')">
+                ${icon('zap', 'i--sm')} ${res.suggested_followup.prompt}
+              </button>
+            </div>
+          `;
+          addBubble('followup', followupHtml);
+        }
+
         // v10.0: Activar Pantalla Interactiva si hi ha referències [[§ID]]
         if (res.mode === 'chat' && res.ai_response) {
           triggerInteractiveScreen(res.ai_response);
@@ -2757,6 +2774,31 @@
       // v5.0: Temp storage for last sent message (for conversation save)
       let lastSentMessage = null;
 
+      /**
+       * v14.3: Handle suggested followup action
+       * Envia una instrucció automàtica per aplicar l'acció suggerida
+       */
+      function handleFollowup(mode) {
+        // Construir instrucció segons el mode
+        let instruction = '';
+        if (mode === 'REWRITE') {
+          instruction = 'Sí, escurça el document aplicant el resum';
+        } else if (mode === 'UPDATE_BY_ID') {
+          instruction = 'Sí, aplica els canvis proposats';
+        } else {
+          instruction = 'Sí, aplica-ho';
+        }
+
+        // Enviar com a missatge de l'usuari
+        addBubble('user', instruction, false);
+        showThinking();
+
+        google.script.run
+          .withSuccessHandler(handleSendSuccess)
+          .withFailureHandler(handleSendFailure)
+          .processUserCommand(instruction, getRecentHistory(), 'edit', true, []);
+      }
+
       function sendMessage() {
         const input = document.getElementById('userInput');
         const text = input.value.trim();
@@ -2886,7 +2928,18 @@
         html = html.replace(/^## (.+)$/gm, '<h4 class="md-header">$1</h4>');
 
         // 8. Unordered lists (- item or * item)
-        html = html.replace(/^[\-\*] (.+)$/gm, '<li class="md-li">$1</li>');
+        // v14.4: Normalitzar formats alternatius de llista que la IA pot generar
+        html = html.replace(/^\(\-\) /gm, '- ');  // (-) → -
+        html = html.replace(/^\(•\) /gm, '- ');   // (•) → -
+        html = html.replace(/^• /gm, '- ');       // • → -
+        // v14.4: Processar cada línia que comença amb - o * seguit d'espai
+        html = html.split('\n').map(function(line) {
+          const match = line.match(/^[\-\*] (.+)$/);
+          if (match) {
+            return '<li class="md-li">' + match[1] + '</li>';
+          }
+          return line;
+        }).join('\n');
         html = html.replace(/(<li class="md-li">.*<\/li>\n?)+/g, '<ul class="md-list">$&</ul>');
 
         // 9. Ordered lists (1. item)
@@ -3612,6 +3665,53 @@
       // v11.0: ANNOTATION SYSTEM - Unified Highlights + Changes
       // ═══════════════════════════════════════════════════════════
 
+      // v14.4: Controlar si els highlights estan actius
+      let annotationHighlightsActive = true;
+
+      /**
+       * v14.4: Callback quan els highlights del document s'han netejat
+       * Actualitza la UI de les anotacions per mostrar el botó "Veure"
+       */
+      function onHighlightsCleared() {
+        if (!annotationHighlightsActive) return;  // Ja netejat
+        annotationHighlightsActive = false;
+
+        // Afegir classe per mostrar botó "Veure" a totes les anotacions pendents
+        document.querySelectorAll('.annotation-item.change-item[data-status="pending"]').forEach(function(el) {
+          el.classList.add('highlights-cleared');
+        });
+      }
+
+      /**
+       * v14.4: Tornar a aplicar highlight per una anotació específica
+       * @param {string} annotationId - ID de l'anotació
+       */
+      function showAnnotationHighlight(annotationId) {
+        const ann = pendingAnnotations.find(a => a.id === annotationId);
+        if (!ann) return;
+
+        // Aplicar highlight al document
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.applied > 0) {
+              annotationHighlightsActive = true;
+              // Treure classe de totes les anotacions
+              document.querySelectorAll('.annotation-item.highlights-cleared').forEach(function(el) {
+                el.classList.remove('highlights-cleared');
+              });
+              showToast('Ressaltat actiu', 'info');
+            }
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error ressaltant', 'error');
+          })
+          .applyReferenceHighlights([{
+            para_id: ann.para_id,
+            snippet: ann.originalText ? ann.originalText.substring(0, 50) : '',
+            color: 'yellow'
+          }]);
+      }
+
       /**
        * Renderitza una resposta amb anotacions (unifica highlights i changes)
        * @param {string} aiResponse - Text de resposta de l'AI
@@ -3620,6 +3720,8 @@
        * @param {string} modificationType - v12.1: Tipus de modificació (fix|improve|expand|simplify|translate)
        */
       function addBubbleWithAnnotations(aiResponse, annotations, docSnapshot, modificationType) {
+        // v14.4: Reset estat dels highlights
+        annotationHighlightsActive = true;
         const container = document.getElementById('chatHistory');
         const bubble = document.createElement('div');
         bubble.className = 'msg ai';
@@ -3678,7 +3780,7 @@
 
         let html = '<div class="annotation-item change-item' + warnClass + '" data-id="' + ann.id + '" ' + statusClass + '>';
         html += '<div class="annotation-header">';
-        html += '<span class="annotation-location">§' + (parseInt(ann.para_id) + 1) + '</span>';
+        html += '<span class="annotation-location">Línia ' + (parseInt(ann.para_id) + 1) + '</span>';
 
         // v14.1: Mostrar badge WARN si aplica
         if (ann._status === 'WARN') {
@@ -3700,6 +3802,8 @@
 
         // Botons d'acció (es mostren segons status via CSS)
         html += '<div class="annotation-actions">';
+        // v14.4: Botó "Veure" per tornar a mostrar highlight (només visible quan highlights cleared)
+        html += '<button class="btn-view" onclick="showAnnotationHighlight(\'' + ann.id + '\')" title="Veure al document">' + icon('eye', 'i--sm') + ' Veure</button>';
         html += '<button class="btn-accept" onclick="acceptSingleAnnotation(\'' + ann.id + '\')">' + icon('check', 'i--sm') + ' Acceptar</button>';
         html += '<button class="btn-reject" onclick="rejectSingleAnnotation(\'' + ann.id + '\')">' + icon('x', 'i--sm') + ' Rebutjar</button>';
         html += '</div>';
@@ -6906,6 +7010,7 @@
       /**
        * Computes HTML diff between two texts using word-level comparison
        * Returns HTML with <del> and <ins> tags
+       * v14.4: Trunca context si el canvi és petit (poques paraules)
        */
       function computeDiffHtml(original, proposed) {
         if (!original && !proposed) return '';
@@ -6918,7 +7023,90 @@
 
         // Simple LCS-based diff
         const diff = computeWordDiff(originalWords, proposedWords);
-        return renderDiff(diff);
+
+        // v14.4: Truncar si el canvi és petit i el text és llarg
+        const truncatedDiff = truncateDiffContext(diff);
+
+        return renderDiff(truncatedDiff);
+      }
+
+      /**
+       * v14.4: Trunca el context del diff si el canvi és petit
+       * Mostra només N paraules abans i després dels canvis
+       *
+       * @param {Array} diff - Array de {type: 'eq'|'del'|'ins', text: string}
+       * @returns {Array} - Diff truncat amb ellipsis si cal
+       */
+      function truncateDiffContext(diff) {
+        const CONTEXT_WORDS = 5;  // Paraules a mostrar abans/després
+        const MIN_TOTAL_FOR_TRUNCATE = 20;  // Mínim de tokens per considerar truncar
+        const MAX_CHANGED_WORDS = 10;  // Màxim de paraules canviades per truncar
+
+        // Comptar tokens i canvis
+        const totalTokens = diff.length;
+        let changedCount = 0;
+        let firstChangeIdx = -1;
+        let lastChangeIdx = -1;
+
+        for (let i = 0; i < diff.length; i++) {
+          if (diff[i].type !== 'eq') {
+            changedCount++;
+            if (firstChangeIdx === -1) firstChangeIdx = i;
+            lastChangeIdx = i;
+          }
+        }
+
+        // No truncar si:
+        // - No hi ha canvis
+        // - El text és curt
+        // - Hi ha molts canvis (no és un canvi petit)
+        if (firstChangeIdx === -1 ||
+            totalTokens < MIN_TOTAL_FOR_TRUNCATE ||
+            changedCount > MAX_CHANGED_WORDS) {
+          return diff;
+        }
+
+        // Calcular rang a mantenir (amb context)
+        // Comptem només tokens no-espai per context
+        let contextBefore = 0;
+        let startIdx = firstChangeIdx;
+        for (let i = firstChangeIdx - 1; i >= 0 && contextBefore < CONTEXT_WORDS; i--) {
+          startIdx = i;
+          if (diff[i].text.trim()) contextBefore++;
+        }
+
+        let contextAfter = 0;
+        let endIdx = lastChangeIdx;
+        for (let i = lastChangeIdx + 1; i < diff.length && contextAfter < CONTEXT_WORDS; i++) {
+          endIdx = i;
+          if (diff[i].text.trim()) contextAfter++;
+        }
+
+        // Si no truncarem prou, no val la pena
+        const wouldRemove = startIdx + (diff.length - endIdx - 1);
+        if (wouldRemove < 8) {
+          return diff;
+        }
+
+        // Construir diff truncat
+        const truncated = [];
+
+        // Afegir ellipsis al principi si truncem
+        if (startIdx > 0) {
+          truncated.push({ type: 'ellipsis', text: '… ' });
+        }
+
+        // Afegir tokens del rang
+        for (let i = startIdx; i <= endIdx; i++) {
+          truncated.push(diff[i]);
+        }
+
+        // Afegir ellipsis al final si truncem
+        if (endIdx < diff.length - 1) {
+          truncated.push({ type: 'ellipsis', text: ' …' });
+        }
+
+        return truncated;
       }
 
       /**
@@ -6974,6 +7162,7 @@
 
       /**
        * Render diff array to HTML
+       * v14.4: Afegit suport per tipus 'ellipsis'
        */
       function renderDiff(diff) {
         let html = '';
@@ -6981,17 +7170,22 @@
         let buffer = '';
 
         for (const item of diff) {
+          // v14.4: Gestionar ellipsis separadament (no s'agrupa)
+          if (item.type === 'ellipsis') {
+            // Flush buffer primer
+            if (buffer) {
+              html += renderDiffBuffer(currentType, buffer);
+              buffer = '';
+              currentType = null;
+            }
+            html += '<span class="diff-ellipsis">' + escapeHtml(item.text) + '</span>';
+            continue;
+          }
+
           if (item.type !== currentType) {
             // Flush buffer
             if (buffer) {
-              if (currentType === 'del') {
-                html += '<del class="diff-del">' + escapeHtml(buffer) + '</del>';
-              } else if (currentType === 'ins') {
-                html += '<ins class="diff-ins">' + escapeHtml(buffer) + '</ins>';
-              } else {
-                // Text inalterat - verd clar
-                html += '<span class="diff-context">' + escapeHtml(buffer) + '</span>';
-              }
+              html += renderDiffBuffer(currentType, buffer);
               buffer = '';
             }
             currentType = item.type;
@@ -7001,17 +7195,24 @@
 
         // Flush remaining buffer
         if (buffer) {
-          if (currentType === 'del') {
-            html += '<del class="diff-del">' + escapeHtml(buffer) + '</del>';
-          } else if (currentType === 'ins') {
-            html += '<ins class="diff-ins">' + escapeHtml(buffer) + '</ins>';
-          } else {
-            // Text inalterat - verd clar
-            html += '<span class="diff-context">' + escapeHtml(buffer) + '</span>';
-          }
+          html += renderDiffBuffer(currentType, buffer);
         }
 
         return html;
+      }
+
+      /**
+       * v14.4: Helper per renderitzar buffer de diff
+       */
+      function renderDiffBuffer(type, buffer) {
+        if (type === 'del') {
+          return '<del class="diff-del">' + escapeHtml(buffer) + '</del>';
+        } else if (type === 'ins') {
+          return '<ins class="diff-ins">' + escapeHtml(buffer) + '</ins>';
+        } else {
+          // Text inalterat - verd clar
+          return '<span class="diff-context">' + escapeHtml(buffer) + '</span>';
+        }
       }
 
       /**

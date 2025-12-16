@@ -158,7 +158,8 @@ async function executeChatOnly(intent, documentContext, conversationContext, opt
       had_pipes: response !== cleanedResponse,
     });
 
-    return {
+    // v14.3: Construir resposta amb suggested_followup si existeix
+    const result = {
       mode: Mode.CHAT_ONLY,
       chat_response: cleanedResponse,
       _meta: {
@@ -170,6 +171,17 @@ async function executeChatOnly(intent, documentContext, conversationContext, opt
         tokens_estimated: usage ? (usage.input + usage.output) : Math.ceil(response.length / 4),
       },
     };
+
+    // v14.3: Passar suggested_followup de l'intent si existeix
+    if (intent.suggested_followup) {
+      result.suggested_followup = {
+        available: true,
+        prompt: intent.suggested_followup,
+        would_become_mode: 'REWRITE',  // Aplicar el resum seria un rewrite
+      };
+    }
+
+    return result;
 
   } catch (error) {
     logError('CHAT_ONLY executor failed', { error: error.message });

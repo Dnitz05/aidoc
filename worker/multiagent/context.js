@@ -270,6 +270,10 @@ function buildWindowedContext(paragraphs, options = {}) {
     recentlyMentioned = [],
     selectedText = null,
     instruction = '',
+    // v14.3: Info de mode per decisió resumeix/explica
+    userMode = 'edit',
+    hasSelection = false,
+    isPartialSelection = false,
   } = options;
 
   // v8.4: Detectar si necessitem document complet
@@ -349,6 +353,10 @@ function buildWindowedContext(paragraphs, options = {}) {
     includedParagraphs: windowedParagraphs.length,
     isComplete,
     isFullDoc: useFullDoc,
+    // v14.3: Info de mode per decisió resumeix/explica
+    userMode,
+    hasSelection,
+    isPartialSelection,
   };
 }
 

@@ -1027,10 +1027,14 @@ function captureCurrentSelection() {
     const cursorChanged = lastCursor && lastCursor !== String(currentCursor);
     const docEdited = lastDocLength && lastDocLength !== String(currentDocLength);
 
+    // v14.4: Notificar el sidebar quan es netegen highlights
+    let highlightsCleared = false;
+
     if (cursorChanged || docEdited) {
       // L'usuari ha mogut el cursor, canviat selecció, o editat el document → netejar highlights
       try {
         clearAllHighlights();
+        highlightsCleared = true;
       } catch (e) {
         // Ignorar errors de neteja
       }
@@ -1040,12 +1044,12 @@ function captureCurrentSelection() {
     props.setProperty('lastDocLength', String(currentDocLength));
 
     if (!selection) {
-      return { captured: false, hasSelection: false, wordCount: 0, docWordCount: docWordCount };
+      return { captured: false, hasSelection: false, wordCount: 0, docWordCount: docWordCount, highlightsCleared: highlightsCleared };
     }
 
     const ranges = selection.getRangeElements() || [];
     if (ranges.length === 0) {
-      return { captured: false, hasSelection: false, wordCount: 0, docWordCount: docWordCount };
+      return { captured: false, hasSelection: false, wordCount: 0, docWordCount: docWordCount, highlightsCleared: highlightsCleared };
     }
 
     // v5.3: També calcular word count per l'indicador
@@ -1102,7 +1106,7 @@ function captureCurrentSelection() {
       : totalText;
 
     if (selectionData.length === 0) {
-      return { captured: false, hasSelection: true, wordCount: wordCount, textPreview: textPreview };
+      return { captured: false, hasSelection: true, wordCount: wordCount, textPreview: textPreview, highlightsCleared: highlightsCleared };
     }
 
     // Guardar al cache (60 segons de vida)
@@ -1113,10 +1117,10 @@ function captureCurrentSelection() {
       elements: selectionData
     }), 60);
 
-    return { captured: true, hasSelection: true, wordCount: wordCount, textPreview: textPreview, elements: selectionData.length };
+    return { captured: true, hasSelection: true, wordCount: wordCount, textPreview: textPreview, elements: selectionData.length, highlightsCleared: highlightsCleared };
 
   } catch (e) {
-    return { captured: false, hasSelection: false, wordCount: 0, error: e.message };
+    return { captured: false, hasSelection: false, wordCount: 0, error: e.message, highlightsCleared: false };
   }
 }
 
@@ -1904,7 +1908,7 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           return {
             ok: true,
             status: 'in_doc_preview_error',
-            ai_response: aiData.change_summary || aiData.chat_response,
+            ai_response: aiData.chat_response || aiData.change_summary,  // v14.4: Prioritzar resposta natural
             credits: json.credits_remaining,
             preview_error: previewError,
             mode: 'edit',
@@ -1962,7 +1966,7 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
           ok: true,
           status: 'preview',  // v11.0: Unified Annotations
           changes: changes,   // Array complet per accept/reject individual
-          ai_response: aiData.change_summary || aiData.chat_response,
+          ai_response: aiData.chat_response || aiData.change_summary,  // v14.4: Prioritzar resposta natural de la IA
           credits: json.credits_remaining,
           thought: aiData.thought,
           mode: 'edit',
