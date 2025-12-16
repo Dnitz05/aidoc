@@ -1010,9 +1010,34 @@ function captureCurrentSelection() {
   try {
     const doc = DocumentApp.getActiveDocument();
     const selection = doc.getSelection();
+    const props = PropertiesService.getDocumentProperties();
 
     // v8.2: Sempre retornar docWordCount per mostrar "tot el document"
     const docWordCount = getDocumentWordCount();
+
+    // v14.2: Detectar canvi de selecció o edició per netejar highlights
+    // Qualsevol acció d'usuari (excepte scroll) ha de netejar els ressaltats
+    const docBody = doc.getBody();
+    const currentCursor = selection ? 'has_selection' : doc.getCursor()?.getOffset() || 'no_cursor';
+    const currentDocLength = docBody.getText().length;  // Proxy ràpid per detectar edicions
+
+    const lastCursor = props.getProperty('lastCursorState');
+    const lastDocLength = props.getProperty('lastDocLength');
+
+    const cursorChanged = lastCursor && lastCursor !== String(currentCursor);
+    const docEdited = lastDocLength && lastDocLength !== String(currentDocLength);
+
+    if (cursorChanged || docEdited) {
+      // L'usuari ha mogut el cursor, canviat selecció, o editat el document → netejar highlights
+      try {
+        clearAllHighlights();
+      } catch (e) {
+        // Ignorar errors de neteja
+      }
+    }
+
+    props.setProperty('lastCursorState', String(currentCursor));
+    props.setProperty('lastDocLength', String(currentDocLength));
 
     if (!selection) {
       return { captured: false, hasSelection: false, wordCount: 0, docWordCount: docWordCount };
