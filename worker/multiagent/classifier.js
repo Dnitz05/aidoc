@@ -111,12 +111,19 @@ La PREGUNTA CLAU: "L'usuari menciona algun aspecte NEGATIU o PROBLEMÀTIC?"
 - SÍ → UPDATE_BY_ID (vol correcció/millora)
 - NO → Potser CHAT_ONLY o REFERENCE_HIGHLIGHT
 
-modification_type:
-- "fix": Errors objectius (ortografia, gramàtica, dades incorrectes)
-- "improve": Millores subjectives (estil, claredat, coherència)
+modification_type (IMPORTANT - tria correctament):
+- "fix": NOMÉS errors ortogràfics/gramaticals (faltes, accents, typos, concordança)
+- "improve": Qualsevol problema SEMÀNTIC o d'ESTIL:
+  * "fora de context" → improve (NO és error ortogràfic!)
+  * "incoherent/estrany/rar" → improve
+  * "confús/poc clar" → improve
+  * "repetitiu/inconsistent" → improve
+  * "sona malament" → improve
 - "expand": Afegir contingut
 - "simplify": Escurçar/condensar
 - "translate": Traduir
+
+⚠️ REGLA: Si NO és clarament ortogràfic → USA "improve"
 
 #### Accions directes → UPDATE_BY_ID
 - Imperatius: "Corregeix", "Millora", "Arregla", "Escurça", "Amplia", "Tradueix"

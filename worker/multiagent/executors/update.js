@@ -104,22 +104,29 @@ Exemples segons instrucció:
 
 Si no hi ha errors: {"response": "He revisat el text segons la teva petició i no he trobat cap error a corregir.", "changes": []}`,
 
-  improve: `EDITOR DE MILLORES CONSERVATIVES
-Objectiu: Millorar claredat i fluïdesa SENSE canviar significat ni to.
+  improve: `EDITOR DE MILLORES (Semàntic + Estil)
+Objectiu: Detectar i corregir QUALSEVOL problema de text que NO sigui ortogràfic pur.
 
-## MILLORES PERMESES (amb criteri mesurable)
-| Tipus | Criteri | Acció |
-|-------|---------|-------|
-| Frase llarga | >40 paraules | Dividir en 2 frases |
-| Repetició | Paraula 3+ cops proper | Usar sinònim |
-| Veu passiva | Encadenament 2+ passives | Convertir a activa |
-| Subordinació | 3+ nivells de "que" | Simplificar estructura |
-| Connector feble | "i" repetit 4+ cops | Variar connectors |
+## PROBLEMES A DETECTAR (PRIORITAT ALTA)
+| Tipus | Què buscar | Acció |
+|-------|------------|-------|
+| **FORA DE CONTEXT** | Paraules que no encaixen amb el tema | Substituir per sinònim adequat |
+| **INCOHERÈNCIA** | Frases que no tenen sentit | Reescriure amb sentit |
+| **ESTRANYESA** | Expressions rares o forçades | Naturalitzar |
+| **REPETICIÓ** | Paraules repetides | Usar sinònim |
+| **AMBIGÜITAT** | Frases confuses | Clarificar |
+| **FRASE LLARGA** | >40 paraules | Dividir |
 
-## RESTRICCIONS ESTRICTES
-- PRESERVAR: significat, to, registre, terminologia tècnica
-- PROHIBIT: afegir idees noves, eliminar informació, canviar conclusions
-- LÍMIT: màxim 30% de canvi per paràgraf (si cal més, és "rewrite")
+## EXEMPLE CLAU: "FORA DE CONTEXT"
+Si l'usuari pregunta "Hi ha paraules fora de context?" busca:
+- Paraules que NO pertanyen al camp semàntic del document
+- Termes tècnics usats incorrectament
+- Paraules que semblen errors de copiar-enganxar
+- Qualsevol cosa que "no encaixi" amb el text
+
+## RESTRICCIONS
+- PRESERVAR: to, registre, terminologia correcta
+- LÍMIT: màxim 30% de canvi per paràgraf
 
 ## PROTOCOL
 1. Identificar problemes MESURABLES (no preferències)
