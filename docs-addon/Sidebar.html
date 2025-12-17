@@ -4004,6 +4004,7 @@
       /**
        * Renderitza una anotació de highlight (informativa, clicable)
        * v14.6: Suport per highlights actionables amb botó "Aplicar"
+       * v14.7: UI millorada - mostra find→replace amb colors, sense repetició
        */
       function renderHighlightAnnotation(ann) {
         const colorClass = 'ref-' + (ann.color || 'yellow');
@@ -4019,10 +4020,23 @@
 
         html += 'onclick="scrollToDocReference(' + ann.para_id + ', \'' + ann.color + '\')" ';
         html += 'title="Clic per veure al document">';
-        html += '<span class="ref-content">';
-        html += '<span class="ref-snippet">"' + escapeHtmlSafe(ann.snippet || '...') + '"</span>';
-        html += '<span class="ref-reason">' + escapeHtmlSafe(ann.reason) + '</span>';
-        html += '</span>';
+
+        // v14.7: Per actionables, mostrar find→replace amb colors (sense duplicació)
+        if (isActionable) {
+          html += '<span class="ref-content actionable-content">';
+          html += '<span class="correction-display">';
+          html += '<span class="correction-find">' + escapeHtmlSafe(ann.find) + '</span>';
+          html += '<span class="correction-arrow">→</span>';
+          html += '<span class="correction-replace">' + escapeHtmlSafe(ann.replace) + '</span>';
+          html += '</span>';
+          html += '</span>';
+        } else {
+          // Format clàssic per highlights no-actionables
+          html += '<span class="ref-content">';
+          html += '<span class="ref-snippet">"' + escapeHtmlSafe(ann.snippet || '...') + '"</span>';
+          html += '<span class="ref-reason">' + escapeHtmlSafe(ann.reason) + '</span>';
+          html += '</span>';
+        }
 
         // v14.6: Botó Aplicar per highlights actionables
         if (isActionable) {

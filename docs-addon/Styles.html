@@ -1104,6 +1104,45 @@
         background: rgba(34, 197, 94, 0.1);
       }
 
+      /* v14.7: Display de correcció amb colors */
+      .actionable-content {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .correction-display {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        flex-wrap: wrap;
+      }
+
+      .correction-find {
+        color: var(--error, #d93025);
+        text-decoration: line-through;
+        font-weight: 500;
+      }
+
+      .correction-arrow {
+        color: var(--text-muted, #80868b);
+        font-size: 12px;
+      }
+
+      .correction-replace {
+        color: var(--success, #188038);
+        font-weight: 600;
+      }
+
+      /* Dark mode */
+      [data-theme="dark"] .correction-find {
+        color: #f28b82;
+      }
+
+      [data-theme="dark"] .correction-replace {
+        color: #81c995;
+      }
+
       /* Container d'accions */
       .ref-actions {
         display: flex;
