@@ -332,9 +332,19 @@ async function executeReferenceHighlight(intent, documentContext, conversationCo
 
   try {
     // Determinar paràgrafs a analitzar
-    const targetParagraphs = intent.target_paragraphs?.length > 0
+    let targetParagraphs = intent.target_paragraphs?.length > 0
       ? intent.target_paragraphs
       : documentContext.paragraphs.map((_, i) => i);
+
+    // v14.6: Si hi ha selecció parcial, prioritzar paràgrafs seleccionats
+    const selectedIds = documentContext.selectedParagraphIds || [];
+    if (selectedIds.length > 0 && documentContext.isPartialSelection) {
+      // Si l'intent no tenia targets específics, usar els seleccionats
+      if (!intent.target_paragraphs?.length) {
+        targetParagraphs = selectedIds.filter(id => id >= 0 && id < documentContext.paragraphs.length);
+        logInfo('Using selected paragraphs for highlight', { targets: targetParagraphs });
+      }
+    }
 
     // Construir prompt segons estratègia
     const { systemPrompt, userPrompt } = buildHighlightPrompt(

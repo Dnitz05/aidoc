@@ -127,6 +127,21 @@ La forma "Pots...?" és cortesa però l'output_target depèn del verb:
 - "Resumeix" / "Fes un resum" → output_target: chat (vol resposta informativa)
 - "Escurça" / "Condensa" / "Redueix" → output_target: document (vol modificar)
 
+### ⚠️ SELECCIÓ ACTIVA (v14.6) - REGLA CRÍTICA ⚠️
+Si "Selecció: PARCIAL" (l'usuari ha seleccionat text específic):
+- Verbs de transformació (resumeix, tradueix, reformula, simplifica, millora) → output_target: document, mode: UPDATE_BY_ID
+- L'usuari vol TRANSFORMAR el text seleccionat, NO rebre resposta al xat
+- "Resumeix el text" + selecció activa → EDITAR (substituir selecció pel resum)
+- "Resumeix el text" + sense selecció → CHAT (resum informatiu)
+
+Exemples amb selecció PARCIAL activa:
+| Instrucció | output_target | mode | Per què |
+|------------|---------------|------|---------|
+| "Resumeix" | document | UPDATE_BY_ID | Vol substituir selecció pel resum |
+| "Tradueix a anglès" | document | UPDATE_BY_ID | Vol traduir la selecció |
+| "Millora el text" | document | UPDATE_BY_ID | Vol millorar la selecció |
+| "De què parla?" | chat | CHAT_ONLY | Pregunta sobre la selecció |
+
 ### Extracció de keywords
 - Entre cometes → terme EXACTE: "busca 'la'" → ["la"]
 - Sense cometes → últim substantiu: "on apareix PAE" → ["PAE"]
@@ -203,6 +218,20 @@ Instrucció: "Què és un blockchain?"
  * Construeix el prompt d'usuari per al classifier
  */
 function buildUserPrompt(sanitizedInput, documentContext, conversationContext) {
+  // v14.6: Determinar selecció amb més detall
+  let selectionInfo = 'CAP (sense selecció)';
+  let selectionHint = '';
+
+  if (documentContext?.hasSelection) {
+    if (documentContext?.isPartialSelection) {
+      const selectedIds = documentContext?.selectedParagraphIds || [];
+      selectionInfo = `PARCIAL (${selectedIds.length} paràgraf${selectedIds.length !== 1 ? 's' : ''} seleccionat${selectedIds.length !== 1 ? 's' : ''})`;
+      selectionHint = '\n⚠️ ATENCIÓ: Amb selecció parcial, verbs de transformació (resumeix, tradueix, simplifica) → UPDATE_BY_ID, NO CHAT_ONLY';
+    } else {
+      selectionInfo = 'TOT EL DOCUMENT o molt extensa';
+    }
+  }
+
   let prompt = `## INSTRUCCIÓ DE L'USUARI
 "${sanitizedInput.original}"
 
@@ -211,7 +240,7 @@ ${sanitizedInput.language}
 
 ## MODE DE L'USUARI
 - Mode: ${documentContext?.userMode === 'chat' ? 'CHAT (l\'usuari NO vol modificacions)' : 'EDIT (l\'usuari permet modificacions)'}
-- Selecció: ${documentContext?.hasSelection ? (documentContext?.isPartialSelection ? 'PARCIAL (paràgrafs específics seleccionats)' : 'TOT EL DOCUMENT o molt extensa') : 'CAP (sense selecció)'}
+- Selecció: ${selectionInfo}${selectionHint}
 `;
 
   // Afegir context del document si disponible

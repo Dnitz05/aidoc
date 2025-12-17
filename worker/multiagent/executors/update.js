@@ -322,9 +322,33 @@ async function executeUpdateById(intent, documentContext, conversationContext, o
   }
 
   // Validar que els paràgrafs existeixen
-  const validTargets = intent.target_paragraphs.filter(
+  let validTargets = intent.target_paragraphs.filter(
     id => id >= 0 && id < documentContext.paragraphs.length
   );
+
+  // v14.6: VALIDACIÓ CRÍTICA - Si hi ha selecció parcial, NOMÉS modificar paràgrafs seleccionats
+  const selectedIds = documentContext.selectedParagraphIds || [];
+  if (selectedIds.length > 0 && documentContext.isPartialSelection) {
+    const selectedSet = new Set(selectedIds);
+    const originalTargets = validTargets.length;
+
+    // Filtrar només paràgrafs que estan seleccionats
+    validTargets = validTargets.filter(id => selectedSet.has(id));
+
+    if (validTargets.length < originalTargets) {
+      logWarn('Filtered out-of-selection paragraphs', {
+        original_targets: originalTargets,
+        after_filter: validTargets.length,
+        selected_ids: selectedIds,
+      });
+    }
+
+    // Si tots els targets estaven fora de selecció, usar només els seleccionats
+    if (validTargets.length === 0 && selectedIds.length > 0) {
+      validTargets = selectedIds.filter(id => id >= 0 && id < documentContext.paragraphs.length);
+      logInfo('Using selected paragraphs as targets', { targets: validTargets });
+    }
+  }
 
   if (validTargets.length === 0) {
     return createInvalidTargetResponse(language);

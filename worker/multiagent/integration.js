@@ -107,43 +107,57 @@ function parseParagraphsFromText(text) {
 
 /**
  * Extreu els IDs de paràgrafs seleccionats
+ * v14.6: Corregit patró per detectar ⟦SEL⟧ (marcador real del Code.gs)
  */
 function extractSelectedParagraphIds(text, hasSelection) {
   if (!hasSelection || !text) return [];
 
-  // Buscar paràgrafs marcats amb [SELECCIÓ] o similars
   const selectedIds = [];
 
-  // Patró 1: Buscar {{N}} seguit de [SELECCIÓ]
-  const selectionPattern = /\{\{(\d+)\}\}[^{]*\[SELECCIÓ\]/gi;
+  // Patró 1: Buscar {{N}} seguit de ⟦SEL⟧ (marcador Unicode real)
+  const selPattern1 = /\{\{(\d+)\}\}\s*⟦SEL⟧/g;
   let match;
-  while ((match = selectionPattern.exec(text)) !== null) {
+  while ((match = selPattern1.exec(text)) !== null) {
     selectedIds.push(parseInt(match[1], 10));
   }
 
-  // Patró 2: Si no hi ha marca explícita però has_selection és true,
-  // assumir que tot el document està seleccionat (cas legacy)
-  if (selectedIds.length === 0 && hasSelection) {
-    // Retornar el primer paràgraf com a seleccionat (heurística)
-    const firstPara = text.match(/\{\{(\d+)\}\}/);
-    if (firstPara) {
-      selectedIds.push(parseInt(firstPara[1], 10));
+  // Patró 2: Fallback per [SELECCIÓ] (legacy)
+  if (selectedIds.length === 0) {
+    const selPattern2 = /\{\{(\d+)\}\}[^{]*\[SELECCIÓ\]/gi;
+    while ((match = selPattern2.exec(text)) !== null) {
+      selectedIds.push(parseInt(match[1], 10));
     }
   }
+
+  // v14.6: NO fer fallback agressiu - si no trobem marcadors,
+  // retornar array buit per indicar "tot el document" o "res seleccionat"
+  // El fallback anterior (assumir primer paràgraf) causava bugs greus
 
   return selectedIds;
 }
 
 /**
  * Extreu el text seleccionat
+ * v14.6: Busca tant ⟦SEL⟧ com [SELECCIÓ]
  */
 function extractSelectedText(text) {
   if (!text) return null;
 
-  // Buscar marcadors de selecció
-  const selectionMatch = text.match(/\[SELECCIÓ:?\s*"?([^"\]]+)"?\]/i);
-  if (selectionMatch) {
-    return selectionMatch[1].trim();
+  // Patró 1: Extreure text dels paràgrafs marcats amb ⟦SEL⟧
+  const selTexts = [];
+  const selPattern = /\{\{\d+\}\}\s*⟦SEL⟧\s*(?:#+ )?(.+?)(?:\n|$)/g;
+  let match;
+  while ((match = selPattern.exec(text)) !== null) {
+    selTexts.push(match[1].trim());
+  }
+  if (selTexts.length > 0) {
+    return selTexts.join('\n');
+  }
+
+  // Patró 2: Legacy [SELECCIÓ: "text"]
+  const legacyMatch = text.match(/\[SELECCIÓ:?\s*"?([^"\]]+)"?\]/i);
+  if (legacyMatch) {
+    return legacyMatch[1].trim();
   }
 
   return null;
