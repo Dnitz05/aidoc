@@ -91,10 +91,18 @@ PROTOCOL:
 }
 \`\`\`
 
-El camp "response" ha de ser una frase natural i breu (1-2 frases) que respongui a la petició de l'usuari.
-Exemples: "He revisat el text i he trobat 3 errors ortogràfics.", "Tot correcte! No he detectat cap error."
+## RESPOSTA CONTEXTUAL (IMPORTANT)
+El camp "response" ha de:
+1. Fer referència directa a la INSTRUCCIÓ de l'usuari (no respostes genèriques)
+2. Ser breu i natural (1-2 frases)
+3. Mencionar específicament què s'ha trobat/fet
 
-Si no hi ha errors: {"response": "He revisat el text i no he trobat cap error.", "changes": []}`,
+Exemples segons instrucció:
+- "Corregeix les faltes" → "He corregit 3 faltes d'ortografia: 'area' → 'àrea', 'documentacio' → 'documentació'..."
+- "Revisa l'ortografia del paràgraf 2" → "Al paràgraf 2 he trobat 2 errors d'accent que he marcat."
+- "Arregla els errors" → "He detectat i marcat 4 errors: 2 accents i 2 typos."
+
+Si no hi ha errors: {"response": "He revisat el text segons la teva petició i no he trobat cap error a corregir.", "changes": []}`,
 
   improve: `EDITOR DE MILLORES CONSERVATIVES
 Objectiu: Millorar claredat i fluïdesa SENSE canviar significat ni to.
@@ -134,10 +142,17 @@ Objectiu: Millorar claredat i fluïdesa SENSE canviar significat ni to.
 }
 \`\`\`
 
-El camp "response" ha de ser natural i contextualitzat a la petició de l'usuari.
-Exemples: "He simplificat algunes frases massa llargues.", "Proposo millorar la fluïdesa d'un paràgraf."
+## RESPOSTA CONTEXTUAL (IMPORTANT)
+El camp "response" ha de:
+1. Fer referència directa a la INSTRUCCIÓ de l'usuari
+2. Explicar breument què s'ha millorat i per què
 
-Si el text ja és clar: {"response": "El text ja està ben escrit, no cal fer canvis.", "changes": []}`,
+Exemples segons instrucció:
+- "Millora aquest text" → "He millorat la fluïdesa dividint dues frases massa llargues i eliminant repeticions."
+- "Fes-ho més clar" → "He simplificat l'estructura per fer-ho més llegible: he dividit un paràgraf dens en dos."
+- "Poleix el text" → "He refinat l'estil substituint connectors repetitius i aclarint una frase ambigua."
+
+Si el text ja és clar: {"response": "He revisat el text i ja està ben escrit, no proposo canvis.", "changes": []}`,
 
   expand: `DESENVOLUPADOR DE CONTINGUT
 Objectiu: Expandir text afegint detalls, exemples o explicacions rellevants.
@@ -177,7 +192,13 @@ Objectiu: Expandir text afegint detalls, exemples o explicacions rellevants.
 }
 \`\`\`
 
-El camp "response" ha de ser natural. Exemple: "He desenvolupat el paràgraf afegint més detalls sobre el tema."`,
+## RESPOSTA CONTEXTUAL (IMPORTANT)
+El camp "response" ha de fer referència a la instrucció de l'usuari i explicar què s'ha afegit.
+
+Exemples:
+- "Amplia aquest punt" → "He ampliat el punt afegint exemples concrets i més context."
+- "Desenvolupa la idea" → "He desenvolupat la idea amb detalls addicionals sobre els beneficis i implicacions."
+- "Afegeix més informació" → "He afegit explicacions sobre el procés i exemples pràctics."`,
 
   simplify: `SIMPLIFICADOR DE TEXT
 Objectiu: Fer el text més accessible mantenint la informació essencial.
@@ -217,7 +238,13 @@ Objectiu: Fer el text més accessible mantenint la informació essencial.
 }
 \`\`\`
 
-El camp "response" ha de ser natural. Exemple: "He simplificat el text usant frases més curtes i directes."`,
+## RESPOSTA CONTEXTUAL (IMPORTANT)
+El camp "response" ha de fer referència a la instrucció de l'usuari.
+
+Exemples:
+- "Simplifica el text" → "He simplificat el text: frases més curtes i vocabulari més directe."
+- "Fes-ho més senzill" → "He fet el text més accessible eliminant estructures complexes."
+- "Escurça això" → "He condensat el contingut mantenint la informació essencial."`,
 
   translate: `TRADUCTOR PROFESSIONAL
 Objectiu: Traduir preservant significat, to i estil.
@@ -255,7 +282,13 @@ Objectiu: Traduir preservant significat, to i estil.
 }
 \`\`\`
 
-El camp "response" ha de ser natural. Exemple: "Aquí tens el text traduït al castellà."`,
+## RESPOSTA CONTEXTUAL (IMPORTANT)
+El camp "response" ha de fer referència a la instrucció de l'usuari i l'idioma.
+
+Exemples:
+- "Tradueix a anglès" → "He traduït el text a l'anglès mantenint el to formal."
+- "Passa-ho al castellà" → "Aquí tens la traducció al castellà, adaptant les expressions idiomàtiques."
+- "Tradueix això" → "He traduït el contingut a [idioma], preservant l'estructura original."`,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -409,19 +442,23 @@ function buildUpdatePrompt(modificationType, intent, documentContext, targetPara
   }
 
   // Paràgrafs a modificar
+  // v14.5: Buscar per ID, no per índex (documentContext.paragraphs pot estar filtrat)
   parts.push('## Paràgrafs a modificar');
   for (const id of targetParagraphs) {
-    const para = documentContext.paragraphs[id];
+    const para = documentContext.paragraphs.find(p => p.id === id) || documentContext.paragraphs[id];
+    if (!para) continue;
     const text = para.text || para;
     parts.push(`§${id + 1}: ${text}`);  // v12.1: 1-indexed per consistència UI
   }
   parts.push('');
 
   // Context addicional (paràgrafs adjacents)
+  // v14.5: Usar totalParagraphs en lloc de length (pot estar filtrat)
   const contextIds = new Set();
+  const totalParagraphs = documentContext.totalParagraphs || documentContext.paragraphs.length;
   for (const id of targetParagraphs) {
     if (id > 0) contextIds.add(id - 1);
-    if (id < documentContext.paragraphs.length - 1) contextIds.add(id + 1);
+    if (id < totalParagraphs - 1) contextIds.add(id + 1);
   }
   // Eliminar els que ja són targets
   targetParagraphs.forEach(id => contextIds.delete(id));
@@ -429,7 +466,9 @@ function buildUpdatePrompt(modificationType, intent, documentContext, targetPara
   if (contextIds.size > 0) {
     parts.push('## Context (paràgrafs adjacents, NO modificar)');
     for (const id of Array.from(contextIds).sort((a, b) => a - b)) {
-      const para = documentContext.paragraphs[id];
+      // v14.5: Buscar per ID, no per índex
+      const para = documentContext.paragraphs.find(p => p.id === id) || documentContext.paragraphs[id];
+      if (!para) continue;
       const text = (para.text || para).slice(0, 200);
       parts.push(`§${id + 1}: ${text}${text.length >= 200 ? '...' : ''}`);  // v12.1: 1-indexed
     }
@@ -569,7 +608,13 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
       continue;
     }
 
-    const original = documentContext.paragraphs[change.paragraph_id];
+    // v14.5: Buscar per ID, no per índex (documentContext.paragraphs pot estar filtrat)
+    const original = documentContext.paragraphs.find(p => p.id === change.paragraph_id)
+                  || documentContext.paragraphs[change.paragraph_id];
+    if (!original) {
+      logWarn('Paragraph not found in context', { id: change.paragraph_id });
+      continue;
+    }
     const originalText = original.text || original;
 
     // v14.1: before_text és el text complet del paràgraf
@@ -680,7 +725,8 @@ function generateHighlightsFromChanges(changes, documentContext) {
 
   for (const change of changes) {
     const paraId = change.paragraph_id;
-    const para = documentContext.paragraphs[paraId];
+    // v14.5: Buscar per ID, no per índex
+    const para = documentContext.paragraphs.find(p => p.id === paraId) || documentContext.paragraphs[paraId];
     const paraText = para?.text || para || '';
 
     // v14.4: Determinar el text específic a ressaltar

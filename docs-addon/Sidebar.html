@@ -345,7 +345,7 @@
         </div>
         <div class="mode-selector" id="recipesModeSelector">
           <button class="mode-btn" onclick="toggleModeDropdown('recipes')" type="button">
-            <span id="recipesModeLabel">Edit</span>
+            <span id="recipesModeLabel">Mode Edit</span>
             <svg class="mode-arrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
             <span class="mode-tooltip">
               <span class="mode-tooltip-line"></span>
@@ -763,7 +763,7 @@
       </div>
       <div class="mode-selector" id="modeSelector">
         <button class="mode-btn" onclick="toggleModeDropdown()" type="button">
-          <span id="modeLabel">Edit</span>
+          <span id="modeLabel">Mode Edit</span>
           <svg class="mode-arrow" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           <span class="mode-tooltip">
             <span class="mode-tooltip-line"></span>
@@ -1031,8 +1031,8 @@
       console.log('[Docmile v6.9] Loaded - ESC cancellation');
 
       const MODES = {
-        edit: { icon: 'edit', label: 'Edit' },
-        chat: { icon: 'messageCircle', label: 'Xat' }
+        edit: { icon: 'edit', label: 'Mode Edit' },
+        chat: { icon: 'messageCircle', label: 'Mode Xat' }
       };
 
       let hasActiveSelection = false;
@@ -2911,6 +2911,61 @@
         // 3. Inline code (`)
         html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
 
+        // ═══════════════════════════════════════════════════════════════
+        // v14.5.3: LLISTES PRIMER - Abans de bold/italic per evitar interferències
+        // ═══════════════════════════════════════════════════════════════
+
+        // Normalitzar formats alternatius de llista
+        html = html.replace(/^\(\-\) /gm, '- ');  // (-) → -
+        html = html.replace(/^\(•\) /gm, '- ');   // (•) → -
+        html = html.replace(/^• /gm, '- ');       // • → -
+
+        // Treure bold/italic dels bullets ABANS de processar
+        // **- text** → - **text**  i  *- text* → - *text*
+        html = html.replace(/^\*\*- /gm, '- **');
+        html = html.replace(/^\*- /gm, '- *');
+        html = html.replace(/^__- /gm, '- __');
+        html = html.replace(/^_- /gm, '- _');
+
+        // Assegurar salt de línia abans de bullets inline
+        // "text:- item" → "text:\n- item"
+        // "text.- item" → "text.\n- item"
+        // "text - item" al principi d'una llista → "text\n- item"
+        html = html.replace(/([:\.])\s*- /g, '$1\n- ');
+        html = html.replace(/([^\n\-])\n?\s*- (?=[A-Z]|[a-z])/g, function(match, before) {
+          // Si el caràcter anterior no és un salt de línia, afegir-lo
+          if (before !== '\n') return before + '\n- ';
+          return match;
+        });
+
+        // Normalitzar espais inicials
+        html = html.replace(/^[ \t]+([\-\*] )/gm, '$1');
+
+        // Processar llistes no ordenades
+        html = html.split('\n').map(function(line) {
+          const match = line.match(/^\s*([\-\*]) (.+)$/);
+          if (match) {
+            return '<li class="md-li">' + match[2] + '</li>';
+          }
+          return line;
+        }).join('\n');
+        html = html.replace(/(<li class="md-li">.*<\/li>\n?)+/g, '<ul class="md-list">$&</ul>');
+
+        // Processar llistes ordenades
+        html = html.replace(/^\d+\. (.+)$/gm, '<li class="md-li-num">$1</li>');
+        html = html.replace(/(<li class="md-li-num">.*<\/li>\n?)+/g, '<ol class="md-list-num">$&</ol>');
+
+        // Netejar newlines dins de llistes
+        html = html.replace(/<\/li>\n<li/g, '</li><li');
+        html = html.replace(/<ul class="md-list">\n/g, '<ul class="md-list">');
+        html = html.replace(/\n<\/ul>/g, '</ul>');
+        html = html.replace(/<ol class="md-list-num">\n/g, '<ol class="md-list-num">');
+        html = html.replace(/\n<\/ol>/g, '</ol>');
+
+        // ═══════════════════════════════════════════════════════════════
+        // FORMATACIÓ DE TEXT - Després de llistes
+        // ═══════════════════════════════════════════════════════════════
+
         // 4. Bold (**text** or __text__)
         html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
@@ -2926,32 +2981,6 @@
         html = html.replace(/^#### (.+)$/gm, '<h6 class="md-header">$1</h6>');
         html = html.replace(/^### (.+)$/gm, '<h5 class="md-header">$1</h5>');
         html = html.replace(/^## (.+)$/gm, '<h4 class="md-header">$1</h4>');
-
-        // 8. Unordered lists (- item or * item)
-        // v14.4: Normalitzar formats alternatius de llista que la IA pot generar
-        html = html.replace(/^\(\-\) /gm, '- ');  // (-) → -
-        html = html.replace(/^\(•\) /gm, '- ');   // (•) → -
-        html = html.replace(/^• /gm, '- ');       // • → -
-        // v14.4: Processar cada línia que comença amb - o * seguit d'espai
-        html = html.split('\n').map(function(line) {
-          const match = line.match(/^[\-\*] (.+)$/);
-          if (match) {
-            return '<li class="md-li">' + match[1] + '</li>';
-          }
-          return line;
-        }).join('\n');
-        html = html.replace(/(<li class="md-li">.*<\/li>\n?)+/g, '<ul class="md-list">$&</ul>');
-
-        // 9. Ordered lists (1. item)
-        html = html.replace(/^\d+\. (.+)$/gm, '<li class="md-li-num">$1</li>');
-        html = html.replace(/(<li class="md-li-num">.*<\/li>\n?)+/g, '<ol class="md-list-num">$&</ol>');
-
-        // 9b. Remove newlines INSIDE lists (before br conversion)
-        html = html.replace(/<\/li>\n<li/g, '</li><li');
-        html = html.replace(/<ul class="md-list">\n/g, '<ul class="md-list">');
-        html = html.replace(/\n<\/ul>/g, '</ul>');
-        html = html.replace(/<ol class="md-list-num">\n/g, '<ol class="md-list-num">');
-        html = html.replace(/\n<\/ol>/g, '</ol>');
 
         // 10. Links [text](url) - only safe HTTPS URLs
         html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
@@ -3228,6 +3257,17 @@
         const bubble = document.createElement('div');
         bubble.className = 'msg ai';
 
+        // v14.6: Guardar highlights actionables per tracking
+        const actionableHighlights = (highlights || []).filter(h => h.actionable && h.find && h.replace);
+        if (actionableHighlights.length > 0) {
+          // Afegir a pendingAnnotations amb tipus 'highlight' i status 'pending'
+          pendingAnnotations = actionableHighlights.map(h => ({
+            ...h,
+            type: 'highlight',
+            status: 'pending'
+          }));
+        }
+
         // Renderitzar resposta principal amb markdown (usar renderMarkdownHtml que retorna string)
         let html = '<div class="md-content">' + renderMarkdownHtml(aiResponse) + '</div>';
 
@@ -3236,16 +3276,8 @@
           html += '<div class="reference-list">';
 
           for (const hl of highlights) {
-            const colorClass = 'ref-' + (hl.color || 'yellow');
-            html += '<div class="reference-item ' + colorClass + '" ' +
-              'onclick="scrollToDocReference(' + hl.para_id + ', \'' + hl.color + '\')" ' +
-              'title="Clic per veure al document">' +
-              '<span class="ref-content">' +
-              '<span class="ref-snippet">"' + escapeHtmlSafe(hl.snippet || '...') + '"</span>' +
-              '<span class="ref-reason">' + escapeHtmlSafe(hl.reason) + '</span>' +
-              '</span>' +
-              '<span class="ref-arrow">' + icon('chevronRight', 'i--sm') + '</span>' +
-              '</div>';
+            // v14.6: Usar renderHighlightAnnotation per suportar actionables
+            html += renderHighlightAnnotation(hl);
           }
 
           html += '</div>';
@@ -3321,6 +3353,8 @@
               document.querySelectorAll('.reference-item').forEach(function(el) {
                 el.classList.add('cleared');
               });
+              // v14.5: Reset annotation highlights state
+              annotationHighlightsActive = false;
             }
           })
           .withFailureHandler(function(err) {
@@ -3328,7 +3362,7 @@
               showToast('Error netejant: ' + err.message, 'error');
             }
           })
-          .clearReferenceHighlights();
+          .clearReferenceHighlights();  // Tornar a funció ràpida
       }
 
       // ═══════════════════════════════════════════════════════════
@@ -3684,11 +3718,43 @@
 
       /**
        * v14.4: Tornar a aplicar highlight per una anotació específica
+       * v14.5: Ressalta només el text específic del canvi, no tot el paràgraf
+       * v14.5.1: Si acceptat mostra el canvi fet, si pendent/rebutjat mostra l'original
        * @param {string} annotationId - ID de l'anotació
        */
       function showAnnotationHighlight(annotationId) {
         const ann = pendingAnnotations.find(a => a.id === annotationId);
         if (!ann) return;
+
+        // v14.5.1: Determinar el text segons l'estat de l'anotació
+        let textToHighlight = '';
+        const isAccepted = ann.status === 'accepted';
+
+        if (ann.find && ann.replacement) {
+          // Mode FIX: si acceptat mostra el replacement, si no el find original
+          textToHighlight = isAccepted ? ann.replacement : ann.find;
+        } else if (ann.originalText && ann.proposedText) {
+          // v14.5.2: Trobar només les paraules que canvien
+          const diff = findChangeFragment(
+            isAccepted ? ann.proposedText : ann.originalText,
+            isAccepted ? ann.originalText : ann.proposedText
+          );
+          if (diff) {
+            textToHighlight = diff;
+          } else {
+            // v14.5.2: Fallback: primeres 2-3 paraules, no 50 chars
+            const source = isAccepted ? ann.proposedText : ann.originalText;
+            const words = source.split(/\s+/).slice(0, 3);
+            textToHighlight = words.join(' ');
+          }
+        } else {
+          // Fallback: primeres 2-3 paraules
+          const source = isAccepted ? ann.proposedText : ann.originalText;
+          if (source) {
+            const words = source.split(/\s+/).slice(0, 3);
+            textToHighlight = words.join(' ');
+          }
+        }
 
         // Aplicar highlight al document
         google.script.run
@@ -3699,7 +3765,6 @@
               document.querySelectorAll('.annotation-item.highlights-cleared').forEach(function(el) {
                 el.classList.remove('highlights-cleared');
               });
-              showToast('Ressaltat actiu', 'info');
             }
           })
           .withFailureHandler(function(err) {
@@ -3707,9 +3772,121 @@
           })
           .applyReferenceHighlights([{
             para_id: ann.para_id,
-            snippet: ann.originalText ? ann.originalText.substring(0, 50) : '',
-            color: 'yellow'
+            snippet: textToHighlight,
+            color: 'blue'  // v14.5: Blau per canvis (coherent amb estils)
           }]);
+      }
+
+      /**
+       * v14.5: Mostrar tots els highlights de canvis pendents
+       */
+      function showAllAnnotationHighlights() {
+        const pending = pendingAnnotations.filter(a => a.type === 'change' && a.status === 'pending');
+        if (pending.length === 0) return;
+
+        // Construir array de highlights per tots els canvis pendents
+        const highlights = [];
+        for (const ann of pending) {
+          let textToHighlight = '';
+
+          if (ann.find) {
+            textToHighlight = ann.find;
+          } else if (ann.originalText && ann.proposedText) {
+            // v14.5.2: Trobar només les paraules que canvien
+            const diff = findChangeFragment(ann.originalText, ann.proposedText);
+            if (diff) {
+              textToHighlight = diff;
+            } else {
+              // Fallback: primeres 2-3 paraules
+              const words = ann.originalText.split(/\s+/).slice(0, 3);
+              textToHighlight = words.join(' ');
+            }
+          } else if (ann.originalText) {
+            // Fallback: primeres 2-3 paraules
+            const words = ann.originalText.split(/\s+/).slice(0, 3);
+            textToHighlight = words.join(' ');
+          }
+
+          if (textToHighlight) {
+            highlights.push({
+              para_id: ann.para_id,
+              snippet: textToHighlight,
+              color: 'blue'
+            });
+          }
+        }
+
+        if (highlights.length === 0) return;
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.applied > 0) {
+              annotationHighlightsActive = true;
+              document.querySelectorAll('.annotation-item.highlights-cleared').forEach(function(el) {
+                el.classList.remove('highlights-cleared');
+              });
+              showToast(result.applied + ' canvis ressaltats', 'success');
+            }
+          })
+          .withFailureHandler(function(err) {
+            showToast('Error ressaltant', 'error');
+          })
+          .applyReferenceHighlights(highlights);
+      }
+
+      /**
+       * v14.5: Troba el fragment de text que canvia entre original i modificat
+       * v14.5.2: Millorat per ressaltar només les paraules que canvien
+       */
+      function findChangeFragment(original, modified) {
+        if (!original || !modified || original === modified) return null;
+
+        // Trobar prefix comú
+        let prefixLen = 0;
+        const minLen = Math.min(original.length, modified.length);
+        while (prefixLen < minLen && original[prefixLen] === modified[prefixLen]) {
+          prefixLen++;
+        }
+
+        // Trobar suffix comú
+        let suffixLen = 0;
+        while (
+          suffixLen < minLen - prefixLen &&
+          original[original.length - 1 - suffixLen] === modified[modified.length - 1 - suffixLen]
+        ) {
+          suffixLen++;
+        }
+
+        let start = prefixLen;
+        let end = original.length - suffixLen;
+
+        // v14.5.2: Expandir als límits de paraula més propers (no al mig d'una paraula)
+        // Retrocedir al principi de la paraula
+        while (start > 0 && original[start - 1] !== ' ' && original[start - 1] !== '\n') {
+          start--;
+        }
+        // Avançar al final de la paraula
+        while (end < original.length && original[end] !== ' ' && original[end] !== '\n') {
+          end++;
+        }
+
+        const fragment = original.substring(start, end).trim();
+
+        // v14.5.2: Si el fragment és buit o només espais, retornar null
+        if (!fragment || fragment.length === 0) return null;
+
+        // v14.5.2: Si el fragment és molt curt (1-2 chars), expandir mínimament només per contexte de cerca
+        if (fragment.length < 3 && original.length > fragment.length) {
+          // Buscar la paraula completa que conté el canvi
+          const words = original.split(/\s+/);
+          for (const word of words) {
+            if (word.includes(fragment) || fragment.includes(word)) {
+              return word;
+            }
+          }
+        }
+
+        return fragment;
       }
 
       /**
@@ -3749,14 +3926,17 @@
 
           html += '</div>';
 
-          // Barra d'accions bulk si hi ha canvis pendents
+          // v14.5: Barra d'accions bulk només si hi ha MÉS D'UN canvi pendent
+          // (si només n'hi ha 1, els botons individuals ja són suficients)
           const pendingChanges = annotations.filter(a => a.type === 'change' && a.status === 'pending');
-          if (pendingChanges.length > 0) {
+          if (pendingChanges.length > 1) {
             html += '<div class="annotation-bulk-actions">';
             html += '<span class="bulk-info">' + pendingChanges.length + ' canvi' + (pendingChanges.length !== 1 ? 's' : '') + ' pendent' + (pendingChanges.length !== 1 ? 's' : '') + '</span>';
             html += '<div class="bulk-buttons">';
+            // v14.5: Botó "Veure tots" per activar tots els highlights
+            html += '<button class="btn-view-all" onclick="showAllAnnotationHighlights()">' + icon('eye', 'i--sm') + ' Veure</button>';
             html += '<button class="btn-discard-all" onclick="discardAllAnnotations()">' + icon('x', 'i--sm') + ' Descartar</button>';
-            html += '<button class="btn-accept-all" onclick="acceptAllAnnotations()">' + icon('check', 'i--sm') + ' Acceptar tots</button>';
+            html += '<button class="btn-accept-all" onclick="acceptAllAnnotations()">' + icon('check', 'i--sm') + ' Acceptar</button>';
             html += '</div>';
             html += '</div>';
           }
@@ -3823,17 +4003,37 @@
 
       /**
        * Renderitza una anotació de highlight (informativa, clicable)
+       * v14.6: Suport per highlights actionables amb botó "Aplicar"
        */
       function renderHighlightAnnotation(ann) {
         const colorClass = 'ref-' + (ann.color || 'yellow');
-        let html = '<div class="annotation-item highlight-item reference-item ' + colorClass + '" ';
+        const isActionable = ann.actionable && ann.find && ann.replace;
+
+        let html = '<div class="annotation-item highlight-item reference-item ' + colorClass;
+        if (isActionable) html += ' actionable-highlight';
+        html += '" ';
+
+        if (isActionable) {
+          html += 'data-id="' + ann.id + '" data-status="' + (ann.status || 'pending') + '" ';
+        }
+
         html += 'onclick="scrollToDocReference(' + ann.para_id + ', \'' + ann.color + '\')" ';
         html += 'title="Clic per veure al document">';
         html += '<span class="ref-content">';
         html += '<span class="ref-snippet">"' + escapeHtmlSafe(ann.snippet || '...') + '"</span>';
         html += '<span class="ref-reason">' + escapeHtmlSafe(ann.reason) + '</span>';
         html += '</span>';
-        html += '<span class="ref-arrow">' + icon('chevronRight', 'i--sm') + '</span>';
+
+        // v14.6: Botó Aplicar per highlights actionables
+        if (isActionable) {
+          html += '<span class="ref-actions" onclick="event.stopPropagation();">';
+          html += '<button class="btn-apply-highlight" onclick="applyActionableHighlight(\'' + ann.id + '\')" title="Aplicar correcció">';
+          html += icon('check', 'i--sm') + '</button>';
+          html += '</span>';
+        } else {
+          html += '<span class="ref-arrow">' + icon('chevronRight', 'i--sm') + '</span>';
+        }
+
         html += '</div>';
         return html;
       }
@@ -3846,8 +4046,8 @@
         const ann = pendingAnnotations.find(a => a.id === annotationId);
         if (!ann || ann.status !== 'pending') return;
 
-        // v14.1: Netejar highlights anteriors quan l'usuari interactua
-        clearAllHighlights(true);
+        // v14.5: NO netejar tots els highlights - només el d'aquest canvi es netejarà
+        // perquè el text original canviarà. Els altres highlights es mantenen.
 
         // Actualitzar UI immediatament (optimistic)
         const el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
@@ -3908,13 +4108,86 @@
         const ann = pendingAnnotations.find(a => a.id === annotationId);
         if (!ann || ann.status !== 'pending') return;
 
-        // v14.1: Netejar highlights anteriors quan l'usuari interactua
-        clearAllHighlights(true);
+        // v14.5: NO netejar tots els highlights - mantenir els altres
+        // L'usuari pot tornar a veure qualsevol canvi amb el botó "Veure"
 
         ann.status = 'rejected';
         updateAnnotationUI(annotationId, 'rejected');
         updateBulkActionsBar();
         showToast('Canvi descartat', 'info');
+      }
+
+      /**
+       * v14.6: Aplicar un highlight actionable (correcció ortogràfica/gramatical)
+       * Reutilitza applyFindReplaceChanges del mode FIX
+       */
+      function applyActionableHighlight(highlightId) {
+        const hl = pendingAnnotations.find(a => a.id === highlightId);
+        if (!hl || hl.status !== 'pending') return;
+
+        // Verificar que té dades d'acció
+        if (!hl.find || !hl.replace) {
+          showToast('Aquest highlight no té correcció aplicable', 'warning');
+          return;
+        }
+
+        // Actualitzar UI immediatament (optimistic)
+        const el = document.querySelector('.annotation-item[data-id="' + highlightId + '"]');
+        if (el) {
+          el.setAttribute('data-status', 'applying');
+          const btn = el.querySelector('.btn-apply-highlight');
+          if (btn) btn.disabled = true;
+        }
+
+        const successHandler = function(result) {
+          if (result && result.ok) {
+            hl.status = 'accepted';
+            updateHighlightUI(highlightId, 'accepted');
+            showToast('Correcció aplicada', 'success');
+          } else {
+            hl.status = 'pending';
+            updateHighlightUI(highlightId, 'pending');
+            showToast(result && result.error ? result.error : 'Error aplicant correcció', 'error');
+          }
+        };
+
+        const failureHandler = function(err) {
+          hl.status = 'pending';
+          updateHighlightUI(highlightId, 'pending');
+          showToast('Error: ' + err.message, 'error');
+        };
+
+        // Reutilitzar applyFindReplaceChanges (ja existeix i funciona)
+        google.script.run
+          .withSuccessHandler(successHandler)
+          .withFailureHandler(failureHandler)
+          .applyFindReplaceChanges([{
+            targetId: hl.para_id,
+            find: hl.find,
+            replace: hl.replace
+          }]);
+      }
+
+      /**
+       * v14.6: Actualitzar UI d'un highlight després d'aplicar
+       */
+      function updateHighlightUI(highlightId, status) {
+        const el = document.querySelector('.annotation-item[data-id="' + highlightId + '"]');
+        if (!el) return;
+
+        el.setAttribute('data-status', status);
+
+        if (status === 'accepted') {
+          el.classList.add('highlight-applied');
+          const actionsEl = el.querySelector('.ref-actions');
+          if (actionsEl) {
+            actionsEl.innerHTML = '<span class="applied-badge">' + icon('checkCircle', 'i--sm') + '</span>';
+          }
+        } else if (status === 'pending') {
+          el.classList.remove('highlight-applied');
+          const btn = el.querySelector('.btn-apply-highlight');
+          if (btn) btn.disabled = false;
+        }
       }
 
       /**
@@ -4021,13 +4294,14 @@
 
         const pending = pendingAnnotations.filter(a => a.type === 'change' && a.status === 'pending');
 
-        if (pending.length === 0) {
+        // v14.5: Amagar barra bulk si només queda 0 o 1 canvi (botons individuals suficients)
+        if (pending.length <= 1) {
           bulkBar.style.display = 'none';
         } else {
           bulkBar.style.display = 'flex';
           const infoEl = bulkBar.querySelector('.bulk-info');
           if (infoEl) {
-            infoEl.textContent = pending.length + ' canvi' + (pending.length !== 1 ? 's' : '') + ' pendent' + (pending.length !== 1 ? 's' : '');
+            infoEl.textContent = pending.length + ' canvis pendents';
           }
         }
       }

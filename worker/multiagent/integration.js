@@ -199,7 +199,9 @@ function convertToLegacyResponse(newResponse) {
 
     case Mode.UPDATE_BY_ID:
       legacyResponse.updates = convertChangesToUpdates(newResponse.changes);
-      legacyResponse.change_summary = buildChangeSummary(newResponse.changes, 'ca');
+      // v14.5: Prioritzar resposta contextual de la IA, fallback a resum genèric
+      legacyResponse.chat_response = newResponse.chat_response || '';
+      legacyResponse.change_summary = newResponse.chat_response || buildChangeSummary(newResponse.changes, 'ca');
       // v14.1: Passar també l'array changes complet per processChangesV14 a Code.gs
       legacyResponse.changes = newResponse.changes;
       legacyResponse.modification_type = newResponse.modification_type || newResponse._meta?.modification_type;
@@ -251,6 +253,8 @@ function convertHighlightsToLegacy(highlights) {
   if (!highlights || !Array.isArray(highlights)) return [];
 
   return highlights.map(h => ({
+    // v14.6: ID únic per tracking
+    id: h.id,
     // para_id: acceptar ambdós formats
     para_id: h.para_id ?? h.paragraph_id,
     // color: usar directament si ja és string, sinó convertir des de severity
@@ -264,6 +268,10 @@ function convertHighlightsToLegacy(highlights) {
     // start/end: acceptar formats nous i antics
     start: h.start ?? h.start_offset,
     end: h.end ?? h.end_offset,
+    // v14.6: Camps per accions aplicables
+    actionable: h.actionable || false,
+    find: h.action?.find || h.matched_text || '',
+    replace: h.action?.replace || '',
   }));
 }
 

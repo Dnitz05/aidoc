@@ -6058,7 +6058,8 @@ function applyReferenceHighlights(highlights) {
         }
 
         const textObj = element.editAsText();
-        const textLength = textObj.getText().length;
+        const fullText = textObj.getText();
+        const textLength = fullText.length;
 
         if (textLength === 0) continue;
 
@@ -6067,10 +6068,19 @@ function applyReferenceHighlights(highlights) {
         let endPos = textLength - 1;
 
         if (typeof hl.start === 'number' && typeof hl.end === 'number') {
-          // Highlight parcial - validar límits
+          // Highlight parcial per posició - validar límits
           startPos = Math.max(0, Math.min(hl.start, textLength - 1));
           endPos = Math.max(startPos, Math.min(hl.end - 1, textLength - 1));
           results.partial++;
+        } else if (hl.snippet && typeof hl.snippet === 'string' && hl.snippet.length > 0) {
+          // v14.5: Highlight parcial per snippet - buscar text dins del paràgraf
+          const snippetPos = fullText.indexOf(hl.snippet);
+          if (snippetPos !== -1) {
+            startPos = snippetPos;
+            endPos = snippetPos + hl.snippet.length - 1;
+            results.partial++;
+          }
+          // Si no es troba el snippet, ressalta tot el paràgraf (fallback)
         }
 
         // Aplicar color de fons

@@ -1090,6 +1090,69 @@
         opacity: 0.6;
       }
 
+      /* ═══════════════════════════════════════════════════════════
+         v14.6: ACTIONABLE HIGHLIGHTS - Botó Aplicar per correccions
+         ═══════════════════════════════════════════════════════════ */
+
+      /* Highlight actionable - fons verd subtle */
+      .reference-item.actionable-highlight {
+        background: rgba(34, 197, 94, 0.05);
+        border-left-color: #22c55e;
+      }
+
+      .reference-item.actionable-highlight:hover {
+        background: rgba(34, 197, 94, 0.1);
+      }
+
+      /* Container d'accions */
+      .ref-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+
+      /* Botó Aplicar - estil coherent amb btn-accept */
+      .btn-apply-highlight {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px 6px;
+        font-size: 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        background: rgba(34, 197, 94, 0.1);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+      }
+
+      .btn-apply-highlight:hover {
+        background: rgba(34, 197, 94, 0.2);
+        border-color: #22c55e;
+      }
+
+      .btn-apply-highlight:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* Badge d'aplicat */
+      .applied-badge {
+        color: #22c55e;
+        display: flex;
+        align-items: center;
+      }
+
+      /* Highlight aplicat */
+      .reference-item.highlight-applied {
+        opacity: 0.6;
+      }
+
+      .reference-item.highlight-applied .ref-snippet {
+        text-decoration: line-through;
+      }
+
       /* Botó netejar */
       .clear-highlights-btn {
         display: inline-flex;
@@ -1296,45 +1359,42 @@
         background: rgba(255, 255, 255, 0.05);
       }
 
+      /* v14.5: Botons més petits i arrodonits */
       .btn-accept, .btn-reject, .btn-view {
         display: inline-flex;
         align-items: center;
-        gap: 3px;
-        padding: 3px 8px;
-        border-radius: var(--radius-xs);
-        font-size: 10px;
+        justify-content: center;
+        gap: 2px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 9px;
         font-weight: 500;
         cursor: pointer;
         border: none;
         transition: all 0.15s ease;
       }
 
-      /* v14.4: Botó "Veure" - inicialment ocult, visible quan highlights cleared */
+      /* v14.5: Botó "Veure" - sempre visible */
       .btn-view {
-        display: none;
-        background: transparent;
-        color: var(--accent);
-        border: 1px solid var(--accent-muted);
+        display: inline-flex;
+        background: rgba(100, 181, 246, 0.1);
+        color: #64B5F6;
+        border: 1px solid rgba(100, 181, 246, 0.3);
       }
 
       .btn-view:hover {
-        background: var(--accent-muted);
-        border-color: var(--accent);
-      }
-
-      /* Mostrar botó "Veure" quan l'anotació té highlights cleared */
-      .annotation-item.highlights-cleared .btn-view {
-        display: inline-flex;
+        background: rgba(100, 181, 246, 0.2);
+        border-color: #64B5F6;
       }
 
       .btn-accept {
-        background: transparent;
+        background: rgba(34, 197, 94, 0.1);
         color: #22c55e;
         border: 1px solid rgba(34, 197, 94, 0.3);
       }
 
       .btn-accept:hover {
-        background: rgba(34, 197, 94, 0.1);
+        background: rgba(34, 197, 94, 0.2);
         border-color: #22c55e;
       }
 
@@ -1345,6 +1405,7 @@
       }
 
       .btn-reject:hover {
+        background: rgba(239, 68, 68, 0.1);
         color: #ef4444;
         border-color: rgba(239, 68, 68, 0.3);
       }
@@ -1371,37 +1432,53 @@
         gap: 6px;
       }
 
-      .btn-accept-all, .btn-discard-all {
+      /* v14.5: Botons bulk - mateixa mida i estil que individuals */
+      .btn-accept-all, .btn-discard-all, .btn-view-all {
         display: inline-flex;
         align-items: center;
-        gap: 3px;
-        padding: 4px 10px;
-        border-radius: var(--radius-xs);
-        font-size: 10px;
+        justify-content: center;
+        gap: 2px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 9px;
         font-weight: 500;
         cursor: pointer;
         border: none;
         transition: all 0.15s ease;
       }
 
+      .btn-view-all {
+        background: rgba(100, 181, 246, 0.1);
+        color: #64B5F6;
+        border: 1px solid rgba(100, 181, 246, 0.3);
+      }
+
+      .btn-view-all:hover {
+        background: rgba(100, 181, 246, 0.2);
+        border-color: #64B5F6;
+      }
+
       .btn-accept-all {
-        background: var(--accent);
-        color: white;
+        background: rgba(34, 197, 94, 0.1);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.3);
       }
 
       .btn-accept-all:hover {
-        background: var(--accent-hover);
+        background: rgba(34, 197, 94, 0.2);
+        border-color: #22c55e;
       }
 
       .btn-discard-all {
         background: transparent;
-        color: var(--text-secondary);
+        color: var(--text-muted);
         border: 1px solid var(--border);
       }
 
       .btn-discard-all:hover {
-        color: var(--error);
-        border-color: var(--error);
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border-color: rgba(239, 68, 68, 0.3);
       }
 
       /* Dark mode - mínim */
@@ -6843,10 +6920,12 @@
       }
 
       .selection-indicator .mode-btn {
-        padding: 2px 6px;
+        padding: 2px 3px;
         font-size: 9px;
         color: var(--accent);
         font-weight: 600;
+        letter-spacing: -0.3px;
+        gap: 2px;
       }
 
       .selection-indicator .mode-btn:hover {

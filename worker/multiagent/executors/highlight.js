@@ -64,20 +64,36 @@ Abans de marcar qualsevol paraula, verifica:
 - Noms propis, sigles, abreviatures
 - Casos on original == correcció
 
-## OUTPUT
+## OUTPUT AMB ACCIONS
 \`\`\`json
 {
+  "response": "<resposta natural i contextual>",
   "highlights": [
     {
       "paragraph_id": <número>,
       "text_to_highlight": "<PARAULA MAL ESCRITA>",
       "comment": "'<error>' → '<correcció diferent>'",
-      "severity": "error"
+      "severity": "error",
+      "actionable": true,
+      "action": {
+        "find": "<text original exacte>",
+        "replace": "<text corregit>"
+      }
     }
-  ],
-  "summary": "<N errors>" | "Cap error"
+  ]
 }
 \`\`\`
+
+## CAMPS D'ACCIÓ (NOUS)
+- "actionable": true → L'error té correcció ÚNICA i INEQUÍVOCA (ortografia/gramàtica)
+- "action.find": El text EXACTE tal com apareix al document
+- "action.replace": El text CORRECTE per substituir-lo
+
+## RESPOSTA CONTEXTUAL
+El camp "response" ha de respondre la instrucció de forma natural:
+- "Revisa l'ortografia" → "He trobat 'area' sense accent i 'documentacio' mal escrit."
+- "Hi ha faltes?" → "Sí, 'urbangística' hauria de ser 'urbanística'."
+- Si no hi ha errors → "He revisat el text i l'ortografia és correcta."
 
 🔴 MAI retornis un error on la correcció sigui igual a l'original!`,
 
@@ -108,6 +124,7 @@ Cada suggeriment ha d'incloure:
 ## OUTPUT
 \`\`\`json
 {
+  "response": "<resposta natural i contextual a la instrucció de l'usuari>",
   "highlights": [
     {
       "paragraph_id": <número>,
@@ -115,10 +132,20 @@ Cada suggeriment ha d'incloure:
       "comment": "[Tipus]: <descripció> → <direcció millora>",
       "severity": "suggestion"
     }
-  ],
-  "summary": "X oportunitats de millora identificades"
+  ]
 }
 \`\`\`
+
+## RESPOSTA CONTEXTUAL (IMPORTANT)
+El camp "response" ha de ser una resposta NATURAL que:
+1. Faci referència directa a la INSTRUCCIÓ de l'usuari
+2. Expliqui què has trobat de forma orgànica
+3. NO sigui genèrica com "He identificat X suggeriments"
+
+Exemples:
+- "Hi ha paraules fora de context?" → "He trobat 'pilota' que no encaixa amb el tema del document."
+- "Què puc millorar?" → "Hi ha una frase massa llarga al paràgraf 2 que podries dividir."
+- "Revisa l'estil" → "L'estil és correcte, però al paràgraf 3 hi ha repetició de 'important'."
 
 IMPORTANT: Millor pocs suggeriments de qualitat que molts de dubtosos.`,
 
@@ -140,6 +167,7 @@ Objectiu: Localitzar totes les mencions d'un concepte o tema al document.
 ## OUTPUT
 \`\`\`json
 {
+  "response": "<resposta natural sobre les mencions trobades>",
   "highlights": [
     {
       "paragraph_id": <número>,
@@ -147,10 +175,14 @@ Objectiu: Localitzar totes les mencions d'un concepte o tema al document.
       "comment": "[Exacta|Variant|Sinònim|Referència]: <breu context>",
       "severity": "info"
     }
-  ],
-  "summary": "X mencions de '<concepte>' trobades"
+  ]
 }
-\`\`\``,
+\`\`\`
+
+## RESPOSTA CONTEXTUAL
+Respon de forma natural mencionant on has trobat el concepte:
+- "On parla de pressupost?" → "El pressupost es menciona als paràgrafs 2 i 5, principalment en relació amb els costos."
+- "Busca 'PAE'" → "He trobat 'PAE' mencionat 3 vegades: al títol i als paràgrafs 3 i 7."`,
 
   structure: `ANALISTA D'ESTRUCTURA DOCUMENTAL
 Objectiu: Identificar i categoritzar elements estructurals del document.
@@ -348,8 +380,8 @@ async function executeReferenceHighlight(intent, documentContext, conversationCo
       by_severity: countBySeverity(filteredHighlights),
     });
 
-    // Construir resposta de chat
-    const chatResponse = buildHighlightChatResponse(
+    // v14.5: Prioritzar resposta contextual de la IA, fallback a template
+    const chatResponse = parsedResponse.response || buildHighlightChatResponse(
       filteredHighlights,
       parsedResponse.summary,
       strategy,
@@ -489,19 +521,35 @@ function parseHighlightResponse(responseText, documentContext) {
   try {
     const parsed = JSON.parse(jsonStr);
 
+    // v14.6: Processar camps actionable i action dels highlights
+    const processedHighlights = (parsed.highlights || []).map(h => ({
+      ...h,
+      // Extreure actionable (default false per suggeriments/info)
+      actionable: h.actionable === true,
+      // Extreure action si existeix i és vàlida
+      action: (h.action?.find && h.action?.replace)
+        ? { find: h.action.find, replace: h.action.replace }
+        : null,
+    }));
+
     logInfo('🔍 [DEBUG] parseHighlightResponse ÈXIT', {
-      highlights_count: parsed.highlights?.length || 0,
-      highlights_detail: parsed.highlights?.map(h => ({
+      highlights_count: processedHighlights.length,
+      highlights_detail: processedHighlights.map(h => ({
         text: h.text_to_highlight,
         para_id: h.paragraph_id,
-        severity: h.severity
+        severity: h.severity,
+        actionable: h.actionable,
+        has_action: !!h.action
       })),
-      summary: parsed.summary?.slice(0, 100)
+      summary: parsed.summary?.slice(0, 100),
+      response: parsed.response?.slice(0, 100)
     });
 
+    // v14.5: Retornar també el camp 'response' contextual de la IA
     return {
-      highlights: parsed.highlights || [],
+      highlights: processedHighlights,
       summary: parsed.summary || '',
+      response: parsed.response || null,
     };
   } catch (error) {
     logWarn('🔍 [DEBUG] parseHighlightResponse ERROR JSON', {
@@ -547,6 +595,35 @@ function extractHighlightsFromText(text, documentContext) {
 // ═══════════════════════════════════════════════════════════════
 // VALIDATION
 // ═══════════════════════════════════════════════════════════════
+
+/**
+ * v14.6: Extreu action del comment si segueix el patró 'error' → 'correcció'
+ * Fallback per quan la IA no retorna l'action explícitament
+ * @param {string} comment - Comentari del highlight
+ * @param {string} matchedText - Text trobat al document
+ * @returns {Object|null} - { find, replace } o null
+ */
+function extractActionFromComment(comment, matchedText) {
+  if (!comment) return null;
+
+  // Patró: 'error' → 'correcció' o "error" → "correcció"
+  const pattern = /['""']?([^'""'→]+)['""']?\s*→\s*['""']?([^'""']+)['""']?/;
+  const match = comment.match(pattern);
+
+  if (match) {
+    const original = match[1].trim();
+    const correction = match[2].trim();
+
+    // Verificar que no són iguals (fals positiu)
+    if (original.toLowerCase() !== correction.toLowerCase()) {
+      return {
+        find: matchedText || original,  // Preferir matchedText per precisió
+        replace: correction
+      };
+    }
+  }
+  return null;
+}
 
 /**
  * Valida, filtra i calcula posicions exactes per als highlights
@@ -647,6 +724,11 @@ function validateHighlights(highlights, documentContext) {
     const before_text = paraText;
     const before_hash = sha256Sync(before_text);
 
+    // v14.6: Determinar action (de la IA o fallback del comment)
+    const action = h.action || extractActionFromComment(h.comment, position.matched_text);
+    // v14.6: actionable si la IA ho indica O si hem extret action del comment (per errors)
+    const actionable = h.actionable || (severity === 'error' && action !== null);
+
     // v14.1: Construir highlight amb format unificat
     validated.push({
       id: generateItemId('h', highlightIndex++),  // v14: ID únic (h_001, h_002...)
@@ -661,6 +743,9 @@ function validateHighlights(highlights, documentContext) {
       reason: h.comment || '',
       severity,
       matched_text: position.matched_text,       // legacy
+      // v14.6: Nous camps per accions aplicables
+      actionable,
+      action,
       _meta: position._meta || {},
     });
   }
@@ -951,42 +1036,54 @@ function filterProperNounHighlights(highlights, documentContext) {
 
 /**
  * Construeix la resposta de chat pels highlights
+ * v14.5: Respostes més naturals i sense repeticions
  */
 function buildHighlightChatResponse(highlights, summary, strategy, language) {
   const count = highlights.length;
   const errorCount = highlights.filter(h => h.severity === 'error').length;
   const suggestionCount = highlights.filter(h => h.severity === 'suggestion').length;
 
+  // v14.5: Respostes més naturals sense repetir comptadors
   const templates = {
     ca: {
-      none: "No he trobat cap element a destacar.",
-      errors_only: `He trobat ${errorCount} error${errorCount !== 1 ? 's' : ''} que he marcat al document.`,
-      suggestions_only: `He identificat ${suggestionCount} suggeriment${suggestionCount !== 1 ? 's' : ''} de millora.`,
-      mixed: `He revisat el document: ${errorCount} error${errorCount !== 1 ? 's' : ''} i ${suggestionCount} suggeriment${suggestionCount !== 1 ? 's' : ''}.`,
-      with_summary: summary ? `\n\n${summary}` : '',
+      none: "He revisat el text i no he trobat res a destacar.",
+      errors_only: count === 1
+        ? "He trobat un error que he marcat al document."
+        : `He trobat ${errorCount} errors i els he marcat al document.`,
+      suggestions_only: count === 1
+        ? "He identificat una possible millora."
+        : `He identificat ${suggestionCount} possibles millores.`,
+      mixed: `He revisat el document i he trobat ${errorCount} error${errorCount !== 1 ? 's' : ''} i ${suggestionCount} suggeriment${suggestionCount !== 1 ? 's' : ''}.`,
     },
     es: {
-      none: "No he encontrado ningún elemento a destacar.",
-      errors_only: `He encontrado ${errorCount} error${errorCount !== 1 ? 'es' : ''} que he marcado en el documento.`,
-      suggestions_only: `He identificado ${suggestionCount} sugerencia${suggestionCount !== 1 ? 's' : ''} de mejora.`,
-      mixed: `He revisado el documento: ${errorCount} error${errorCount !== 1 ? 'es' : ''} y ${suggestionCount} sugerencia${suggestionCount !== 1 ? 's' : ''}.`,
-      with_summary: summary ? `\n\n${summary}` : '',
+      none: "He revisado el texto y no he encontrado nada que destacar.",
+      errors_only: count === 1
+        ? "He encontrado un error que he marcado en el documento."
+        : `He encontrado ${errorCount} errores y los he marcado en el documento.`,
+      suggestions_only: count === 1
+        ? "He identificado una posible mejora."
+        : `He identificado ${suggestionCount} posibles mejoras.`,
+      mixed: `He revisado el documento y he encontrado ${errorCount} error${errorCount !== 1 ? 'es' : ''} y ${suggestionCount} sugerencia${suggestionCount !== 1 ? 's' : ''}.`,
     },
     en: {
-      none: "I didn't find any elements to highlight.",
-      errors_only: `I found ${errorCount} error${errorCount !== 1 ? 's' : ''} that I've marked in the document.`,
-      suggestions_only: `I identified ${suggestionCount} improvement suggestion${suggestionCount !== 1 ? 's' : ''}.`,
-      mixed: `I've reviewed the document: ${errorCount} error${errorCount !== 1 ? 's' : ''} and ${suggestionCount} suggestion${suggestionCount !== 1 ? 's' : ''}.`,
-      with_summary: summary ? `\n\n${summary}` : '',
+      none: "I've reviewed the text and found nothing to highlight.",
+      errors_only: count === 1
+        ? "I found one error that I've marked in the document."
+        : `I found ${errorCount} errors and marked them in the document.`,
+      suggestions_only: count === 1
+        ? "I identified one possible improvement."
+        : `I identified ${suggestionCount} possible improvements.`,
+      mixed: `I've reviewed the document and found ${errorCount} error${errorCount !== 1 ? 's' : ''} and ${suggestionCount} suggestion${suggestionCount !== 1 ? 's' : ''}.`,
     },
   };
 
   const t = templates[language] || templates.ca;
 
+  // v14.5: NO afegir summary redundant - ja hem dit el recompte
   if (count === 0) return t.none;
-  if (errorCount > 0 && suggestionCount === 0) return t.errors_only + t.with_summary;
-  if (suggestionCount > 0 && errorCount === 0) return t.suggestions_only + t.with_summary;
-  return t.mixed + t.with_summary;
+  if (errorCount > 0 && suggestionCount === 0) return t.errors_only;
+  if (suggestionCount > 0 && errorCount === 0) return t.suggestions_only;
+  return t.mixed;
 }
 
 function countBySeverity(highlights) {
