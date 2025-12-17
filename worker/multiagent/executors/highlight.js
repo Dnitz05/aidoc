@@ -531,25 +531,15 @@ function parseHighlightResponse(responseText, documentContext) {
   try {
     const parsed = JSON.parse(jsonStr);
 
-    // v14.6: Processar camps actionable i action dels highlights
-    const processedHighlights = (parsed.highlights || []).map(h => ({
-      ...h,
-      // Extreure actionable (default false per suggeriments/info)
-      actionable: h.actionable === true,
-      // Extreure action si existeix i és vàlida
-      action: (h.action?.find && h.action?.replace)
-        ? { find: h.action.find, replace: h.action.replace }
-        : null,
-    }));
+    // v16.0: Simplificat - només localització, sense accions
+    const processedHighlights = parsed.highlights || [];
 
     logInfo('🔍 [DEBUG] parseHighlightResponse ÈXIT', {
       highlights_count: processedHighlights.length,
       highlights_detail: processedHighlights.map(h => ({
         text: h.text_to_highlight,
         para_id: h.paragraph_id,
-        severity: h.severity,
-        actionable: h.actionable,
-        has_action: !!h.action
+        severity: h.severity
       })),
       summary: parsed.summary?.slice(0, 100),
       response: parsed.response?.slice(0, 100)
@@ -605,35 +595,6 @@ function extractHighlightsFromText(text, documentContext) {
 // ═══════════════════════════════════════════════════════════════
 // VALIDATION
 // ═══════════════════════════════════════════════════════════════
-
-/**
- * v14.6: Extreu action del comment si segueix el patró 'error' → 'correcció'
- * Fallback per quan la IA no retorna l'action explícitament
- * @param {string} comment - Comentari del highlight
- * @param {string} matchedText - Text trobat al document
- * @returns {Object|null} - { find, replace } o null
- */
-function extractActionFromComment(comment, matchedText) {
-  if (!comment) return null;
-
-  // Patró: 'error' → 'correcció' o "error" → "correcció"
-  const pattern = /['""']?([^'""'→]+)['""']?\s*→\s*['""']?([^'""']+)['""']?/;
-  const match = comment.match(pattern);
-
-  if (match) {
-    const original = match[1].trim();
-    const correction = match[2].trim();
-
-    // Verificar que no són iguals (fals positiu)
-    if (original.toLowerCase() !== correction.toLowerCase()) {
-      return {
-        find: matchedText || original,  // Preferir matchedText per precisió
-        replace: correction
-      };
-    }
-  }
-  return null;
-}
 
 /**
  * Valida, filtra i calcula posicions exactes per als highlights
@@ -734,28 +695,21 @@ function validateHighlights(highlights, documentContext) {
     const before_text = paraText;
     const before_hash = sha256Sync(before_text);
 
-    // v14.6: Determinar action (de la IA o fallback del comment)
-    const action = h.action || extractActionFromComment(h.comment, position.matched_text);
-    // v14.6: actionable si la IA ho indica O si hem extret action del comment (per errors)
-    const actionable = h.actionable || (severity === 'error' && action !== null);
-
-    // v14.1: Construir highlight amb format unificat
+    // v16.0: Construir highlight simplificat (només localització)
     validated.push({
-      id: generateItemId('h', highlightIndex++),  // v14: ID únic (h_001, h_002...)
+      id: generateItemId('h', highlightIndex++),
       para_id: paraId,
-      paragraph_id: paraId,                       // v14: alias per compatibilitat
+      paragraph_id: paraId,
       start: position.start,
       end: position.end,
-      text: position.matched_text,               // v14: text destacat
-      before_text,                               // v14: text complet del paràgraf
-      before_hash,                               // v14: hash per detecció STALE
+      text: position.matched_text,
+      snippet: position.matched_text,            // v16.0: Alias per UI
+      before_text,
+      before_hash,
       color: severityToColor(severity),
       reason: h.comment || '',
       severity,
-      matched_text: position.matched_text,       // legacy
-      // v14.6: Nous camps per accions aplicables
-      actionable,
-      action,
+      matched_text: position.matched_text,
       _meta: position._meta || {},
     });
   }

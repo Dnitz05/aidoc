@@ -3257,17 +3257,6 @@
         const bubble = document.createElement('div');
         bubble.className = 'msg ai';
 
-        // v14.6: Guardar highlights actionables per tracking
-        const actionableHighlights = (highlights || []).filter(h => h.actionable && h.find && h.replace);
-        if (actionableHighlights.length > 0) {
-          // Afegir a pendingAnnotations amb tipus 'highlight' i status 'pending'
-          pendingAnnotations = actionableHighlights.map(h => ({
-            ...h,
-            type: 'highlight',
-            status: 'pending'
-          }));
-        }
-
         // Renderitzar resposta principal amb markdown (usar renderMarkdownHtml que retorna string)
         let html = '<div class="md-content">' + renderMarkdownHtml(aiResponse) + '</div>';
 
@@ -3944,9 +3933,8 @@
             html += '<div class="annotation-bulk-actions">';
             html += '<span class="bulk-info">' + pendingChanges.length + ' canvi' + (pendingChanges.length !== 1 ? 's' : '') + ' pendent' + (pendingChanges.length !== 1 ? 's' : '') + '</span>';
             html += '<div class="bulk-buttons">';
-            // v14.5: Botons només icones
+            // v16.0: Botons bulk - només Veure tots i Acceptar tots
             html += '<button class="btn-view-all" onclick="showAllAnnotationHighlights()" title="Veure tots">' + icon('eye', 'i--sm') + '</button>';
-            html += '<button class="btn-discard-all" onclick="discardAllAnnotations()" title="Descartar tots">' + icon('x', 'i--sm') + '</button>';
             html += '<button class="btn-accept-all" onclick="acceptAllAnnotations()" title="Acceptar tots">' + icon('check', 'i--sm') + '</button>';
             html += '</div>';
             html += '</div>';
@@ -4031,7 +4019,11 @@
           html += '</span>';
         }
 
-        html += '<span class="annotation-reason">' + escapeHtmlSafe(ann.reason || 'Canvi proposat') + '</span>';
+        // v15.1: Només mostrar reason si és diferent de "Canvi proposat" (evitar duplicat)
+        const reason = ann.reason || '';
+        if (reason && reason !== 'Canvi proposat') {
+          html += '<span class="annotation-reason">' + escapeHtmlSafe(reason) + '</span>';
+        }
         html += '</div>';
 
         // v14.6: Per canvis grans, mostrar vista col·lapsada
@@ -4063,18 +4055,15 @@
         if (stats.isLarge) {
           html += '<button class="btn-expand" onclick="toggleAnnotationExpand(\'' + ann.id + '\')" title="Expandir">' + icon('chevronDown', 'i--sm') + '</button>';
         }
-        // v14.5: Botons només icones
+        // v16.0: Només botons Veure i Acceptar (Descartar eliminat)
         html += '<button class="btn-view" onclick="showAnnotationHighlight(\'' + ann.id + '\', this)" title="Veure al document">' + icon('eye', 'i--sm') + '</button>';
         html += '<button class="btn-accept" onclick="acceptSingleAnnotation(\'' + ann.id + '\')" title="Acceptar">' + icon('check', 'i--sm') + '</button>';
-        html += '<button class="btn-reject" onclick="rejectSingleAnnotation(\'' + ann.id + '\')" title="Rebutjar">' + icon('x', 'i--sm') + '</button>';
         html += '</div>';
 
-        // Status (es mostra quan està accepted/rejected)
+        // Status (es mostra quan està accepted)
         html += '<div class="annotation-status">';
         if (ann.status === 'accepted') {
           html += icon('checkCircle', 'i--sm') + ' Aplicat';
-        } else if (ann.status === 'rejected') {
-          html += icon('xCircle', 'i--sm') + ' Descartat';
         }
         html += '</div>';
 
@@ -4084,50 +4073,22 @@
 
       /**
        * Renderitza una anotació de highlight (informativa, clicable)
-       * v14.6: Suport per highlights actionables amb botó "Aplicar"
-       * v14.7: UI millorada - mostra find→replace amb colors, sense repetició
+       * v16.0: Simplificat - només localització, sense accions
        */
       function renderHighlightAnnotation(ann) {
         const colorClass = 'ref-' + (ann.color || 'yellow');
-        const isActionable = ann.actionable && ann.find && ann.replace;
 
-        let html = '<div class="annotation-item highlight-item reference-item ' + colorClass;
-        if (isActionable) html += ' actionable-highlight';
-        html += '" ';
-
-        if (isActionable) {
-          html += 'data-id="' + ann.id + '" data-status="' + (ann.status || 'pending') + '" ';
-        }
-
+        let html = '<div class="annotation-item highlight-item reference-item ' + colorClass + '" ';
         html += 'onclick="scrollToDocReference(' + ann.para_id + ', \'' + ann.color + '\')" ';
         html += 'title="Clic per veure al document">';
 
-        // v14.7: Per actionables, mostrar find→replace amb colors (sense duplicació)
-        if (isActionable) {
-          html += '<span class="ref-content actionable-content">';
-          html += '<span class="correction-display">';
-          html += '<span class="correction-find">' + escapeHtmlSafe(ann.find) + '</span>';
-          html += '<span class="correction-arrow">→</span>';
-          html += '<span class="correction-replace">' + escapeHtmlSafe(ann.replace) + '</span>';
-          html += '</span>';
-          html += '</span>';
-        } else {
-          // Format clàssic per highlights no-actionables
-          html += '<span class="ref-content">';
-          html += '<span class="ref-snippet">"' + escapeHtmlSafe(ann.snippet || '...') + '"</span>';
-          html += '<span class="ref-reason">' + escapeHtmlSafe(ann.reason) + '</span>';
-          html += '</span>';
-        }
+        // Format clàssic: snippet + reason
+        html += '<span class="ref-content">';
+        html += '<span class="ref-snippet">"' + escapeHtmlSafe(ann.snippet || '...') + '"</span>';
+        html += '<span class="ref-reason">' + escapeHtmlSafe(ann.reason) + '</span>';
+        html += '</span>';
 
-        // v14.6: Botó Aplicar per highlights actionables
-        if (isActionable) {
-          html += '<span class="ref-actions" onclick="event.stopPropagation();">';
-          html += '<button class="btn-apply-highlight" onclick="applyActionableHighlight(\'' + ann.id + '\')" title="Aplicar correcció">';
-          html += icon('check', 'i--sm') + '</button>';
-          html += '</span>';
-        } else {
-          html += '<span class="ref-arrow">' + icon('chevronRight', 'i--sm') + '</span>';
-        }
+        html += '<span class="ref-arrow">' + icon('chevronRight', 'i--sm') + '</span>';
 
         html += '</div>';
         return html;
@@ -4197,95 +4158,6 @@
       }
 
       /**
-       * Rebutjar un canvi individual (sense aplicar res)
-       */
-      function rejectSingleAnnotation(annotationId) {
-        const ann = pendingAnnotations.find(a => a.id === annotationId);
-        if (!ann || ann.status !== 'pending') return;
-
-        // v14.5: NO netejar tots els highlights - mantenir els altres
-        // L'usuari pot tornar a veure qualsevol canvi amb el botó "Veure"
-
-        ann.status = 'rejected';
-        updateAnnotationUI(annotationId, 'rejected');
-        updateBulkActionsBar();
-        showToast('Canvi descartat', 'info');
-      }
-
-      /**
-       * v14.6: Aplicar un highlight actionable (correcció ortogràfica/gramatical)
-       * Reutilitza applyFindReplaceChanges del mode FIX
-       */
-      function applyActionableHighlight(highlightId) {
-        const hl = pendingAnnotations.find(a => a.id === highlightId);
-        if (!hl || hl.status !== 'pending') return;
-
-        // Verificar que té dades d'acció
-        if (!hl.find || !hl.replace) {
-          showToast('Aquest highlight no té correcció aplicable', 'warning');
-          return;
-        }
-
-        // Actualitzar UI immediatament (optimistic)
-        const el = document.querySelector('.annotation-item[data-id="' + highlightId + '"]');
-        if (el) {
-          el.setAttribute('data-status', 'applying');
-          const btn = el.querySelector('.btn-apply-highlight');
-          if (btn) btn.disabled = true;
-        }
-
-        const successHandler = function(result) {
-          if (result && result.ok) {
-            hl.status = 'accepted';
-            updateHighlightUI(highlightId, 'accepted');
-            showToast('Correcció aplicada', 'success');
-          } else {
-            hl.status = 'pending';
-            updateHighlightUI(highlightId, 'pending');
-            showToast(result && result.error ? result.error : 'Error aplicant correcció', 'error');
-          }
-        };
-
-        const failureHandler = function(err) {
-          hl.status = 'pending';
-          updateHighlightUI(highlightId, 'pending');
-          showToast('Error: ' + err.message, 'error');
-        };
-
-        // Reutilitzar applyFindReplaceChanges (ja existeix i funciona)
-        google.script.run
-          .withSuccessHandler(successHandler)
-          .withFailureHandler(failureHandler)
-          .applyFindReplaceChanges([{
-            targetId: hl.para_id,
-            find: hl.find,
-            replace: hl.replace
-          }]);
-      }
-
-      /**
-       * v14.6: Actualitzar UI d'un highlight després d'aplicar
-       */
-      function updateHighlightUI(highlightId, status) {
-        const el = document.querySelector('.annotation-item[data-id="' + highlightId + '"]');
-        if (!el) return;
-
-        el.setAttribute('data-status', status);
-
-        if (status === 'accepted') {
-          el.classList.add('highlight-applied');
-          const actionsEl = el.querySelector('.ref-actions');
-          if (actionsEl) {
-            actionsEl.innerHTML = '<span class="applied-badge">' + icon('checkCircle', 'i--sm') + '</span>';
-          }
-        } else if (status === 'pending') {
-          el.classList.remove('highlight-applied');
-          const btn = el.querySelector('.btn-apply-highlight');
-          if (btn) btn.disabled = false;
-        }
-      }
-
-      /**
        * Acceptar tots els canvis pendents
        * v12.1: Router híbrid - usa applyFindReplaceChanges per mode FIX
        */
@@ -4346,19 +4218,6 @@
       }
 
       /**
-       * Descartar tots els canvis pendents
-       */
-      function discardAllAnnotations() {
-        const pending = pendingAnnotations.filter(a => a.type === 'change' && a.status === 'pending');
-        pending.forEach(ann => {
-          ann.status = 'rejected';
-          updateAnnotationUI(ann.id, 'rejected');
-        });
-        updateBulkActionsBar();
-        showToast('Tots els canvis descartats', 'info');
-      }
-
-      /**
        * Actualitza la UI d'una anotació segons el seu status
        */
       function updateAnnotationUI(annotationId, status) {
@@ -4367,13 +4226,11 @@
 
         el.setAttribute('data-status', status);
 
-        // Actualitzar contingut del status
+        // v16.0: Actualitzar contingut del status (només accepted)
         const statusEl = el.querySelector('.annotation-status');
         if (statusEl) {
           if (status === 'accepted') {
             statusEl.innerHTML = icon('checkCircle', 'i--sm') + ' Aplicat';
-          } else if (status === 'rejected') {
-            statusEl.innerHTML = icon('xCircle', 'i--sm') + ' Descartat';
           } else {
             statusEl.innerHTML = '';
           }
