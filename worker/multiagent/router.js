@@ -8,7 +8,7 @@
  * - Gestió del flux de confirmació (REWRITE)
  */
 
-import { Mode, RiskLevel } from './types.js';
+import { Mode, RiskLevel, OutputTarget } from './types.js';
 import { CONFIDENCE_THRESHOLDS, FEATURE_FLAGS } from './config.js';
 import { logInfo, logDebug, logWarn } from './telemetry.js';
 import {
@@ -54,7 +54,27 @@ function decideRouting(intent, session, documentContext) {
     confidence,
     threshold,
     has_pending: hasPendingIntent(session),
+    output_target: intent.output_target,
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // PRIORITAT 0: RESPECTAR output_target (v15.0)
+  // ═══════════════════════════════════════════════════════════════
+  if (intent.output_target === OutputTarget.CHAT) {
+    logInfo('Router: output_target=chat, forcing CHAT_ONLY', {
+      original_mode: mode,
+      instruction: intent.original_instruction?.slice(0, 50),
+    });
+    return {
+      action: 'execute',
+      intent: { ...intent, mode: Mode.CHAT_ONLY, _original_mode: mode },
+      clarification: null,
+      reason: 'output_target_chat',
+    };
+  }
+
+  // v15.1: Si output_target='auto', confiem en el mode classificat
+  // El sistema de clarificació per baixa confiança s'encarrega si cal
 
   // 1. Si ve d'una clarificació, executar directament
   if (intent._meta?.from_clarification) {

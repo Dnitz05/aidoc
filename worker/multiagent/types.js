@@ -82,6 +82,17 @@ const RiskLevel = {
 };
 
 /**
+ * v15.0: On vol l'usuari el resultat (Intel·ligent Output Routing)
+ * La IA infereix aquest valor basant-se en indicadors lingüístics
+ * @enum {string}
+ */
+const OutputTarget = {
+  CHAT: 'chat',       // Resposta al sidebar (xat)
+  DOCUMENT: 'document', // Acció al document (ressaltar/modificar)
+  AUTO: 'auto',       // Router decideix (comportament per defecte)
+};
+
+/**
  * Estat del cache
  * @enum {string}
  */
@@ -568,6 +579,8 @@ function createDefaultIntent() {
     risk_level: RiskLevel.NONE,
     is_question: false,
     resolved_references: [],
+    // v15.0: Intel·ligent Output Routing
+    output_target: 'auto',
   };
 }
 
@@ -842,6 +855,7 @@ export {
   Scope,
   HighlightStrategy,
   RiskLevel,
+  OutputTarget,  // v15.0: Intel·ligent Output Routing
   CacheState,
   CircuitBreakerState,
   HighlightColor,

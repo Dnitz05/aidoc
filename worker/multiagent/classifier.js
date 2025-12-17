@@ -23,30 +23,53 @@ import { logInfo, logError, logDebug } from './telemetry.js';
 // CLASSIFIER SYSTEM PROMPT
 // ═══════════════════════════════════════════════════════════════
 
-const CLASSIFIER_SYSTEM_PROMPT = `Ets el Router d'Intencions de Docmile v13.6. Retorna JSON estricte.
+const CLASSIFIER_SYSTEM_PROMPT = `Ets el Router d'Intencions de Docmile v15.0. Retorna JSON estricte.
 
-## ⚠️ REGLA SUPREMA: VISUAL-FIRST (RESSALTAR SEMPRE QUE SIGUI POSSIBLE) ⚠️
+## ⚠️ CONCEPTE CLAU: OUTPUT_TARGET (On vol la resposta?) ⚠️
 
-PRINCIPI CLAU: Si la resposta pot senyalar parts del document → REFERENCE_HIGHLIGHT
-CHAT_ONLY només per preguntes SENSE relació amb el document.
+ABANS de decidir el mode, pregunta't: "ON vol l'usuari el resultat?"
 
-### DECISIÓ RÀPIDA:
-1. La resposta pot apuntar a parts específiques del document? → REFERENCE_HIGHLIGHT
-2. És una pregunta general sense relació amb el document? → CHAT_ONLY
-3. Vol modificar el document? → UPDATE_BY_ID o REWRITE
+| output_target | Significat | Quan usar |
+|---------------|------------|-----------|
+| chat | Resposta al sidebar | Preguntes, explicacions, resums informatius |
+| document | Acció al document | Ressaltar, corregir, modificar |
+| auto | Incert, demanar clarificació | Ambigüitat genuïna |
 
-### EXEMPLES CRÍTICS:
-| Instrucció | Mode | Per què |
-|------------|------|---------|
-| "Qui signa l'informe?" | REFERENCE_HIGHLIGHT | Localitzar ON apareix el signant |
-| "On apareix el pressupost?" | REFERENCE_HIGHLIGHT | Explícitament vol localitzar |
-| "Busca 'PAE'" | REFERENCE_HIGHLIGHT | Buscar un terme específic |
-| "Revisa l'ortografia" | REFERENCE_HIGHLIGHT | Detectar i marcar errors |
-| "De què parla el document?" | CHAT_ONLY | Explicació general, resposta al xat |
-| "Resumeix el document" | CHAT_ONLY | Resum textual, resposta al xat |
-| "Explica el contingut" | CHAT_ONLY | Explicació, resposta al xat |
-| "Què és un framework?" | CHAT_ONLY | Pregunta general, no relacionada amb el doc |
-| "Hola, com estàs?" | CHAT_ONLY | Conversa social |
+### INDICADORS LINGÜÍSTICS (la IA ha d'inferir-los)
+
+**→ output_target: "chat" (vol RESPOSTA al xat):**
+- Preguntes corteses: "Pots...?", "Podries...?", "Em pots dir...?"
+- Demandes d'informació: "Fes-me un resum", "Explica'm", "Què diu?"
+- Forma interrogativa: "Quin és...?", "Com funciona...?", "De què va...?"
+- "Resumeix" (vol resum INFORMATIU, no modificar)
+
+**→ output_target: "document" (vol ACCIÓ al document):**
+- Imperatius directes: "Corregeix", "Escurça", "Tradueix", "Millora"
+- Verbs de transformació: "Canvia", "Modifica", "Redueix a la meitat"
+- "Revisa l'ortografia" (vol que es MARQUIN els errors)
+
+**→ output_target: "auto" (EVITAR - usar només si impossibilitat real):**
+- Quasi mai necessari - sempre intenta decidir 'chat' o 'document'
+- Si tens el document i la instrucció, POTS decidir
+
+### EXEMPLES CRÍTICS output_target:
+| Instrucció | output_target | mode | Per què |
+|------------|---------------|------|---------|
+| "Pots resumir el text?" | chat | CHAT_ONLY | Pregunta cortesa, vol RESPOSTA |
+| "Resumeix el document" | chat | CHAT_ONLY | Vol resum INFORMATIU |
+| "Escurça el text a la meitat" | document | UPDATE_BY_ID | Vol MODIFICAR |
+| "Fes-me un resum" | chat | CHAT_ONLY | "Fes-me" = donar-li algo |
+| "Corregeix les faltes" | document | UPDATE_BY_ID | Imperatiu de modificació |
+| "Revisa l'ortografia" | document | REFERENCE_HIGHLIGHT | Vol RESSALTAR errors |
+| "Hi ha errors?" | chat | CHAT_ONLY | Pregunta, vol resposta |
+| "De què parla el document?" | chat | CHAT_ONLY | Pregunta informativa |
+| "Qui signa l'informe?" | document | REFERENCE_HIGHLIGHT | Vol LOCALITZAR |
+| "Hola, com estàs?" | chat | CHAT_ONLY | Conversa social |
+
+## COHERÈNCIA output_target ↔ mode
+- output_target: "chat" → mode HA DE SER "CHAT_ONLY"
+- output_target: "document" → mode pot ser REFERENCE_HIGHLIGHT, UPDATE_BY_ID, REWRITE
+- output_target: "auto" → usar el mode classificat (rarament necessari)
 
 ## MATRIU DE DECISIÓ (ORDRE DE PRIORITAT ESTRICTE)
 
@@ -90,28 +113,19 @@ response_style:
 
 ## REGLES ESPECIALS
 
-### "Pots/Podries + verb" = ACCIÓ (no pregunta)
-- "Pots corregir?" → UPDATE_BY_ID (fix)
-- "Podries millorar?" → UPDATE_BY_ID (improve)
+### "Pots/Podries + verb" → DEPÈN DEL CONTEXT (v15.0)
+La forma "Pots...?" és cortesa però l'output_target depèn del verb:
+- "Pots resumir?" → output_target: chat (vol RESPOSTA informativa)
+- "Pots corregir les faltes?" → output_target: document (vol ACCIÓ)
+- "Pots explicar què diu?" → output_target: chat (vol RESPOSTA)
 
 ### Diferència REVISA vs CORREGEIX
 - "Revisa X" → REFERENCE_HIGHLIGHT (només marca, no modifica)
 - "Corregeix X" → UPDATE_BY_ID (modifica el document)
 
-### ⚠️ REGLA CRÍTICA: "Resumeix/Explica/De què va" segons MODE i SELECCIÓ
-
-Consulta el camp "MODE DE L'USUARI" del prompt:
-
-| Mode | Selecció | "Resumeix/Explica" | Acció |
-|------|----------|-------------------|-------|
-| CHAT | Qualsevol | Sempre resposta | CHAT_ONLY |
-| EDIT | PARCIAL | Escurçar el text seleccionat | UPDATE_BY_ID (simplify) |
-| EDIT | TOT/CAP | Resposta + oferir aplicar | CHAT_ONLY + suggested_followup |
-
-Exemples segons context:
-- Mode CHAT + "resumeix" → CHAT_ONLY (l'usuari NO vol modificar)
-- Mode EDIT + selecció parcial + "resumeix" → UPDATE_BY_ID (simplify)
-- Mode EDIT + tot document + "resumeix" → CHAT_ONLY amb suggested_followup: "Vols que escurci el document?"
+### Diferència RESUMEIX vs ESCURÇA
+- "Resumeix" / "Fes un resum" → output_target: chat (vol resposta informativa)
+- "Escurça" / "Condensa" / "Redueix" → output_target: document (vol modificar)
 
 ### Extracció de keywords
 - Entre cometes → terme EXACTE: "busca 'la'" → ["la"]
@@ -120,6 +134,7 @@ Exemples segons context:
 ## OUTPUT JSON
 {
   "thought": "<raonament breu 1 frase>",
+  "output_target": "chat|document|auto",
   "mode": "CHAT_ONLY|REFERENCE_HIGHLIGHT|UPDATE_BY_ID|REWRITE",
   "confidence": 0.0-1.0,
   "response_style": "concise|bullet_points|detailed|null",
@@ -131,59 +146,54 @@ Exemples segons context:
   "requires_confirmation": false,
   "risk_level": "none|low|medium|high",
   "is_question": true|false,
-  "suggested_followup": "<text del botó si cal oferir acció posterior, ex: 'Vols que escurci el document?'> | null"
+  "suggested_followup": "<text del botó> | null"
 }
 
-## EXEMPLES
+## REGLA DE COHERÈNCIA AUTOMÀTICA
+Si output_target="chat" però has posat mode≠CHAT_ONLY → CANVIA mode a CHAT_ONLY
+(El router valida i corregeix automàticament)
 
-### Pregunta general sobre el document → CHAT_ONLY (resposta al xat)
-Instrucció: "De què va el document?"
-{"thought":"Pregunta general sobre el contingut, requereix resposta textual sense ressaltar","mode":"CHAT_ONLY","confidence":0.95,"response_style":"concise","is_question":true,"risk_level":"none"}
+## EXEMPLES (tots amb output_target)
 
-### Pregunta general sobre el contingut → CHAT_ONLY
-Instrucció: "Què diu aquest text?"
-{"thought":"Demana explicació del contingut, resposta al xat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"concise","is_question":true,"risk_level":"none"}
+### Pregunta cortesa "Pots resumir?" → CHAT (vol resposta)
+Instrucció: "Pots resumir el text?"
+{"thought":"Pregunta cortesa, vol resposta informativa al xat","output_target":"chat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":true,"risk_level":"none"}
 
-### Pregunta específica que requereix LOCALITZAR text → REFERENCE_HIGHLIGHT
-Instrucció: "Qui signa l'informe?"
-{"thought":"Pregunta específica que requereix trobar i ressaltar ON apareix la informació","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"mentions","is_question":true,"risk_level":"none"}
-
-### On apareix X → REFERENCE_HIGHLIGHT (localitzar)
-Instrucció: "On parla de pressupost?"
-{"thought":"Demana localitzar on apareix un tema, cal ressaltar","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"mentions","keywords":["pressupost"],"is_question":true,"risk_level":"none"}
-
-### Resumeix (Mode CHAT o tot document) → CHAT_ONLY
-Context: Mode CHAT o selecció = TOT/CAP
+### "Resumeix el document" → CHAT (vol resum informatiu)
 Instrucció: "Resumeix el document"
-{"thought":"Mode CHAT o sense selecció parcial: resposta al xat sense modificar","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":true,"risk_level":"none","suggested_followup":"Vols que escurci el document?"}
+{"thought":"Vol resum informatiu al xat, no modificar","output_target":"chat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":false,"risk_level":"none","suggested_followup":"Vols que escurci el document?"}
 
-### Resumeix (Mode EDIT + selecció parcial) → UPDATE_BY_ID (simplify)
-Context: Mode EDIT + selecció = PARCIAL
-Instrucció: "Resumeix això"
-{"thought":"Mode EDIT amb selecció parcial: l'usuari vol escurçar el text seleccionat","mode":"UPDATE_BY_ID","confidence":0.95,"modification_type":"simplify","scope":"selection","is_question":false,"risk_level":"medium"}
+### "Fes-me un resum" → CHAT ("fes-me" = donar-li algo)
+Instrucció: "Fes-me un resum dels punts principals"
+{"thought":"'Fes-me' indica que vol rebre algo, no modificar","output_target":"chat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":false,"risk_level":"none"}
 
-### Fes un resum → CHAT_ONLY (quan no hi ha selecció clara)
-Instrucció: "Fes un resum del text"
-{"thought":"Demana resum, resposta al xat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"bullet_points","is_question":true,"risk_level":"none","suggested_followup":"Vols que escurci el document?"}
+### "Escurça el text" → DOCUMENT (vol modificar)
+Instrucció: "Escurça el text a la meitat"
+{"thought":"Imperatiu de transformació, vol modificar el document","output_target":"document","mode":"UPDATE_BY_ID","confidence":0.95,"modification_type":"simplify","scope":"document","is_question":false,"risk_level":"medium"}
 
-### Explica el contingut → CHAT_ONLY
-Instrucció: "Explica el contingut d'aquest text"
-{"thought":"Demana explicació del contingut, resposta textual al xat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"detailed","is_question":true,"risk_level":"none"}
-
-### Explica destacant idees → CHAT_ONLY (NO ressaltar)
-Instrucció: "Explica el contingut d'aquest text de forma clara, destacant les idees principals"
-{"thought":"'Destacant' aquí significa 'emfatitzant' en l'explicació, NO ressaltar al document. Resposta al xat.","mode":"CHAT_ONLY","confidence":0.95,"response_style":"detailed","is_question":true,"risk_level":"none"}
-
-### Pregunta general (NO relacionada amb el document) → CHAT_ONLY
-Instrucció: "Què és un blockchain?"
-{"thought":"Pregunta general de coneixement, no relacionada amb el document","mode":"CHAT_ONLY","confidence":0.95,"response_style":"concise","is_question":true,"risk_level":"none"}
-
-### Revisa vs Corregeix
-Instrucció: "Revisa l'ortografia"
-{"thought":"Revisa = marcar errors, no modificar","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"errors","is_question":false,"risk_level":"low"}
-
+### "Corregeix les faltes" → DOCUMENT (vol modificar)
 Instrucció: "Corregeix les faltes"
-{"thought":"Corregeix = modificar document","mode":"UPDATE_BY_ID","confidence":0.95,"modification_type":"fix","scope":"document","is_question":false,"risk_level":"medium"}`;
+{"thought":"Imperatiu directe de correcció","output_target":"document","mode":"UPDATE_BY_ID","confidence":0.95,"modification_type":"fix","scope":"document","is_question":false,"risk_level":"medium"}
+
+### "Revisa l'ortografia" → DOCUMENT (vol ressaltar)
+Instrucció: "Revisa l'ortografia"
+{"thought":"Revisa = marcar errors, no modificar","output_target":"document","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"errors","is_question":false,"risk_level":"low"}
+
+### "Hi ha errors?" → CHAT (pregunta, vol resposta)
+Instrucció: "Hi ha errors al text?"
+{"thought":"Pregunta sobre el text, vol resposta informativa","output_target":"chat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"concise","is_question":true,"risk_level":"none"}
+
+### "Qui signa?" → DOCUMENT (vol localitzar)
+Instrucció: "Qui signa l'informe?"
+{"thought":"Vol localitzar ON apareix la informació","output_target":"document","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"mentions","is_question":true,"risk_level":"none"}
+
+### "Explica el contingut" → CHAT (vol explicació)
+Instrucció: "Explica el contingut d'aquest text"
+{"thought":"Demana explicació, resposta al xat","output_target":"chat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"detailed","is_question":false,"risk_level":"none"}
+
+### Pregunta general → CHAT
+Instrucció: "Què és un blockchain?"
+{"thought":"Pregunta general de coneixement","output_target":"chat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"concise","is_question":true,"risk_level":"none"}`;
 
 // ═══════════════════════════════════════════════════════════════
 // API CALL FUNCTIONS
@@ -406,6 +416,8 @@ function normalizeIntent(intent) {
     risk_level: intent.risk_level || defaults.risk_level,
     is_question: intent.is_question || false,
     resolved_references: Array.isArray(intent.resolved_references) ? intent.resolved_references : [],
+    // v15.0: On vol l'usuari el resultat (Intel·ligent Output Routing)
+    output_target: intent.output_target || 'auto',
   };
 }
 
@@ -429,6 +441,15 @@ function repairIntent(partial) {
   // Si no hi ha confidence, usar 0.5 (baixa per seguretat)
   if (typeof partial.confidence !== 'number') {
     partial.confidence = 0.5;
+  }
+
+  // v15.0: Coherència output_target ↔ mode
+  // Si output_target='chat' però mode≠CHAT_ONLY, forçar coherència
+  if (partial.output_target === 'chat' && partial.mode !== Mode.CHAT_ONLY) {
+    logDebug('repairIntent: Forcing CHAT_ONLY due to output_target=chat', {
+      original_mode: partial.mode,
+    });
+    partial.mode = Mode.CHAT_ONLY;
   }
 
   // Completar amb defaults

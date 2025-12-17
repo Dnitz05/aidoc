@@ -695,6 +695,11 @@
         word-break: break-word;
       }
 
+      /* v14.5: Badge selecció alineat a la dreta */
+      .msg.user .selection-badge {
+        margin-left: auto;
+      }
+
       /* v6.7: Save prompt button */
       .msg.user {
         position: relative;
@@ -1120,7 +1125,6 @@
 
       .correction-find {
         color: var(--error, #d93025);
-        text-decoration: line-through;
         font-weight: 500;
       }
 
@@ -1398,16 +1402,13 @@
         background: rgba(255, 255, 255, 0.05);
       }
 
-      /* v14.5: Botons més petits i arrodonits */
+      /* v14.5: Botons només icones - compactes */
       .btn-accept, .btn-reject, .btn-view {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 2px;
-        padding: 2px 6px;
-        border-radius: 10px;
-        font-size: 9px;
-        font-weight: 500;
+        padding: 4px;
+        border-radius: 6px;
         cursor: pointer;
         border: none;
         transition: all 0.15s ease;
@@ -1471,16 +1472,13 @@
         gap: 6px;
       }
 
-      /* v14.5: Botons bulk - mateixa mida i estil que individuals */
+      /* v14.5: Botons bulk només icones - compactes */
       .btn-accept-all, .btn-discard-all, .btn-view-all {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 2px;
-        padding: 2px 6px;
-        border-radius: 10px;
-        font-size: 9px;
-        font-weight: 500;
+        padding: 4px;
+        border-radius: 6px;
         cursor: pointer;
         border: none;
         transition: all 0.15s ease;
