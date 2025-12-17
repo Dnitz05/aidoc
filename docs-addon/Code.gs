@@ -3290,15 +3290,39 @@ function captureFormatAttributes(textObj, startIndex, endIndex) {
 
   for (let i = startIndex; i <= endIndex; i++) {
     try {
+      let fontSize = safeGetAttribute(textObj, 'getFontSize', i);
+      let fontFamily = safeGetAttribute(textObj, 'getFontFamily', i);
+      let foregroundColor = safeGetAttribute(textObj, 'getForegroundColor', i);
+
+      // v15.1: FALLBACK per fonts/mida per defecte que retornen null
+      if (!fontSize || !fontFamily) {
+        try {
+          const charAttrs = textObj.getAttributes(i);
+          if (charAttrs) {
+            if (!fontSize && charAttrs[DocumentApp.Attribute.FONT_SIZE]) {
+              fontSize = charAttrs[DocumentApp.Attribute.FONT_SIZE];
+            }
+            if (!fontFamily && charAttrs[DocumentApp.Attribute.FONT_FAMILY]) {
+              fontFamily = charAttrs[DocumentApp.Attribute.FONT_FAMILY];
+            }
+            if (!foregroundColor && charAttrs[DocumentApp.Attribute.FOREGROUND_COLOR]) {
+              foregroundColor = charAttrs[DocumentApp.Attribute.FOREGROUND_COLOR];
+            }
+          }
+        } catch (attrErr) {
+          // Ignorar - usar els valors que tenim
+        }
+      }
+
       attrs.push({
         position: i - startIndex, // Posició relativa
         bold: safeGetAttribute(textObj, 'isBold', i),
         italic: safeGetAttribute(textObj, 'isItalic', i),
         underline: safeGetAttribute(textObj, 'isUnderline', i),
         strikethrough: safeGetAttribute(textObj, 'isStrikethrough', i),
-        fontSize: safeGetAttribute(textObj, 'getFontSize', i),
-        fontFamily: safeGetAttribute(textObj, 'getFontFamily', i),
-        foregroundColor: safeGetAttribute(textObj, 'getForegroundColor', i),
+        fontSize: fontSize,
+        fontFamily: fontFamily,
+        foregroundColor: foregroundColor,
         backgroundColor: safeGetAttribute(textObj, 'getBackgroundColor', i),
         linkUrl: safeGetAttribute(textObj, 'getLinkUrl', i)
       });
@@ -3517,11 +3541,47 @@ function rewritePreservingFormat(element, newText) {
     const oldText = textObj.getText();
 
     // 1. Capturar format complet del paràgraf existent
-    let dominantFormat = { bold: false, italic: false };
+    // v15.1: Default amb fontSize/fontFamily per evitar pèrdua de format
+    let dominantFormat = {
+      bold: false,
+      italic: false,
+      fontSize: null,
+      fontFamily: null,
+      foregroundColor: null
+    };
+
     if (oldText.length > 0) {
       const fullFormat = captureFormatAttributes(textObj, 0, oldText.length - 1);
       dominantFormat = getDominantFormat(fullFormat);
+
+      // v15.1: FALLBACK CRÍTIC - Si fontSize/fontFamily són null (default de Google),
+      // intentar capturar directament del primer caràcter amb mètode alternatiu
+      if (!dominantFormat.fontSize || !dominantFormat.fontFamily) {
+        try {
+          // Usar getAttributes() que retorna TOTS els atributs incloent defaults
+          const firstCharAttrs = textObj.getAttributes(0);
+          if (firstCharAttrs) {
+            if (!dominantFormat.fontSize && firstCharAttrs[DocumentApp.Attribute.FONT_SIZE]) {
+              dominantFormat.fontSize = firstCharAttrs[DocumentApp.Attribute.FONT_SIZE];
+            }
+            if (!dominantFormat.fontFamily && firstCharAttrs[DocumentApp.Attribute.FONT_FAMILY]) {
+              dominantFormat.fontFamily = firstCharAttrs[DocumentApp.Attribute.FONT_FAMILY];
+            }
+            if (!dominantFormat.foregroundColor && firstCharAttrs[DocumentApp.Attribute.FOREGROUND_COLOR]) {
+              dominantFormat.foregroundColor = firstCharAttrs[DocumentApp.Attribute.FOREGROUND_COLOR];
+            }
+          }
+        } catch (attrErr) {
+          console.log('[FormatPreserver] getAttributes fallback error:', attrErr.message);
+        }
+      }
     }
+
+    console.log('[FormatPreserver] dominantFormat after fallback:', JSON.stringify({
+      fontSize: dominantFormat.fontSize,
+      fontFamily: dominantFormat.fontFamily,
+      bold: dominantFormat.bold
+    }));
 
     // 2. Capturar atributs de paràgraf
     const paragraphAttrs = captureParagraphAttributes(element);
