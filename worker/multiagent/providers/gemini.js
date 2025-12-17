@@ -6,7 +6,7 @@ import { BaseProvider } from './base.js';
 
 export class GeminiProvider extends BaseProvider {
   static PROVIDER_ID = 'gemini';
-  static DEFAULT_MODEL = 'gemini-2.0-flash-001';
+  static DEFAULT_MODEL = 'gemini-3-flash-preview';
   static BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
   /**

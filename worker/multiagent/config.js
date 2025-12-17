@@ -145,14 +145,14 @@ const CACHE = {
 const API = {
   gemini: {
     // Model pel classifier (amb thinking per entendre bé l'intent)
-    classifier_model: 'gemini-2.5-flash',
+    classifier_model: 'gemini-3-flash-preview',
     // Models per executors (separats per qualitat vs velocitat)
-    model_highlight: 'gemini-2.5-flash-lite',    // Ràpid: només busca/marca
-    model_update: 'gemini-2.5-flash',            // Thinking: qualitat en modificar
-    model_rewrite: 'gemini-2.5-flash',           // Thinking: qualitat en reescriure
-    model_chat: 'gemini-2.5-flash',              // Thinking: qualitat en respostes
+    model_highlight: 'gemini-3-flash-preview',    // Ràpid: només busca/marca
+    model_update: 'gemini-3-flash-preview',       // Thinking: qualitat en modificar
+    model_rewrite: 'gemini-3-flash-preview',      // Thinking: qualitat en reescriure
+    model_chat: 'gemini-3-flash-preview',         // Thinking: qualitat en respostes
     // Legacy (per compatibilitat)
-    executor_model: 'gemini-2.5-flash-lite',
+    executor_model: 'gemini-3-flash-preview',
     // Model per embeddings (cache semàntic)
     embedding_model: 'text-embedding-004',
     // Base URL

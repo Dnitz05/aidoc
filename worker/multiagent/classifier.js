@@ -61,7 +61,7 @@ ABANS de decidir el mode, pregunta't: "ON vol l'usuari el resultat?"
 | "Fes-me un resum" | chat | CHAT_ONLY | "Fes-me" = donar-li algo |
 | "Corregeix les faltes" | document | UPDATE_BY_ID | Imperatiu de modificació |
 | "Revisa l'ortografia" | document | REFERENCE_HIGHLIGHT | Vol RESSALTAR errors |
-| "Hi ha errors?" | chat | CHAT_ONLY | Pregunta, vol resposta |
+| "Hi ha errors/faltes?" | document | REFERENCE_HIGHLIGHT | Vol VEURE errors al document |
 | "De què parla el document?" | chat | CHAT_ONLY | Pregunta informativa |
 | "Qui signa l'informe?" | document | REFERENCE_HIGHLIGHT | Vol LOCALITZAR |
 | "Hola, com estàs?" | chat | CHAT_ONLY | Conversa social |
@@ -194,9 +194,9 @@ Instrucció: "Corregeix les faltes"
 Instrucció: "Revisa l'ortografia"
 {"thought":"Revisa = marcar errors, no modificar","output_target":"document","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"errors","is_question":false,"risk_level":"low"}
 
-### "Hi ha errors?" → CHAT (pregunta, vol resposta)
-Instrucció: "Hi ha errors al text?"
-{"thought":"Pregunta sobre el text, vol resposta informativa","output_target":"chat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"concise","is_question":true,"risk_level":"none"}
+### "Hi ha errors/faltes?" → DOCUMENT (vol VEURE els errors)
+Instrucció: "Hi ha faltes?"
+{"thought":"Vol veure si hi ha errors, cal revisar i ressaltar-los","output_target":"document","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"errors","is_question":true,"risk_level":"low"}
 
 ### "Qui signa?" → DOCUMENT (vol localitzar)
 Instrucció: "Qui signa l'informe?"

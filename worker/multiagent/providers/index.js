@@ -40,10 +40,10 @@ const PROVIDER_INFO = {
     name: 'Google Gemini',
     defaultModel: GeminiProvider.DEFAULT_MODEL,
     models: {
+      'gemini-3-flash-preview': 'Gemini 3 Flash (Recomanat)',
       'gemini-3-pro': 'Gemini 3 Pro (Més potent)',
-      'gemini-2.0-flash': 'Gemini 2.0 Flash (Recomanat)',
-      'gemini-2.0-flash-thinking-exp': 'Gemini 2.0 Flash Thinking',
-      'gemini-1.5-pro-latest': 'Gemini 1.5 Pro',
+      'gemini-2.5-flash': 'Gemini 2.5 Flash',
+      'gemini-2.0-flash': 'Gemini 2.0 Flash',
     },
     keyPrefix: null,
   },
