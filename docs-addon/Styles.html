@@ -315,8 +315,8 @@
 
       /* Message Bubbles */
       .msg {
-        max-width: 92%;
-        padding: var(--space-md) var(--space-lg);
+        max-width: 96%;
+        padding: var(--space-sm) var(--space-md);
         border-radius: var(--radius-lg);
         font-size: 12px;
         line-height: 1.5;
@@ -444,11 +444,16 @@
         color: var(--accent);
       }
       /* v9.4: Animació respiració mentre es processa */
-      .inline-eye-btn.breathing {
+      .inline-eye-btn.breathing,
+      .bubble-eye-btn.breathing,
+      .btn-view.breathing {
         animation: eyeBreathe 0.8s ease-in-out infinite;
       }
-      .inline-eye-btn.breathing .i {
+      .inline-eye-btn.breathing .i,
+      .bubble-eye-btn.breathing svg,
+      .btn-view.breathing .i {
         color: var(--accent);
+        stroke: var(--accent);
       }
       @keyframes eyeBreathe {
         0%, 100% { opacity: 0.5; transform: scale(0.95); }
@@ -1448,6 +1453,59 @@
         background: rgba(239, 68, 68, 0.1);
         color: #ef4444;
         border-color: rgba(239, 68, 68, 0.3);
+      }
+
+      /* v14.6: Botó expandir */
+      .btn-expand {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+        border-radius: 6px;
+        cursor: pointer;
+        border: none;
+        background: var(--bg-tertiary);
+        color: var(--text-muted);
+        transition: all 0.15s ease;
+      }
+
+      .btn-expand:hover {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+      }
+
+      /* v14.6: Vista col·lapsada per canvis grans */
+      .annotation-item.large-change .annotation-diff.collapsed {
+        display: none;
+      }
+
+      .annotation-item.large-change.expanded .annotation-diff.collapsed {
+        display: block;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px dashed var(--border);
+      }
+
+      /* v14.6: Estadístiques del canvi */
+      .annotation-stats {
+        display: flex;
+        gap: 8px;
+        font-size: 10px;
+        margin: 4px 0;
+      }
+
+      .stat-removed {
+        color: #ef4444;
+        font-weight: 500;
+      }
+
+      .stat-added {
+        color: #22c55e;
+        font-weight: 500;
+      }
+
+      .stat-chars {
+        color: var(--text-muted);
       }
 
       /* Barra d'accions bulk - simplificada */

@@ -3178,7 +3178,7 @@
             '</button>';
         } else if (isEdit) {
           // És una edició - mostrar per navegar a l'última edició
-          return '<button class="bubble-eye-btn" onclick="scrollToLastEdit()" title="Veure al document">' +
+          return '<button class="bubble-eye-btn" onclick="scrollToLastEdit(this)" title="Veure al document">' +
             '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
             '</button>';
         }
@@ -3720,11 +3720,17 @@
        * v14.4: Tornar a aplicar highlight per una anotació específica
        * v14.5: Ressalta només el text específic del canvi, no tot el paràgraf
        * v14.5.1: Si acceptat mostra el canvi fet, si pendent/rebutjat mostra l'original
+       * v15.1: Animació breathing mentre es processa
        * @param {string} annotationId - ID de l'anotació
+       * @param {HTMLElement} btn - Botó que ha disparat l'acció (opcional)
        */
-      function showAnnotationHighlight(annotationId) {
+      function showAnnotationHighlight(annotationId, btn) {
+        // v15.1: Activar animació de respiració
+        if (btn) btn.classList.add('breathing');
+        function stopBreathing() { if (btn) btn.classList.remove('breathing'); }
+
         const ann = pendingAnnotations.find(a => a.id === annotationId);
-        if (!ann) return;
+        if (!ann) { stopBreathing(); return; }
 
         // v14.5.1: Determinar el text segons l'estat de l'anotació
         let textToHighlight = '';
@@ -3759,6 +3765,7 @@
         // Aplicar highlight al document
         google.script.run
           .withSuccessHandler(function(result) {
+            stopBreathing();
             if (result && result.applied > 0) {
               annotationHighlightsActive = true;
               // Treure classe de totes les anotacions
@@ -3768,6 +3775,7 @@
             }
           })
           .withFailureHandler(function(err) {
+            stopBreathing();
             showToast('Error ressaltant', 'error');
           })
           .applyReferenceHighlights([{
@@ -3915,9 +3923,12 @@
         if (annotations && annotations.length > 0) {
           html += '<div class="annotation-list">';
 
+          const totalChanges = annotations.filter(a => a.type === 'change').length;
+          let changeIndex = 0;
           for (const ann of annotations) {
             if (ann.type === 'change') {
-              html += renderChangeAnnotation(ann);
+              changeIndex++;
+              html += renderChangeAnnotation(ann, changeIndex, totalChanges);
             } else {
               // Highlight (informatiu)
               html += renderHighlightAnnotation(ann);
@@ -3948,19 +3959,70 @@
       }
 
       /**
+       * v14.6: Calcula estadístiques d'un canvi
+       * @returns {Object} { charDiff, wordsAdded, wordsRemoved, isLarge }
+       */
+      function computeChangeStats(original, proposed) {
+        const origText = original || '';
+        const propText = proposed || '';
+
+        const origWords = origText.split(/\s+/).filter(w => w.length > 0);
+        const propWords = propText.split(/\s+/).filter(w => w.length > 0);
+
+        const charDiff = Math.abs(propText.length - origText.length);
+        const totalCharChange = Math.abs(propText.length - origText.length) +
+          Math.min(origText.length, propText.length) * 0.5; // Estimació de canvis
+
+        // Comptar paraules afegides/eliminades (aproximat)
+        const wordsAdded = Math.max(0, propWords.length - origWords.length);
+        const wordsRemoved = Math.max(0, origWords.length - propWords.length);
+
+        // És gran si: >80 chars de diferència O >60 chars en total i canvi significatiu
+        const isLarge = charDiff > 80 || (origText.length + propText.length > 120 && charDiff > 30);
+
+        return { charDiff, wordsAdded, wordsRemoved, isLarge, origLen: origText.length, propLen: propText.length };
+      }
+
+      /**
+       * v14.6: Toggle expandir/col·lapsar una anotació
+       */
+      function toggleAnnotationExpand(annId) {
+        const item = document.querySelector('.annotation-item[data-id="' + annId + '"]');
+        if (!item) return;
+
+        const isExpanded = item.classList.contains('expanded');
+        item.classList.toggle('expanded', !isExpanded);
+
+        // Actualitzar icona del botó
+        const btn = item.querySelector('.btn-expand');
+        if (btn) {
+          btn.innerHTML = isExpanded ? icon('chevronDown', 'i--sm') : icon('chevronUp', 'i--sm');
+          btn.title = isExpanded ? 'Expandir' : 'Col·lapsar';
+        }
+      }
+
+      /**
        * Renderitza una anotació de canvi (amb botons Accept/Reject)
        * v14.1: Afegit suport per indicadors WARN
+       * v14.6: Vista col·lapsada per canvis grans
+       * v14.7: "Canvi proposat N:" en lloc de "Línia X" (només numerat si >1 canvi)
        */
-      function renderChangeAnnotation(ann) {
+      function renderChangeAnnotation(ann, changeNum, totalChanges) {
         const diffHtml = ann.diffHtml || computeDiffHtml(ann.originalText || '', ann.proposedText || '');
         const statusClass = 'data-status="' + (ann.status || 'pending') + '"';
+        const stats = computeChangeStats(ann.originalText, ann.proposedText);
 
         // v14.1: Afegir classe especial si és WARN
         const warnClass = ann._status === 'WARN' ? ' warn-change' : '';
+        // v14.6: Classe per canvis grans (col·lapsats per defecte)
+        const largeClass = stats.isLarge ? ' large-change' : '';
 
-        let html = '<div class="annotation-item change-item' + warnClass + '" data-id="' + ann.id + '" ' + statusClass + '>';
+        // v14.7: Només mostrar número si hi ha més d'un canvi
+        const locationLabel = (totalChanges > 1) ? 'Canvi proposat ' + changeNum + ':' : 'Canvi proposat:';
+
+        let html = '<div class="annotation-item change-item' + warnClass + largeClass + '" data-id="' + ann.id + '" ' + statusClass + '>';
         html += '<div class="annotation-header">';
-        html += '<span class="annotation-location">Línia ' + (parseInt(ann.para_id) + 1) + '</span>';
+        html += '<span class="annotation-location">' + locationLabel + '</span>';
 
         // v14.1: Mostrar badge WARN si aplica
         if (ann._status === 'WARN') {
@@ -3971,7 +4033,22 @@
 
         html += '<span class="annotation-reason">' + escapeHtmlSafe(ann.reason || 'Canvi proposat') + '</span>';
         html += '</div>';
-        html += '<div class="annotation-diff">' + diffHtml + '</div>';
+
+        // v14.6: Per canvis grans, mostrar vista col·lapsada
+        if (stats.isLarge) {
+          // Estadístiques compactes
+          html += '<div class="annotation-stats">';
+          if (stats.wordsRemoved > 0) html += '<span class="stat-removed">−' + stats.wordsRemoved + ' p</span>';
+          if (stats.wordsAdded > 0) html += '<span class="stat-added">+' + stats.wordsAdded + ' p</span>';
+          html += '<span class="stat-chars">±' + stats.charDiff + ' chars</span>';
+          html += '</div>';
+
+          // Diff amagat (es mostra quan s'expandeix)
+          html += '<div class="annotation-diff collapsed">' + diffHtml + '</div>';
+        } else {
+          // Canvi petit: mostrar diff directament
+          html += '<div class="annotation-diff">' + diffHtml + '</div>';
+        }
 
         // v14.1: Mostrar info d'edit distance si és WARN
         if (ann._status === 'WARN' && ann._edit_distance) {
@@ -3982,8 +4059,12 @@
 
         // Botons d'acció (es mostren segons status via CSS)
         html += '<div class="annotation-actions">';
+        // v14.6: Botó expandir per canvis grans
+        if (stats.isLarge) {
+          html += '<button class="btn-expand" onclick="toggleAnnotationExpand(\'' + ann.id + '\')" title="Expandir">' + icon('chevronDown', 'i--sm') + '</button>';
+        }
         // v14.5: Botons només icones
-        html += '<button class="btn-view" onclick="showAnnotationHighlight(\'' + ann.id + '\')" title="Veure al document">' + icon('eye', 'i--sm') + '</button>';
+        html += '<button class="btn-view" onclick="showAnnotationHighlight(\'' + ann.id + '\', this)" title="Veure al document">' + icon('eye', 'i--sm') + '</button>';
         html += '<button class="btn-accept" onclick="acceptSingleAnnotation(\'' + ann.id + '\')" title="Acceptar">' + icon('check', 'i--sm') + '</button>';
         html += '<button class="btn-reject" onclick="rejectSingleAnnotation(\'' + ann.id + '\')" title="Rebutjar">' + icon('x', 'i--sm') + '</button>';
         html += '</div>';
@@ -7451,11 +7532,13 @@
       /**
        * Render diff array to HTML
        * v14.4: Afegit suport per tipus 'ellipsis'
+       * v14.7: Espai entre del i ins per millorar llegibilitat
        */
       function renderDiff(diff) {
         let html = '';
         let currentType = null;
         let buffer = '';
+        let lastFlushedType = null;
 
         for (const item of diff) {
           // v14.4: Gestionar ellipsis separadament (no s'agrupa)
@@ -7463,10 +7546,12 @@
             // Flush buffer primer
             if (buffer) {
               html += renderDiffBuffer(currentType, buffer);
+              lastFlushedType = currentType;
               buffer = '';
               currentType = null;
             }
             html += '<span class="diff-ellipsis">' + escapeHtml(item.text) + '</span>';
+            lastFlushedType = 'ellipsis';
             continue;
           }
 
@@ -7474,7 +7559,12 @@
             // Flush buffer
             if (buffer) {
               html += renderDiffBuffer(currentType, buffer);
+              lastFlushedType = currentType;
               buffer = '';
+            }
+            // v14.7: Afegir espai entre del→ins per separar original de proposta
+            if (lastFlushedType === 'del' && item.type === 'ins') {
+              html += ' ';
             }
             currentType = item.type;
           }
