@@ -1188,25 +1188,65 @@
         opacity: 0.6;
       }
 
-      .annotation-item.change-item[data-status="accepted"] .annotation-actions {
+      /* v15.4: Quan accepted, amagar botó acceptar però mantenir botó ull */
+      .annotation-item.change-item[data-status="accepted"] .annotation-actions .btn-accept {
+        display: none;
+      }
+      .annotation-item.change-item[data-status="accepted"] .annotation-actions .btn-expand {
         display: none;
       }
 
+      /* v15.4: Footer amb status i accions en línia */
+      /* v16.5: Footer eliminat - ara tot al header */
+
+      /* v16.5: Status colors segons estat */
       .annotation-item.change-item[data-status="accepted"] .annotation-status {
-        display: inline-flex;
-        align-items: center;
-        gap: 3px;
         color: #81C784;
-        font-size: 10px;
-        margin-top: 4px;
       }
 
-      /* v14.4: Capçalera anotació - compacta com reference-item */
+      .annotation-item.change-item[data-status="undone"] .annotation-status {
+        color: #fbbf24;
+      }
+
+      /* Quan pending, status buit no ocupa espai */
+      .annotation-item.change-item[data-status="pending"] .annotation-status {
+        display: none;
+      }
+
+      /* v16.1: Estil per canvi desfet */
+      .annotation-item.change-item[data-status="undone"] {
+        border-left-color: #fbbf24;
+        padding-left: 8px;
+        opacity: 0.6;
+      }
+
+      .annotation-item.change-item[data-status="undone"] .annotation-actions .btn-accept,
+      .annotation-item.change-item[data-status="undone"] .annotation-actions .btn-expand {
+        display: none;
+      }
+
+      /* v16.5: Capçalera anotació - botons a la dreta */
       .annotation-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        margin-bottom: 3px;
+      }
+
+      .annotation-header-left {
         display: flex;
         align-items: baseline;
         gap: 6px;
-        margin-bottom: 3px;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .annotation-header-right {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
       }
 
       .annotation-location {
@@ -1234,14 +1274,23 @@
         padding: 4px 0;
       }
 
-      /* v14.4: Accions individuals - estil com reference-item */
+      /* v16.5: Accions individuals - ara a la capçalera */
       .annotation-actions {
         display: inline-flex;
-        gap: 6px;
-        margin-top: 4px;
+        gap: 4px;
       }
 
+      /* v16.5: Status ara al header */
       .annotation-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 10px;
+        color: var(--success, #22c55e);
+        font-weight: 500;
+      }
+
+      .annotation-status:empty {
         display: none;
       }
 
@@ -1315,6 +1364,30 @@
       .btn-accept:hover {
         background: rgba(34, 197, 94, 0.2);
         border-color: #22c55e;
+      }
+
+      /* v16.1: Botó desfer */
+      .btn-undo {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        background: rgba(251, 191, 36, 0.1);
+        color: #fbbf24;
+        border: 1px solid rgba(251, 191, 36, 0.3);
+      }
+
+      .btn-undo:hover {
+        background: rgba(251, 191, 36, 0.2);
+        border-color: #fbbf24;
+      }
+
+      .btn-undo:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
 
       /* v14.6: Botó expandir */

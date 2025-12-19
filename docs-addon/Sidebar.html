@@ -2187,10 +2187,12 @@
               id: c.id || ('change-' + i),
               type: 'change',
               para_id: parseInt(c.targetId !== undefined ? c.targetId : c.paragraph_id),
-              originalText: c.originalText,
-              proposedText: c.proposedText,
+              // v16.3: Arreglat mapeig de camps - backend envia snake_case
+              originalText: c.originalText || c.original_text || c.original || null,
+              proposedText: c.proposedText || c.new_text || c.replacement || null,
               // v12.1: Camps per mode FIX (find/replace natiu)
-              find: c.find || c.original || null,
+              // v16.4: NO usar c.original com a fallback perquè és el paràgraf complet, no el fragment!
+              find: c.find || null,
               replace: c.replace || c.replacement || null,
               context: c.context || null,
               reason: c.reason || c.explanation || 'Canvi proposat',
@@ -3725,9 +3727,38 @@
         let textToHighlight = '';
         const isAccepted = ann.status === 'accepted';
 
-        if (ann.find && ann.replacement) {
+        // v15.4: Detectar si és una eliminació (proposedText buit o molt més curt)
+        const isDeleted = isAccepted && (
+          !ann.proposedText ||
+          ann.proposedText === '' ||
+          (ann.replace !== undefined && ann.replace === '') ||
+          (ann.originalText && ann.proposedText && ann.proposedText.length < ann.originalText.length * 0.3)
+        );
+
+        if (isDeleted) {
+          // v15.4: Text eliminat - ressaltar el paràgraf sencer
+          google.script.run
+            .withSuccessHandler(function(result) {
+              stopBreathing();
+              if (result && result.applied > 0) {
+                annotationHighlightsActive = true;
+                showToast('Paràgraf ressaltat (text eliminat)', 'info');
+              } else {
+                // v15.4: Si no es pot ressaltar, mostrar info alternativa
+                showToast('Text eliminat: "' + (ann.find || ann.originalText || '').substring(0, 30) + '"', 'info');
+              }
+            })
+            .withFailureHandler(function(err) {
+              stopBreathing();
+              showToast('Text eliminat: "' + (ann.find || ann.originalText || '').substring(0, 30) + '"', 'info');
+            })
+            .highlightParagraphById(ann.para_id);
+          return;
+        }
+
+        if (ann.find && ann.replace !== undefined) {
           // Mode FIX: si acceptat mostra el replacement, si no el find original
-          textToHighlight = isAccepted ? ann.replacement : ann.find;
+          textToHighlight = isAccepted ? ann.replace : ann.find;
         } else if (ann.originalText && ann.proposedText) {
           // v14.5.2: Trobar només les paraules que canvien
           const diff = findChangeFragment(
@@ -3761,6 +3792,9 @@
               document.querySelectorAll('.annotation-item.highlights-cleared').forEach(function(el) {
                 el.classList.remove('highlights-cleared');
               });
+            } else {
+              // v15.4: Si el text no es troba (potser s'ha modificat manualment)
+              showToast('No s\'ha trobat el text al document', 'warning');
             }
           })
           .withFailureHandler(function(err) {
@@ -4009,7 +4043,9 @@
         const locationLabel = (totalChanges > 1) ? 'Canvi proposat ' + changeNum + ':' : 'Canvi proposat:';
 
         let html = '<div class="annotation-item change-item' + warnClass + largeClass + '" data-id="' + ann.id + '" ' + statusClass + '>';
+        // v16.5: Header amb botons a la dreta
         html += '<div class="annotation-header">';
+        html += '<div class="annotation-header-left">';
         html += '<span class="annotation-location">' + locationLabel + '</span>';
 
         // v14.1: Mostrar badge WARN si aplica
@@ -4024,7 +4060,27 @@
         if (reason && reason !== 'Canvi proposat') {
           html += '<span class="annotation-reason">' + escapeHtmlSafe(reason) + '</span>';
         }
+        html += '</div>'; // annotation-header-left
+
+        // v16.5: Botons i status a la dreta de la capçalera
+        html += '<div class="annotation-header-right">';
+        // Status (es mostra quan està accepted)
+        html += '<span class="annotation-status">';
+        if (ann.status === 'accepted') {
+          html += icon('checkCircle', 'i--sm') + ' Aplicat';
+        }
+        html += '</span>';
+        // Botons d'acció
+        html += '<div class="annotation-actions">';
+        if (stats.isLarge) {
+          html += '<button class="btn-expand" onclick="toggleAnnotationExpand(\'' + ann.id + '\')" title="Expandir">' + icon('chevronDown', 'i--sm') + '</button>';
+        }
+        html += '<button class="btn-view" onclick="showAnnotationHighlight(\'' + ann.id + '\', this)" title="Veure al document">' + icon('eye', 'i--sm') + '</button>';
+        html += '<button class="btn-accept" onclick="acceptSingleAnnotation(\'' + ann.id + '\', this)" title="Acceptar">' + icon('check', 'i--sm') + '</button>';
         html += '</div>';
+        html += '</div>'; // annotation-header-right
+
+        html += '</div>'; // annotation-header
 
         // v14.6: Per canvis grans, mostrar vista col·lapsada
         if (stats.isLarge) {
@@ -4049,23 +4105,7 @@
           html += '</div>';
         }
 
-        // Botons d'acció (es mostren segons status via CSS)
-        html += '<div class="annotation-actions">';
-        // v14.6: Botó expandir per canvis grans
-        if (stats.isLarge) {
-          html += '<button class="btn-expand" onclick="toggleAnnotationExpand(\'' + ann.id + '\')" title="Expandir">' + icon('chevronDown', 'i--sm') + '</button>';
-        }
-        // v16.0: Només botons Veure i Acceptar (Descartar eliminat)
-        html += '<button class="btn-view" onclick="showAnnotationHighlight(\'' + ann.id + '\', this)" title="Veure al document">' + icon('eye', 'i--sm') + '</button>';
-        html += '<button class="btn-accept" onclick="acceptSingleAnnotation(\'' + ann.id + '\')" title="Acceptar">' + icon('check', 'i--sm') + '</button>';
-        html += '</div>';
-
-        // Status (es mostra quan està accepted)
-        html += '<div class="annotation-status">';
-        if (ann.status === 'accepted') {
-          html += icon('checkCircle', 'i--sm') + ' Aplicat';
-        }
-        html += '</div>';
+        // v16.5: Footer eliminat - botons ara a la capçalera
 
         html += '</div>';
         return html;
@@ -4098,9 +4138,22 @@
        * Acceptar un canvi individual
        * v12.1: Router híbrid - FIX usa replaceText natiu, altres usen FormatPreserver
        */
-      function acceptSingleAnnotation(annotationId) {
+      function acceptSingleAnnotation(annotationId, btn) {
         const ann = pendingAnnotations.find(a => a.id === annotationId);
         if (!ann || ann.status !== 'pending') return;
+
+        // v16.4: Activar animació breathing al botó ABANS de deshabilitar-lo
+        if (btn) {
+          btn.classList.add('breathing');
+          // NO deshabilitar el botó - només afegir classe per evitar doble-click
+          btn.style.pointerEvents = 'none';
+        }
+        function stopBreathing() {
+          if (btn) {
+            btn.classList.remove('breathing');
+            btn.style.pointerEvents = '';
+          }
+        }
 
         // v14.5: NO netejar tots els highlights - només el d'aquest canvi es netejarà
         // perquè el text original canviarà. Els altres highlights es mantenen.
@@ -4109,16 +4162,65 @@
         const el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
         if (el) {
           el.setAttribute('data-status', 'applying');
-          el.querySelector('.btn-accept').disabled = true;
-          el.querySelector('.btn-reject').disabled = true;
+          const btnReject = el.querySelector('.btn-reject');
+          if (btnReject) btnReject.disabled = true;
         }
 
         const successHandler = function(result) {
+          stopBreathing();  // v16.2: Aturar breathing
+          // v16.3: Debug logging per undo
+          console.log('[acceptSingleAnnotation] result:', JSON.stringify(result));
+          console.log('[acceptSingleAnnotation] modification_type:', annotationModificationType);
           if (result && result.ok) {
             ann.status = 'accepted';
+            // v16.1: Guardar snapshot local per undo immediat
+            if (result.undoSnapshots && result.undoSnapshots.length > 0) {
+              ann.undoSnapshot = result.undoSnapshots[0];
+              console.log('[acceptSingleAnnotation] Using undoSnapshots[0]');
+            } else if (result.undoSnapshot) {
+              ann.undoSnapshot = result.undoSnapshot;
+              console.log('[acceptSingleAnnotation] Using undoSnapshot');
+            } else {
+              console.warn('[acceptSingleAnnotation] NO undoSnapshot in result!');
+            }
+
+            // v16.1: Guardar a Supabase per historial persistent (async, no bloqueja)
+            const editData = {
+              target_id: ann.para_id,
+              before_text: ann.undoSnapshot ? ann.undoSnapshot.originalText : (ann.find || ann.originalText),
+              after_text: ann.replace !== undefined ? ann.replace : ann.proposedText,
+              instruction: ann.reason || 'Canvi acceptat',
+              reason: ann.reason || null
+            };
+            google.script.run
+              .withSuccessHandler(function(saveResult) {
+                if (saveResult && saveResult.ok && saveResult.event_id) {
+                  ann.event_id = saveResult.event_id;  // Guardar per undo persistent
+                }
+              })
+              .saveAppliedEdit(editData);
+
             updateAnnotationUI(annotationId, 'accepted');
-            showToast('Canvi aplicat', 'success');
+            // v15.4: Toast més informatiu
+            let toastMsg = 'Canvi aplicat';
+            if (ann.find || ann.originalText) {
+              const original = ann.find || ann.originalText.substring(0, 30);
+              const replacement = ann.replace !== undefined ? ann.replace : ann.proposedText;
+              if (replacement === '' || (ann.proposedText && ann.proposedText.length < ann.originalText.length * 0.5)) {
+                toastMsg = 'Eliminat: "' + original.substring(0, 20) + '"';
+              } else {
+                toastMsg = 'Canviat: "' + original.substring(0, 15) + '"';
+              }
+            }
+            showToast(toastMsg, 'success');
             updateBulkActionsBar();
+
+            // v16.4: Auto-clear highlight després de 3 segons
+            if (result.highlightApplied) {
+              setTimeout(function() {
+                google.script.run.clearHighlightByParaId(ann.para_id);
+              }, 3000);
+            }
           } else {
             ann.status = 'pending';
             updateAnnotationUI(annotationId, 'pending');
@@ -4127,6 +4229,7 @@
         };
 
         const failureHandler = function(err) {
+          stopBreathing();  // v16.2: Aturar breathing
           ann.status = 'pending';
           updateAnnotationUI(annotationId, 'pending');
           showToast('Error: ' + err.message, 'error');
@@ -4231,9 +4334,101 @@
         if (statusEl) {
           if (status === 'accepted') {
             statusEl.innerHTML = icon('checkCircle', 'i--sm') + ' Aplicat';
+          } else if (status === 'undone') {
+            statusEl.innerHTML = icon('undo', 'i--sm') + ' Desfet';
           } else {
             statusEl.innerHTML = '';
           }
+        }
+
+        // v16.1: Afegir/treure botó Desfer segons estat
+        const actionsEl = el.querySelector('.annotation-actions');
+        if (actionsEl) {
+          const ann = pendingAnnotations.find(a => a.id === annotationId);
+          const existingUndoBtn = actionsEl.querySelector('.btn-undo');
+
+          // Mostrar botó desfer si tenim undoSnapshot (local) o event_id (persistent)
+          const canUndo = ann && (ann.undoSnapshot || ann.event_id);
+          // v16.3: Debug logging
+          console.log('[updateAnnotationUI] id:', annotationId, 'status:', status, 'canUndo:', canUndo, 'hasSnapshot:', !!ann?.undoSnapshot, 'hasEventId:', !!ann?.event_id);
+
+          if (status === 'accepted' && canUndo) {
+            // Afegir botó Desfer si no existeix
+            if (!existingUndoBtn) {
+              const undoBtn = document.createElement('button');
+              undoBtn.className = 'btn-undo';
+              undoBtn.title = 'Desfer aquest canvi';
+              undoBtn.innerHTML = icon('undo', 'i--sm');
+              undoBtn.onclick = function() { undoSingleAnnotation(annotationId); };
+              actionsEl.appendChild(undoBtn);
+            }
+          } else if (status === 'undone' && existingUndoBtn) {
+            // Treure botó Desfer quan s'ha desfet
+            existingUndoBtn.remove();
+          }
+        }
+      }
+
+      /**
+       * v16.1: Desfer un canvi individual
+       * Usa event_id (persistent via Supabase) o undoSnapshot (local immediat)
+       */
+      function undoSingleAnnotation(annotationId) {
+        const ann = pendingAnnotations.find(a => a.id === annotationId);
+
+        // Verificar que tenim algun mètode de desfer
+        if (!ann || (!ann.undoSnapshot && !ann.event_id)) {
+          showToast('No es pot desfer aquest canvi', 'warning');
+          return;
+        }
+
+        // Desactivar botó mentre es processa
+        const el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
+        const undoBtn = el ? el.querySelector('.btn-undo') : null;
+        if (undoBtn) {
+          undoBtn.disabled = true;
+          undoBtn.innerHTML = icon('loader', 'i--sm');
+        }
+
+        const handleUndoSuccess = function(result) {
+          // Verificar èxit segons el tipus de resposta
+          const success = result && (result.ok || result.success || result.status === 'restored');
+          if (success) {
+            ann.status = 'undone';
+            ann.undoSnapshot = null;
+            ann.event_id = null;  // Ja no es pot tornar a desfer
+            updateAnnotationUI(annotationId, 'undone');
+            showToast('Canvi desfet', 'undo');
+          } else {
+            showToast(result.error || 'Error desfent canvi', 'error');
+            if (undoBtn) {
+              undoBtn.disabled = false;
+              undoBtn.innerHTML = icon('undo', 'i--sm');
+            }
+          }
+        };
+
+        const handleUndoFailure = function(err) {
+          showToast('Error: ' + err.message, 'error');
+          if (undoBtn) {
+            undoBtn.disabled = false;
+            undoBtn.innerHTML = icon('undo', 'i--sm');
+          }
+        };
+
+        // v16.1: Prioritzar event_id (persistent) sobre undoSnapshot (local)
+        if (ann.event_id) {
+          // Usar revertEditById per undo persistent via Supabase
+          google.script.run
+            .withSuccessHandler(handleUndoSuccess)
+            .withFailureHandler(handleUndoFailure)
+            .revertEditById(ann.event_id);
+        } else if (ann.undoSnapshot) {
+          // Fallback a undo local (snapshot)
+          google.script.run
+            .withSuccessHandler(handleUndoSuccess)
+            .withFailureHandler(handleUndoFailure)
+            .undoAnnotationChange(ann.undoSnapshot);
         }
       }
 
@@ -4643,14 +4838,16 @@
                 return {
                   id: 'change-' + i,
                   type: 'change',
-                  para_id: parseInt(c.targetId),
-                  originalText: c.originalText,
-                  proposedText: c.proposedText,
+                  para_id: parseInt(c.targetId !== undefined ? c.targetId : c.paragraph_id),
+                  // v16.3: Arreglat mapeig de camps - backend envia snake_case
+                  originalText: c.originalText || c.original_text || c.original || null,
+                  proposedText: c.proposedText || c.new_text || c.replacement || null,
                   // v12.1: Camps per mode FIX (find/replace natiu)
+                  // v16.4: NO usar c.original com a fallback perquè és el paràgraf complet, no el fragment!
                   find: c.find || null,
-                  replace: c.replace || null,
+                  replace: c.replace || c.replacement || null,
                   context: c.context || null,
-                  reason: c.reason || 'Canvi proposat',
+                  reason: c.reason || c.explanation || 'Canvi proposat',
                   status: 'pending'
                 };
               });
@@ -5277,14 +5474,16 @@
                 return {
                   id: 'change-' + i,
                   type: 'change',
-                  para_id: parseInt(c.targetId),
-                  originalText: c.originalText,
-                  proposedText: c.proposedText,
+                  para_id: parseInt(c.targetId !== undefined ? c.targetId : c.paragraph_id),
+                  // v16.3: Arreglat mapeig de camps - backend envia snake_case
+                  originalText: c.originalText || c.original_text || c.original || null,
+                  proposedText: c.proposedText || c.new_text || c.replacement || null,
                   // v12.1: Camps per mode FIX (find/replace natiu)
+                  // v16.4: NO usar c.original com a fallback perquè és el paràgraf complet, no el fragment!
                   find: c.find || null,
-                  replace: c.replace || null,
+                  replace: c.replace || c.replacement || null,
                   context: c.context || null,
-                  reason: c.reason || 'Canvi proposat',
+                  reason: c.reason || c.explanation || 'Canvi proposat',
                   status: 'pending'
                 };
               });
