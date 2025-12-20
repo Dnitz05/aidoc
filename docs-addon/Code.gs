@@ -565,6 +565,80 @@ function getEditableElements(body) {
 }
 
 /**
+ * v17.5: Construeix un mapa índex->element consistent amb captureFullDocument/processElement
+ * IMPORTANT: Aquesta funció replica EXACTAMENT la lògica d'assignació d'índexs de processElement
+ * @param {Body} body - El body del document
+ * @returns {Object} - { map: {índex: element}, maxIndex: número }
+ */
+function buildElementIndexMap(body) {
+  const numChildren = body.getNumChildren();
+  const map = {};
+  let currentIndex = 0;
+
+  for (let i = 0; i < numChildren; i++) {
+    const element = body.getChild(i);
+    const elementType = element.getType();
+
+    switch (elementType) {
+      case DocumentApp.ElementType.PARAGRAPH:
+      case DocumentApp.ElementType.LIST_ITEM:
+        // Aquests tipus assignen índex i es guarden al mapa (si tenen text)
+        try {
+          const text = element.asText().getText();
+          if (text.trim().length > 0) {
+            map[currentIndex] = element;
+            currentIndex++;
+          }
+        } catch (e) {}
+        break;
+
+      case DocumentApp.ElementType.TABLE:
+        // Les taules consumeixen índex però NO es guarden al mapa (són read-only)
+        // IMPORTANT: Usar convertTableToText per consistència amb processElement
+        try {
+          const tableText = convertTableToText(element.asTable());
+          if (tableText.trim().length > 0) {
+            currentIndex++;  // Consumeix índex sense guardar al mapa
+          }
+        } catch (e) {}
+        break;
+
+      case DocumentApp.ElementType.TABLE_OF_CONTENTS:
+        // TOC consumeix índex però no és editable
+        try {
+          const tocText = element.asTableOfContents().getText();
+          if (tocText.trim()) {
+            currentIndex++;
+          }
+        } catch (e) {}
+        break;
+
+      case DocumentApp.ElementType.INLINE_IMAGE:
+      case DocumentApp.ElementType.INLINE_DRAWING:
+        // Imatges i dibuixos consumeixen índex
+        currentIndex++;
+        break;
+
+      // HORIZONTAL_RULE i PAGE_BREAK no consumeixen índex
+
+      default:
+        // Altres elements: intentar extreure text
+        try {
+          if (element.asText) {
+            const otherText = element.asText().getText();
+            if (otherText && otherText.trim().length > 0) {
+              map[currentIndex] = element;
+              currentIndex++;
+            }
+          }
+        } catch (e) {}
+    }
+  }
+
+  return { map, maxIndex: currentIndex };
+}
+
+/**
  * Troba un element pel seu índex (comptant només elements amb text)
  * @param {Array} elements - Array d'elements del document
  * @param {number} targetIndex - Índex a trobar
@@ -633,6 +707,7 @@ const ChangeStatus = {
  * @param {Object} mapIdToElement - Mapa d'IDs a elements del document
  * @returns {Object} - { updates: {...}, processedChanges: [...], stalChanges: [...], blockedChanges: [...] }
  */
+// v15.3 - Fix array detection for GAS
 function processChangesV14(aiData, mapIdToElement) {
   const result = {
     updates: {},              // Format antic per compatibilitat
@@ -650,13 +725,47 @@ function processChangesV14(aiData, mapIdToElement) {
     return result;
   }
 
-  // Cas 2: Format v14 (aiData.changes array)
-  if (aiData.changes && Array.isArray(aiData.changes)) {
+  // Cas 2: Format v14 (aiData.changes array o objecte amb claus numèriques)
+  // NOTA: GAS pot deserialitzar arrays com objectes amb claus "0", "1", etc.
+  // Acceptem qualsevol objecte que tingui aiData.changes[0] definit
+  const hasChanges = aiData.changes &&
+    typeof aiData.changes === 'object' &&
+    (aiData.changes[0] !== undefined || aiData.changes['0'] !== undefined);
+
+  if (hasChanges) {
     result.hasV14Format = true;
 
-    for (const change of aiData.changes) {
+    // v15.2: Debug logging per investigar el problema
+    const mapKeys = Object.keys(mapIdToElement);
+    logDiagnostic('V14_PROCESSING', {
+      changes_count: aiData.changes.length,
+      map_keys: mapKeys.length,
+      map_keys_sample: mapKeys.slice(0, 20).join(','),
+    });
+
+    // Usar for clàssic en lloc de for..of per compatibilitat amb GAS
+    const changesArray = Array.isArray(aiData.changes) ? aiData.changes : Object.values(aiData.changes);
+    for (let i = 0; i < changesArray.length; i++) {
+      const change = changesArray[i];
       const paraId = change.paragraph_id;
       const targetElement = mapIdToElement[paraId];
+
+      // v15.2: Debug - mostrar info del canvi
+      const changeDebug = {
+        paraId: paraId,
+        paraId_type: typeof paraId,
+        has_element: !!targetElement,
+        has_replacement: change.replacement !== undefined,
+        has_new_text: change.new_text !== undefined,
+        has_original: change.original !== undefined,
+        has_original_text: change.original_text !== undefined,
+        new_text_value: change.new_text,
+        original_text_value: change.original_text ? change.original_text.substring(0, 30) : null,
+      };
+
+      // TEMPORAL: Afegir a resposta per debug
+      if (!result._debug) result._debug = [];
+      result._debug.push(changeDebug);
 
       // Si no trobem l'element, bloquejar
       if (!targetElement) {
@@ -799,7 +908,7 @@ function revertLastEdit() {
     // Fallback: usar mapa d'IDs (ara sincronitzat amb processElement)
     if (!targetElement) {
       const targetId = parseInt(lastEdit.targetId, 10);
-      const mapIdToElement = buildElementMap(body);
+      const { map: mapIdToElement } = buildElementIndexMap(body);
       targetElement = mapIdToElement[targetId];
     }
 
@@ -874,7 +983,7 @@ function restoreText(targetId, originalText, bodyIndex, formatSnapshot) {
     // Fallback: usar mapa d'IDs (ara sincronitzat amb processElement)
     if (!targetElement) {
       const numericId = parseInt(targetId, 10);
-      const mapIdToElement = buildElementMap(body);
+      const { map: mapIdToElement } = buildElementIndexMap(body);
       targetElement = mapIdToElement[numericId];
     }
 
@@ -1561,9 +1670,9 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
   // Intentar cache primer (només si no hi ha selecció)
   const cachedResult = getCachedCapture(currentHash, isSelection);
   if (cachedResult) {
-    // v8.2 FIX: Cache HIT - només construir mapIdToElement (operació lleugera)
-    // NO cridem captureFullDocument per estalviar temps
-    const lightweightMap = buildElementMap(body);
+    // v17.6 FIX: Cache HIT - usar buildElementIndexMap per consistència absoluta
+    // IMPORTANT: buildElementIndexMap replica exactament processElement
+    const { map: lightweightMap } = buildElementIndexMap(body);
     captureResult = {
       contentPayload: cachedResult.contentPayload,
       stats: cachedResult.stats,
@@ -1858,6 +1967,11 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
       if (previewMode) {
         let changes = [];
 
+        // v15.3: Workaround - detectar format v14 directament si processChangesV14 falla
+        const hasChangesWorkaround = aiData.changes &&
+          typeof aiData.changes === 'object' &&
+          (aiData.changes[0] !== undefined || aiData.changes['0'] !== undefined);
+
         // v14.1: Si tenim format v14, usar processedChanges directament
         if (v14Result.hasV14Format) {
           changes = v14Result.processedChanges;
@@ -1870,6 +1984,55 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
               stale: v14Result.staleChanges.length,
               warned: v14Result.warnChanges.length,
             });
+          }
+        } else if (hasChangesWorkaround) {
+          // v15.3: Workaround - processar directament si GAS té codi antic cachejat
+          const changesArray = Array.isArray(aiData.changes) ? aiData.changes : Object.values(aiData.changes);
+          logDiagnostic('WORKAROUND_V15.3', {
+            changes_count: changesArray.length,
+            map_keys: Object.keys(mapIdToElement).slice(0, 10),
+          });
+          for (let i = 0; i < changesArray.length; i++) {
+            const change = changesArray[i];
+            const paraId = change.paragraph_id;
+            // v15.3: Provar tant amb número com amb string
+            const targetElement = mapIdToElement[paraId] || mapIdToElement[String(paraId)];
+
+            logDiagnostic('WORKAROUND_CHANGE', {
+              i: i,
+              paraId: paraId,
+              paraIdType: typeof paraId,
+              hasElement: !!targetElement,
+              original: change.original ? change.original.substring(0, 20) : null,
+              replacement: change.replacement,
+            });
+
+            if (targetElement) {
+              const currentText = targetElement.asText().getText();
+              // Determinar el text nou
+              let newText = change.new_text;
+              if (newText === undefined && change.replacement !== undefined) {
+                // Format find/replace: aplicar substitució
+                const original = change.original || change.original_text || '';
+                if (original && currentText.includes(original)) {
+                  newText = currentText.replace(original, change.replacement);
+                } else {
+                  logDiagnostic('WORKAROUND_NO_MATCH', {
+                    original: original,
+                    currentText: currentText.substring(0, 50),
+                    includes: currentText.includes(original),
+                  });
+                }
+              }
+              if (newText !== undefined) {
+                changes.push({
+                  targetId: paraId,
+                  originalText: currentText,
+                  proposedText: newText,
+                  _workaround: true,
+                });
+              }
+            }
           }
         } else {
           // Format antic: convertir a array de canvis
@@ -1889,12 +2052,32 @@ function processUserCommand(instruction, chatHistory, userMode, previewMode, cha
 
         // If no changes found (IDs don't match), return error - no fallback to direct mode
         if (changes.length === 0) {
+          // v15.3: Debug info més complet per investigar el problema
+          const firstChange = aiData.changes ? (aiData.changes[0] || aiData.changes['0']) : null;
+          const hasChangesCheck = aiData.changes &&
+            typeof aiData.changes === 'object' &&
+            (aiData.changes[0] !== undefined || aiData.changes['0'] !== undefined);
+          const debugInfo = {
+            ai_changes: aiData.changes ? Object.keys(aiData.changes).length : 0,
+            is_array: Array.isArray(aiData.changes),
+            changes_type: typeof aiData.changes,
+            changes_keys: aiData.changes ? Object.keys(aiData.changes).slice(0, 5) : [],
+            first_change: firstChange ? JSON.stringify(firstChange).substring(0, 100) : null,
+            hasChangesCheck: hasChangesCheck,
+            processed: v14Result.processedChanges.length,
+            blocked: v14Result.blockedChanges.length,
+            stale: v14Result.staleChanges.length,
+            map_keys: Object.keys(mapIdToElement).length,
+            hasV14: v14Result.hasV14Format,
+            change_debug: v14Result._debug || [],
+          };
+
           // v14.1: Millorar missatge d'error si hi ha canvis bloquejats/stale
-          let previewError = 'No he pogut identificar els paràgrafs a modificar. Prova a seleccionar el text específic.';
+          let previewError = `DEBUG: ${JSON.stringify(debugInfo)}`;
           if (v14Result.staleChanges.length > 0) {
             previewError = 'El document ha canviat des de l\'última anàlisi. Actualitza el document i torna a provar.';
           } else if (v14Result.blockedChanges.length > 0) {
-            previewError = 'Els canvis proposats no s\'han pogut validar. Torna a provar.';
+            previewError = `Canvi bloquejat: ${v14Result.blockedChanges[0]._block_reason} (para ${v14Result.blockedChanges[0].paragraph_id})`;
           }
 
           logDiagnostic('WARNING', {
@@ -2333,19 +2516,8 @@ function applyPendingChanges(changes, expectedSnapshot) {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
 
-    // v3.10: Usar funció utilitat refactoritzada
-    const elementsToProcess = getEditableElements(body);
-
-    // Crear mapa ID -> Element (només els que tenen text)
-    let mapIdToElement = {};
-    let currentIndex = 0;
-    for (const el of elementsToProcess) {
-      const text = el.asText().getText();
-      if (text.trim().length > 0) {
-        mapIdToElement[currentIndex] = el;
-        currentIndex++;
-      }
-    }
+    // v17.5: Usar funció auxiliar consistent amb captureFullDocument/processElement
+    const { map: mapIdToElement } = buildElementIndexMap(body);
 
     // v3.3: Verificar que el document no ha canviat (race condition detection)
     if (expectedSnapshot) {
@@ -2455,19 +2627,8 @@ function applySingleChange(change) {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
 
-    // Obtenir elements editables
-    const elementsToProcess = getEditableElements(body);
-
-    // Crear mapa ID -> Element
-    let mapIdToElement = {};
-    let currentIndex = 0;
-    for (const el of elementsToProcess) {
-      const text = el.asText().getText();
-      if (text.trim().length > 0) {
-        mapIdToElement[currentIndex] = el;
-        currentIndex++;
-      }
-    }
+    // v17.5: Usar funció auxiliar consistent amb captureFullDocument/processElement
+    const { map: mapIdToElement } = buildElementIndexMap(body);
 
     const targetId = parseInt(change.targetId, 10);
     const targetElement = mapIdToElement[targetId];
@@ -2526,10 +2687,34 @@ function applySingleChange(change) {
     // Invalidar cache
     invalidateCaptureCache();
 
+    // v16.4: Highlight temporal NOMÉS del fragment canviat
+    try {
+      const APPLIED_HIGHLIGHT_COLOR = '#D4EDDA';  // Verd suau (success)
+      const textObj = targetElement.asText();
+      const newText = textObj.getText();
+
+      // Trobar el fragment que ha canviat comparant original i nou
+      const diff = findTextDiff(currentDocText, newText);
+      if (diff && diff.start >= 0 && diff.end > diff.start) {
+        textObj.setBackgroundColor(diff.start, diff.end - 1, APPLIED_HIGHLIGHT_COLOR);
+      } else if (newText.length > 0) {
+        // Fallback: si no podem trobar la diferència, marcar primeres paraules
+        const words = newText.split(/\s+/).slice(0, 3).join(' ');
+        const endPos = Math.min(words.length - 1, newText.length - 1);
+        if (endPos >= 0) {
+          textObj.setBackgroundColor(0, endPos, APPLIED_HIGHLIGHT_COLOR);
+        }
+      }
+    } catch (highlightErr) {
+      // No fallar si el highlight no funciona
+      console.warn('[applySingleChange] Highlight error:', highlightErr);
+    }
+
     return {
       ok: true,
       applied: 1,
-      undoSnapshot: undoSnapshot
+      undoSnapshot: undoSnapshot,
+      highlightApplied: true  // v15.4: Indicar que s'ha aplicat highlight
     };
 
   } catch (e) {
@@ -2557,19 +2742,8 @@ function applyFindReplaceChanges(changes) {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
 
-    // Obtenir elements editables
-    const elementsToProcess = getEditableElements(body);
-
-    // Crear mapa ID -> Element
-    let mapIdToElement = {};
-    let currentIndex = 0;
-    for (const el of elementsToProcess) {
-      const text = el.asText().getText();
-      if (text.trim().length > 0) {
-        mapIdToElement[currentIndex] = el;
-        currentIndex++;
-      }
-    }
+    // v17.5: Usar funció auxiliar consistent amb captureFullDocument/processElement
+    const { map: mapIdToElement } = buildElementIndexMap(body);
 
     const undoSnapshots = [];
     let appliedCount = 0;
@@ -2579,7 +2753,11 @@ function applyFindReplaceChanges(changes) {
       const targetId = parseInt(change.targetId, 10);
       const targetElement = mapIdToElement[targetId];
 
+      // v17.5 DEBUG: Log per diagnosticar problemes d'indexació
+      console.log('[applyFindReplaceChanges] targetId=' + targetId + ', found=' + !!targetElement + ', mapKeys=' + Object.keys(mapIdToElement).join(','));
+
       if (!targetElement) {
+        console.warn('[applyFindReplaceChanges] Element NOT FOUND for targetId=' + targetId);
         skippedCount++;
         continue;
       }
@@ -2587,42 +2765,144 @@ function applyFindReplaceChanges(changes) {
       const text = targetElement.asText();
       const currentText = text.getText();
 
-      // Verificar que el text 'find' existeix al paràgraf
-      if (!currentText.includes(change.find)) {
-        skippedCount++;
-        continue;
-      }
+      // v17.3: Lògica de decisió robusta per modes find/replace vs full-replace
+      // IMPORTANT: replace pot ser string buit "" (eliminar text) - això és VÀLID!
+      const hasFind = change.find !== null && change.find !== undefined && change.find !== '';
+      const hasReplace = change.replace !== null && change.replace !== undefined;  // "" és vàlid!
+      const hasOriginalText = change.original_text && change.original_text.length > 0;
+      const hasNewText = change.new_text !== null && change.new_text !== undefined;  // "" és vàlid!
 
-      // v12.1: Context Anchor - verificar unicitat si es proporciona context
-      if (change.context) {
-        const fullPattern = (change.context.before || '') + change.find + (change.context.after || '');
-        if (!currentText.includes(fullPattern)) {
-          // El context no coincideix, potser el document ha canviat
+      // Prioritat 1: Mode find/replace (correccions atòmiques - mode FIX)
+      if (hasFind && hasReplace) {
+        // Verificar que el text 'find' existeix al paràgraf
+        if (!currentText.includes(change.find)) {
           skippedCount++;
           continue;
         }
+
+        // Guardar snapshot per undo ABANS del canvi
+        undoSnapshots.push({
+          targetId: change.targetId,
+          originalText: currentText,
+          bodyIndex: getBodyIndex(targetElement),
+          highlight_find: change.highlight_find || change.find || null
+        });
+
+        // MAGIC: replaceText() natiu preserva el format automàticament!
+        text.replaceText(escapeRegExp(change.find), change.replace);
+        appliedCount++;
+
+        // v17.3: Highlight PRECÍS després d'aplicar
+        try {
+          const APPLIED_HIGHLIGHT_COLOR = '#D4EDDA';  // Verd suau
+          const newText = text.getText();
+          const textLen = newText.length;
+
+          // PRIMER: Netejar TOT el highlight del paràgraf
+          if (textLen > 0) {
+            text.setBackgroundColor(0, textLen - 1, null);
+          }
+
+          // DESPRÉS: Afegir highlight verd NOMÉS a la paraula canviada
+          const textToHighlight = change.highlight_replace || change.replace;
+          if (textToHighlight && textToHighlight.length > 0) {
+            const highlightPos = newText.indexOf(textToHighlight);
+            if (highlightPos !== -1) {
+              text.setBackgroundColor(highlightPos, highlightPos + textToHighlight.length - 1, APPLIED_HIGHLIGHT_COLOR);
+            }
+          }
+        } catch (highlightErr) {
+          console.warn('[applyFindReplaceChanges] Highlight error:', highlightErr);
+        }
+
+        continue;  // Processat - següent canvi
       }
 
-      // Comptar ocurrències del text 'find' al paràgraf
-      const occurrences = (currentText.match(new RegExp(escapeRegExp(change.find), 'g')) || []).length;
+      // Prioritat 2: Mode full-replace (paràgraf complet - mode IMPROVE)
+      if (hasOriginalText && hasNewText) {
+        // v17.5: VALIDACIÓ CRÍTICA - Verificar que el text actual coincideix amb l'original
+        // Això prevé aplicar canvis al paràgraf equivocat si el document ha canviat
+        const normalizeForCompare = (t) => t.trim().replace(/\s+/g, ' ');
+        if (normalizeForCompare(currentText) !== normalizeForCompare(change.original_text)) {
+          console.warn('[applyFindReplaceChanges] Text mismatch for full-replace, targetId=' + targetId);
+          console.warn('[applyFindReplaceChanges] Expected: "' + change.original_text.substring(0, 80) + '..."');
+          console.warn('[applyFindReplaceChanges] Found: "' + currentText.substring(0, 80) + '..."');
+          skippedCount++;
+          continue;
+        }
 
-      // Si hi ha múltiples ocurrències i no hi ha context, saltar per seguretat
-      if (occurrences > 1 && !change.context) {
-        // Loguejar per debug però aplicar igualment (replaceText canvia totes)
-        // En producció, el backend hauria d'enviar context per casos ambigus
+        // Guardar snapshot per undo ABANS del canvi
+        undoSnapshots.push({
+          targetId: change.targetId,
+          originalText: currentText,
+          bodyIndex: getBodyIndex(targetElement),
+          highlight_find: change.highlight_find || null
+        });
+
+        // Substituir tot el paràgraf
+        text.setText(change.new_text);
+        appliedCount++;
+
+        // Highlight per full-replace
+        try {
+          const APPLIED_HIGHLIGHT_COLOR = '#D4EDDA';
+          const newText = text.getText();
+          const textLen = newText.length;
+
+          // PRIMER: Netejar TOT el highlight
+          if (textLen > 0) {
+            text.setBackgroundColor(0, textLen - 1, null);
+          }
+
+          // DESPRÉS: Ressaltar el fragment canviat
+          const toHighlight = change.highlight_replace;
+          if (toHighlight && toHighlight.length > 0) {
+            const pos = newText.indexOf(toHighlight);
+            if (pos !== -1) {
+              text.setBackgroundColor(pos, pos + toHighlight.length - 1, APPLIED_HIGHLIGHT_COLOR);
+            }
+          }
+        } catch (e) {}
+
+        continue;  // Processat - següent canvi
       }
 
-      // Guardar snapshot per undo
-      undoSnapshots.push({
-        targetId: change.targetId,
-        originalText: currentText,
-        bodyIndex: getBodyIndex(targetElement)
-      });
+      // Fallback: Intentar amb original/replacement
+      if (change.original && (change.replacement !== null && change.replacement !== undefined)) {
+        if (!currentText.includes(change.original)) {
+          skippedCount++;
+          continue;
+        }
 
-      // MAGIC: replaceText() natiu preserva el format automàticament!
-      // Això és el core de l'optimització v12.1
-      text.replaceText(escapeRegExp(change.find), change.replace);
-      appliedCount++;
+        undoSnapshots.push({
+          targetId: change.targetId,
+          originalText: currentText,
+          bodyIndex: getBodyIndex(targetElement),
+          highlight_find: change.original
+        });
+
+        text.replaceText(escapeRegExp(change.original), change.replacement);
+        appliedCount++;
+
+        try {
+          const newText = text.getText();
+          const textLen = newText.length;
+          if (textLen > 0) {
+            text.setBackgroundColor(0, textLen - 1, null);
+          }
+          if (change.replacement && change.replacement.length > 0) {
+            const pos = newText.indexOf(change.replacement);
+            if (pos !== -1) {
+              text.setBackgroundColor(pos, pos + change.replacement.length - 1, '#D4EDDA');
+            }
+          }
+        } catch (e) {}
+
+        continue;
+      }
+
+      // Cap mode vàlid - saltar
+      skippedCount++;
     }
 
     // Invalidar cache
@@ -2632,8 +2912,73 @@ function applyFindReplaceChanges(changes) {
       ok: true,
       applied: appliedCount,
       skipped: skippedCount,
-      undoSnapshots: undoSnapshots
+      undoSnapshots: undoSnapshots,
+      highlightApplied: appliedCount > 0  // v15.4
     };
+
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+/**
+ * v16.1: Desfer un canvi aplicat anteriorment
+ * Restaura el text original al paràgraf corresponent
+ * @param {Object} snapshot - {targetId, originalText, bodyIndex}
+ * @returns {Object} {ok, error}
+ */
+function undoAnnotationChange(snapshot) {
+  try {
+    if (!snapshot || !snapshot.originalText) {
+      return { ok: false, error: "Snapshot invàlid" };
+    }
+
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+
+    // v17.5: Usar funció auxiliar consistent amb captureFullDocument/processElement
+    const { map: mapIdToElement } = buildElementIndexMap(body);
+
+    const targetId = parseInt(snapshot.targetId, 10);
+    const targetElement = mapIdToElement[targetId];
+
+    if (!targetElement) {
+      return { ok: false, error: "No s'ha trobat el paràgraf original" };
+    }
+
+    // Restaurar el text original
+    const textObj = targetElement.asText();
+    textObj.setText(snapshot.originalText);
+
+    // v17.2: Highlight PRECÍS per undo
+    try {
+      const UNDO_HIGHLIGHT_COLOR = '#FFF3CD';  // Groc suau
+      const restoredText = textObj.getText();
+      const textLen = restoredText.length;
+
+      // PRIMER: Netejar TOT el highlight del paràgraf
+      if (textLen > 0) {
+        textObj.setBackgroundColor(0, textLen - 1, null);
+      }
+
+      // DESPRÉS: Ressaltar NOMÉS el text restaurat
+      const textToHighlight = snapshot.highlight_find;
+      if (textToHighlight && textToHighlight.length > 0) {
+        const pos = restoredText.indexOf(textToHighlight);
+        if (pos !== -1) {
+          const endPos = pos + textToHighlight.length - 1;
+          textObj.setBackgroundColor(pos, endPos, UNDO_HIGHLIGHT_COLOR);
+        }
+      }
+    } catch (highlightErr) {
+      // No fallar si el highlight no funciona
+    }
+
+    // Invalidar cache
+    invalidateCaptureCache();
+
+    // v16.7: Retornar targetId per poder netejar el highlight després
+    return { ok: true, targetId: targetId };
 
   } catch (e) {
     return { ok: false, error: e.message };
@@ -2647,6 +2992,42 @@ function applyFindReplaceChanges(changes) {
  */
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * v16.4: Troba el fragment que difereix entre dos textos
+ * Retorna {start, end} del fragment NOU (en newText)
+ * @param {string} oldText - Text original
+ * @param {string} newText - Text nou
+ * @returns {Object|null} - {start, end} o null si no hi ha diferència
+ */
+function findTextDiff(oldText, newText) {
+  if (!oldText || !newText || oldText === newText) return null;
+
+  // Trobar prefix comú
+  let prefixLen = 0;
+  const minLen = Math.min(oldText.length, newText.length);
+  while (prefixLen < minLen && oldText[prefixLen] === newText[prefixLen]) {
+    prefixLen++;
+  }
+
+  // Trobar suffix comú
+  let suffixLen = 0;
+  while (
+    suffixLen < minLen - prefixLen &&
+    oldText[oldText.length - 1 - suffixLen] === newText[newText.length - 1 - suffixLen]
+  ) {
+    suffixLen++;
+  }
+
+  // El fragment canviat és entre prefix i (length - suffix)
+  const start = prefixLen;
+  const end = newText.length - suffixLen;
+
+  // Validar que tenim un rang vàlid
+  if (end <= start) return null;
+
+  return { start, end };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2689,8 +3070,8 @@ function applyInDocumentPreview(changes, existingMap) {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
 
-    // v5.3: Usar mapa existent si es proporciona (per seleccions), sinó reconstruir
-    const mapIdToElement = existingMap || buildElementMap(body);
+    // v17.6: Usar mapa existent si es proporciona (per seleccions), sinó reconstruir amb buildElementIndexMap
+    const mapIdToElement = existingMap || buildElementIndexMap(body).map;
     const previews = [];
 
     for (const change of changes) {
@@ -2788,8 +3169,8 @@ function commitInDocumentPreview() {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
 
-    // v5.3: Construir mapa usant bodyIndex si disponible, sinó fallback al mapa general
-    const mapIdToElement = buildElementMap(body);
+    // v17.6: Construir mapa usant buildElementIndexMap per consistència
+    const { map: mapIdToElement } = buildElementIndexMap(body);
 
     // v5.3: Crear mapa alternatiu usant bodyIndex per seleccions
     const hasBodyIndices = previews.some(p => p.bodyIndex !== undefined && p.bodyIndex >= 0);
@@ -2916,8 +3297,8 @@ function cancelInDocumentPreview() {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
 
-    // v5.3: Construir mapa usant bodyIndex si disponible
-    const mapIdToElement = buildElementMap(body);
+    // v17.6: Construir mapa usant buildElementIndexMap per consistència
+    const { map: mapIdToElement } = buildElementIndexMap(body);
     const hasBodyIndices = previews.some(p => p.bodyIndex !== undefined && p.bodyIndex >= 0);
 
     let cancelled = 0;
@@ -5217,7 +5598,6 @@ function captureFullDocument(doc, body, isSelection, selectedElements) {
 
   if (isSelection && selectedElements && selectedElements.length > 0) {
     // Trobar els índexs dels elements seleccionats dins del body
-    const selectionBodyIndices = [];
     for (let i = 0; i < totalElements; i++) {
       const bodyEl = allBodyElements[i];
       for (const selEl of selectedElements) {
@@ -5225,34 +5605,17 @@ function captureFullDocument(doc, body, isSelection, selectedElements) {
         if (bodyEl === selEl ||
             (selEl.getParent && selEl.getParent() === bodyEl) ||
             (bodyEl.getText && selEl.getText && bodyEl.getText() === selEl.getText())) {
-          selectionBodyIndices.push(i);
           selectedIndices.add(i);
           break;
         }
       }
     }
+  }
 
-    if (selectionBodyIndices.length > 0) {
-      // Expandir rang ±3 elements al voltant de la selecció
-      const CONTEXT_WINDOW = 3;
-      const minIdx = Math.max(0, Math.min(...selectionBodyIndices) - CONTEXT_WINDOW);
-      const maxIdx = Math.min(totalElements - 1, Math.max(...selectionBodyIndices) + CONTEXT_WINDOW);
-
-      // Processar el rang expandit
-      for (let i = minIdx; i <= maxIdx; i++) {
-        elementsToProcess.push({ element: allBodyElements[i], bodyIndex: i });
-      }
-    } else {
-      // Fallback: si no trobem els elements, processar tot
-      for (let i = 0; i < totalElements; i++) {
-        elementsToProcess.push({ element: allBodyElements[i], bodyIndex: i });
-      }
-    }
-  } else {
-    // Sense selecció: processar tot el document
-    for (let i = 0; i < totalElements; i++) {
-      elementsToProcess.push({ element: allBodyElements[i], bodyIndex: i });
-    }
+  // v17.6 FIX: SEMPRE processar tot el document per garantir índexs absoluts consistents
+  // La selecció es marca amb ⟦SEL⟧ dins processElement
+  for (let i = 0; i < totalElements; i++) {
+    elementsToProcess.push({ element: allBodyElements[i], bodyIndex: i });
   }
 
   stats.total_elements = elementsToProcess.length;
@@ -5784,7 +6147,7 @@ function highlightElement(options) {
 
       case 'elementId':
         // ID del sistema {{0}}, {{1}} (usat per AI i lastEdit)
-        const map = buildElementMap(body);
+        const { map } = buildElementIndexMap(body);
         element = map[value];
         if (element) {
           const parent = element.getParent();
@@ -5892,6 +6255,33 @@ function highlightElement(options) {
   } catch (e) {
     console.error('[highlightElement] Error:', e);
     return { success: false, error: e.message };
+  }
+}
+
+/**
+ * v16.4: Neteja el highlight d'un paràgraf específic per ID
+ * @param {number} paraId - ID del paràgraf
+ */
+function clearHighlightByParaId(paraId) {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+
+    // v17.5: Usar funció auxiliar consistent amb captureFullDocument/processElement
+    const { map: mapIdToElement } = buildElementIndexMap(body);
+
+    const targetId = parseInt(paraId, 10);
+    const targetElement = mapIdToElement[targetId];
+
+    if (targetElement) {
+      const textObj = targetElement.asText();
+      const textLen = textObj.getText().length;
+      if (textLen > 0) {
+        textObj.setBackgroundColor(0, textLen - 1, null);
+      }
+    }
+  } catch (e) {
+    console.warn('[clearHighlightByParaId] Error:', e);
   }
 }
 
@@ -6026,6 +6416,48 @@ function applyPendingRewrite(blocks, isSelection) {
 }
 
 /**
+ * v15.4: Ressaltar un paràgraf sencer per ID (usat quan el text s'ha eliminat)
+ * @param {number} paragraphId - L'índex del paràgraf
+ * @returns {Object} - {applied: number, error?: string}
+ */
+function highlightParagraphById(paragraphId) {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const body = doc.getBody();
+
+    // v17.5: Usar funció auxiliar consistent amb captureFullDocument/processElement
+    const { map: mapIdToElement } = buildElementIndexMap(body);
+
+    const targetId = parseInt(paragraphId, 10);
+    const targetElement = mapIdToElement[targetId] || mapIdToElement[String(targetId)];
+
+    if (!targetElement) {
+      return { applied: 0, error: 'Paràgraf no trobat: ' + targetId };
+    }
+
+    // Ressaltar tot el paràgraf en verd suau
+    const PARAGRAPH_HIGHLIGHT_COLOR = '#FFF3CD';  // Groc suau (info)
+    const textObj = targetElement.asText();
+    const text = textObj.getText();
+
+    if (text.length > 0) {
+      textObj.setBackgroundColor(0, text.length - 1, PARAGRAPH_HIGHLIGHT_COLOR);
+
+      // Guardar per poder netejar després
+      const props = PropertiesService.getDocumentProperties();
+      props.setProperty('highlight_para_id', String(targetId));
+
+      return { applied: 1 };
+    }
+
+    return { applied: 0, error: 'Paràgraf buit' };
+  } catch (e) {
+    console.error('[highlightParagraphById] Error:', e);
+    return { applied: 0, error: e.message };
+  }
+}
+
+/**
  * @deprecated Usar highlightElement({mode:'bodyIndex', value:idx})
  * Mantingut per compatibilitat amb crides existents
  */
@@ -6096,17 +6528,8 @@ function applyReferenceHighlights(highlights) {
     const highlightedIndices = [];
     const highlightDetails = [];  // v7.1: Guardem detalls per neteja precisa
 
-    // Construir mapa d'elements editables
-    const elementsToProcess = getEditableElements(body);
-    let mapIdToElement = {};
-    let currentIndex = 0;
-    for (const el of elementsToProcess) {
-      const text = el.asText().getText();
-      if (text.trim().length > 0) {
-        mapIdToElement[currentIndex] = el;
-        currentIndex++;
-      }
-    }
+    // v17.5: Usar funció auxiliar consistent amb captureFullDocument/processElement
+    const { map: mapIdToElement } = buildElementIndexMap(body);
 
     for (const hl of highlights) {
       try {
@@ -6193,17 +6616,8 @@ function clearReferenceHighlights() {
     const indices = JSON.parse(savedIndices);
     const details = savedDetails ? JSON.parse(savedDetails) : null;  // v7.1
 
-    // Reconstruir mapa d'elements
-    const elementsToProcess = getEditableElements(body);
-    let mapIdToElement = {};
-    let currentIndex = 0;
-    for (const el of elementsToProcess) {
-      const text = el.asText().getText();
-      if (text.trim().length > 0) {
-        mapIdToElement[currentIndex] = el;
-        currentIndex++;
-      }
-    }
+    // v17.5: Usar funció auxiliar consistent amb captureFullDocument/processElement
+    const { map: mapIdToElement } = buildElementIndexMap(body);
 
     let cleared = 0;
 
@@ -6290,19 +6704,8 @@ function applyProactiveHighlights(highlights) {
     const results = { applied: 0, errors: [], notFound: [] };
     const highlightDetails = [];
 
-    // Build element map for para_id lookup
-    const elementsToProcess = getEditableElements(body);
-    let mapIdToElement = {};
-    let currentIndex = 0;
-    for (const el of elementsToProcess) {
-      try {
-        const text = el.asText().getText();
-        if (text.trim().length > 0) {
-          mapIdToElement[currentIndex] = el;
-          currentIndex++;
-        }
-      } catch (e) {}
-    }
+    // v17.5: Usar funció auxiliar consistent amb captureFullDocument/processElement
+    const { map: mapIdToElement } = buildElementIndexMap(body);
 
     for (const hl of highlights) {
       try {
@@ -6431,19 +6834,8 @@ function clearProactiveHighlights() {
     const body = doc.getBody();
     let cleared = 0;
 
-    // Rebuild element map for para_id based lookups
-    const elementsToProcess = getEditableElements(body);
-    let mapIdToElement = {};
-    let currentIndex = 0;
-    for (const el of elementsToProcess) {
-      try {
-        const text = el.asText().getText();
-        if (text.trim().length > 0) {
-          mapIdToElement[currentIndex] = el;
-          currentIndex++;
-        }
-      } catch (e) {}
-    }
+    // v17.5: Usar funció auxiliar consistent amb captureFullDocument/processElement
+    const { map: mapIdToElement } = buildElementIndexMap(body);
 
     for (const detail of details) {
       try {
@@ -6976,6 +7368,50 @@ function getEditHistory(limit) {
 }
 
 /**
+ * v16.1: Guarda un canvi aplicat a l'historial persistent
+ * @param {Object} editData - {target_id, before_text, after_text, instruction, reason}
+ * @returns {Object} {ok, event_id, error}
+ */
+function saveAppliedEdit(editData) {
+  const doc = DocumentApp.getActiveDocument();
+  if (!doc) return { ok: false, error: "No hi ha document actiu" };
+
+  const settings = JSON.parse(getSettings());
+  if (!settings.license_key) return { ok: false, error: "Falta llicència" };
+
+  const payload = {
+    action: 'save_applied_edit',
+    license_key: settings.license_key,
+    doc_id: doc.getId(),
+    target_id: editData.target_id,
+    before_text: editData.before_text,
+    after_text: editData.after_text,
+    instruction: editData.instruction,
+    reason: editData.reason
+  };
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': JSON.stringify(payload),
+    'muteHttpExceptions': true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const json = JSON.parse(response.getContentText());
+
+    if (response.getResponseCode() !== 200 || json.status !== 'ok') {
+      return { ok: false, error: json.error || "Error guardant event" };
+    }
+
+    return { ok: true, event_id: json.event_id };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+/**
  * Reverteix una edició específica per ID d'event
  */
 function revertEditById(eventId) {
@@ -7042,7 +7478,8 @@ function revertEditById(eventId) {
         targetElement.asText().setText(json.restore_text);
         // v8.2: Invalidar cache
         invalidateCaptureCache();
-        return { success: true, restored: true };
+        // v16.8: Retornar targetId per poder netejar highlight
+        return { success: true, restored: true, targetId: targetId };
       } else {
         return { success: false, error: "No s'ha trobat el paràgraf" };
       }

@@ -340,6 +340,7 @@
         color: var(--user-msg-text);
         border: 1px solid var(--user-msg-border);
         border-bottom-right-radius: var(--space-xs);
+        margin-left: 24px;
       }
 
       .msg.ai {
@@ -350,6 +351,7 @@
         color: var(--text-primary);
         transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
         position: relative;
+        margin-right: 24px;
       }
 
       /* Eye button outside AI bubbles - right side */
@@ -1171,18 +1173,19 @@
       }
 
       /* v14.4: Canvi pendent - estil similar a reference-item amb color blau */
+      /* v14.8: Fons gris per defecte (abans només en hover) */
       .annotation-item.change-item[data-status="pending"] {
-        background: transparent;
+        background: var(--bg-secondary);
         border-left-color: #90CAF9;
         padding-left: 8px;
       }
 
-      .annotation-item.change-item[data-status="pending"]:hover {
-        background: var(--bg-secondary);
-      }
+      /* v14.8: Hover eliminat - fons estàtic */
 
       /* Canvi acceptat - verd */
+      /* v17.22: Fons gris clar (igual que pending) amb opacitat reduïda */
       .annotation-item.change-item[data-status="accepted"] {
+        background: var(--bg-secondary);
         border-left-color: #81C784;
         padding-left: 8px;
         opacity: 0.6;
@@ -1264,6 +1267,16 @@
         text-overflow: ellipsis;
       }
 
+      /* v17.0: Descripció curta del canvi (ex: «Informaciió») */
+      .annotation-desc {
+        font-size: 11px;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-style: italic;
+      }
+
       /* v14.4: Diff dins anotació - més compacte */
       .annotation-diff {
         font-size: 11px;
@@ -1272,6 +1285,22 @@
         color: var(--text-muted);
         font-style: italic;
         padding: 4px 0;
+      }
+
+      /* v17.4: Text proposat per canvis de paràgraf complet */
+      /* v14.8: Sense contenidor - text directe sobre fons gris */
+      .annotation-proposed-text {
+        font-size: 11px;
+        line-height: 1.5;
+        word-break: break-word;
+        color: var(--text-primary);
+        padding: 4px 0;
+        margin-top: 4px;
+      }
+
+      /* v17.4: Estil per canvis de paràgraf complet */
+      .annotation-item.full-paragraph-change {
+        border-left: 3px solid var(--accent);
       }
 
       /* v16.5: Accions individuals - ara a la capçalera */
@@ -1331,12 +1360,13 @@
       }
 
       /* v16.0: Botons només icones - compactes */
+      /* v17.17: Botons més petits */
       .btn-accept, .btn-view {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 4px;
-        border-radius: 6px;
+        padding: 2px;
+        border-radius: 4px;
         cursor: pointer;
         border: none;
         transition: all 0.15s ease;
@@ -1407,6 +1437,46 @@
       .btn-expand:hover {
         background: var(--bg-secondary);
         color: var(--text-primary);
+      }
+
+      /* v17.17: Botó info - més petit */
+      .btn-info {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px;
+        border-radius: 4px;
+        cursor: pointer;
+        background: rgba(156, 163, 175, 0.1);
+        color: #9CA3AF;
+        border: 1px solid rgba(156, 163, 175, 0.3);
+        transition: all 0.15s ease;
+      }
+
+      .btn-info:hover {
+        background: rgba(156, 163, 175, 0.2);
+        border-color: #9CA3AF;
+      }
+
+      .btn-info.active {
+        background: rgba(100, 181, 246, 0.2);
+        color: #64B5F6;
+        border-color: #64B5F6;
+      }
+
+      .change-info-box {
+        background: rgba(100, 181, 246, 0.05);
+        border-left: 3px solid #64B5F6;
+        border-radius: 4px;
+        padding: 8px 10px;
+        margin: 6px 0;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--text-secondary);
+      }
+
+      .change-info-content {
+        white-space: pre-wrap;
       }
 
       /* v14.6: Vista col·lapsada per canvis grans */
@@ -1500,12 +1570,11 @@
       }
 
       /* Dark mode - mínim */
-      [data-theme="dark"] .annotation-item.change-item[data-status="pending"] {
-        background: transparent;
-      }
+      /* v14.8: Eliminat override transparent - var(--bg-secondary) ja s'adapta al tema */
 
+      /* v17.22: Fons gris clar en dark mode també */
       [data-theme="dark"] .annotation-item.change-item[data-status="accepted"] {
-        background: transparent;
+        background: var(--bg-secondary);
       }
 
       [data-theme="dark"] .annotation-diff {

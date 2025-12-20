@@ -94,36 +94,39 @@ NO busquis coincidències de patrons literals - ENTÉN el SIGNIFICAT.
 
 ### UPDATE_BY_ID: Quan l'usuari vol CORREGIR o MILLORAR
 
-#### 🔑 REGLA UNIVERSAL DE PROBLEMES 🔑
+#### ⚠️⚠️⚠️ REGLA CRÍTICA: PREGUNTES SOBRE PROBLEMES ⚠️⚠️⚠️
 
-Si l'usuari menciona o pregunta sobre QUALSEVOL aspecte NEGATIU del text:
-→ Mode: UPDATE_BY_ID (vol que ho arreglis)
+QUALSEVOL pregunta o menció sobre aspectes NEGATIUS del text:
+→ Mode: UPDATE_BY_ID (NO CHAT_ONLY!)
+→ L'usuari vol que ACTUÏS, no que li expliquis
 
-Això inclou (però NO es limita a):
-- **Errors objectius**: faltes, errors ortogràfics, typos, gramàtica incorrecta
+Això inclou (SENSE LÍMIT a aquesta llista - USA INFERÈNCIA):
+- **Errors ortogràfics**: faltes, errors, typos, gramàtica incorrecta
 - **Problemes semàntics**: fora de context, incoherent, no té sentit, no encaixa
 - **Problemes d'estil**: sona malament, estrany, rar, poc natural, forçat
 - **Problemes de claredat**: confús, poc clar, difícil d'entendre, ambigu
 - **Problemes de consistència**: repetitiu, contradictori, inconsistent
 - **Problemes d'adequació**: inadequat, inapropiat, massa formal/informal
+- **QUALSEVOL ALTRA cosa negativa** que puguis inferir semànticament
 
-La PREGUNTA CLAU: "L'usuari menciona algun aspecte NEGATIU o PROBLEMÀTIC?"
-- SÍ → UPDATE_BY_ID (vol correcció/millora)
-- NO → Potser CHAT_ONLY o REFERENCE_HIGHLIGHT
+⚠️ PREGUNTA CLAU: "L'usuari menciona algun aspecte NEGATIU o PROBLEMÀTIC?"
+→ SÍ = UPDATE_BY_ID (SEMPRE, sense excepcions)
+→ NO = Potser CHAT_ONLY o REFERENCE_HIGHLIGHT
 
-modification_type (IMPORTANT - tria correctament):
-- "fix": NOMÉS errors ortogràfics/gramaticals (faltes, accents, typos, concordança)
-- "improve": Qualsevol problema SEMÀNTIC o d'ESTIL:
-  * "fora de context" → improve (NO és error ortogràfic!)
+modification_type (REGLA SIMPLE):
+- "fix": NOMÉS si menciona ESPECÍFICAMENT: faltes, ortografia, accents, gramàtica, typos
+- "improve": PER TOT EL RESTA:
+  * "fora de context" → improve (NO és ortogràfic!)
   * "incoherent/estrany/rar" → improve
   * "confús/poc clar" → improve
   * "repetitiu/inconsistent" → improve
   * "sona malament" → improve
+  * "coherent?" (pregunta negativa implícita) → improve
 - "expand": Afegir contingut
 - "simplify": Escurçar/condensar
 - "translate": Traduir
 
-⚠️ REGLA: Si NO és clarament ortogràfic → USA "improve"
+⚠️ DUBTE entre fix/improve? → USA "improve" (més segur)
 
 #### Accions directes → UPDATE_BY_ID
 - Imperatius: "Corregeix", "Millora", "Arregla", "Escurça", "Amplia", "Tradueix"
@@ -221,6 +224,22 @@ Instrucció: "Revisa l'ortografia"
 Instrucció: "Hi ha faltes?"
 {"thought":"Pregunta sobre problemes implica acció correctiva","output_target":"document","mode":"UPDATE_BY_ID","confidence":0.95,"modification_type":"fix","scope":"document","is_question":true,"risk_level":"medium"}
 
+### ⚠️ "Paraules fora de context?" → DOCUMENT (vol CORREGIR - improve!)
+Instrucció: "Hi ha paraules fora de context?"
+{"thought":"Pregunta sobre problemes SEMÀNTICS, vol correcció","output_target":"document","mode":"UPDATE_BY_ID","confidence":0.95,"modification_type":"improve","scope":"document","is_question":true,"risk_level":"medium"}
+
+### ⚠️ "Algo sona estrany?" → DOCUMENT (vol CORREGIR - improve!)
+Instrucció: "Veus alguna cosa que soni estranya?"
+{"thought":"Pregunta sobre problemes d'ESTIL, vol correcció","output_target":"document","mode":"UPDATE_BY_ID","confidence":0.95,"modification_type":"improve","scope":"document","is_question":true,"risk_level":"medium"}
+
+### ⚠️ "És coherent?" → DOCUMENT (pregunta negativa implícita - improve!)
+Instrucció: "El text és coherent?"
+{"thought":"Pregunta implícita sobre problemes, vol verificar i corregir","output_target":"document","mode":"UPDATE_BY_ID","confidence":0.90,"modification_type":"improve","scope":"document","is_question":true,"risk_level":"medium"}
+
+### ⚠️ "Repeticions?" → DOCUMENT (vol CORREGIR - improve!)
+Instrucció: "Hi ha repeticions innecessàries?"
+{"thought":"Pregunta sobre problemes de CONSISTÈNCIA, vol correcció","output_target":"document","mode":"UPDATE_BY_ID","confidence":0.95,"modification_type":"improve","scope":"document","is_question":true,"risk_level":"medium"}
+
 ### "Qui signa?" → DOCUMENT (vol localitzar)
 Instrucció: "Qui signa l'informe?"
 {"thought":"Vol localitzar ON apareix la informació","output_target":"document","mode":"REFERENCE_HIGHLIGHT","confidence":0.95,"highlight_strategy":"mentions","is_question":true,"risk_level":"none"}
@@ -231,7 +250,16 @@ Instrucció: "Explica el contingut d'aquest text"
 
 ### Pregunta general → CHAT
 Instrucció: "Què és un blockchain?"
-{"thought":"Pregunta general de coneixement","output_target":"chat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"concise","is_question":true,"risk_level":"none"}`;
+{"thought":"Pregunta general de coneixement","output_target":"chat","mode":"CHAT_ONLY","confidence":0.95,"response_style":"concise","is_question":true,"risk_level":"none"}
+
+## ⚠️ HEURÍSTICA DE SEGURETAT FINAL ⚠️
+
+Si tens DUBTE:
+1. CHAT_ONLY vs UPDATE_BY_ID per pregunta sobre el text → **UPDATE_BY_ID** (l'usuari vol acció)
+2. "fix" vs "improve" per modification_type → **"improve"** (més flexible)
+3. Pregunta sobre problemes amb confidence baixa → **confidence >= 0.90** igualment
+
+RECORDA: Preguntes sobre aspectes negatius del text = UPDATE_BY_ID, SEMPRE.`;
 
 // ═══════════════════════════════════════════════════════════════
 // API CALL FUNCTIONS

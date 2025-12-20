@@ -2182,18 +2182,29 @@
           }
 
           // Convertir changes a annotations per la nova UI unificada
+          // v17.18: Debug - log raw change
+          console.log('[v17.18] Raw changes from worker:', JSON.stringify(res.changes).substring(0, 500));
           const annotations = res.changes.map(function(c, i) {
+            // v17.18: Log each change reason
+            console.log('[v17.18] Change', i, 'reason:', c.reason, 'explanation:', c.explanation);
             return {
               id: c.id || ('change-' + i),
               type: 'change',
               para_id: parseInt(c.targetId !== undefined ? c.targetId : c.paragraph_id),
               // v16.3: Arreglat mapeig de camps - backend envia snake_case
-              originalText: c.originalText || c.original_text || c.original || null,
-              proposedText: c.proposedText || c.new_text || c.replacement || null,
+              // v17.6: Netejar marcadors interns
+              // v17.31: NO usar c.original com fallback - en mode FIX és el fragment, no el paràgraf!
+              // original_text és SEMPRE el paràgraf complet
+              originalText: cleanInternalMarkers(c.originalText || c.original_text || null),
+              // v17.31: NO usar c.replacement com fallback - en mode FIX és el fragment, no el paràgraf!
+              proposedText: cleanInternalMarkers(c.proposedText || c.new_text || null),
               // v12.1: Camps per mode FIX (find/replace natiu)
-              // v16.4: NO usar c.original com a fallback perquè és el paràgraf complet, no el fragment!
-              find: c.find || null,
-              replace: c.replace || c.replacement || null,
+              // v17.7: NOMÉS usar c.find/c.replace - c.original és el paràgraf COMPLET, no el fragment
+              find: cleanInternalMarkers(c.find || null),
+              replace: cleanInternalMarkers(c.replace || null),
+              // v16.6: Text exacte per highlight (sense context extra de Gemini)
+              highlight_find: c.highlight_find || null,
+              highlight_replace: c.highlight_replace || null,
               context: c.context || null,
               reason: c.reason || c.explanation || 'Canvi proposat',
               status: 'pending',
@@ -3290,6 +3301,14 @@
       }
 
       /**
+       * v17.6: Neteja marcadors interns (⟦SEL⟧) del text
+       */
+      function cleanInternalMarkers(text) {
+        if (!text) return text;
+        return text.replace(/⟦SEL⟧\s*/g, '');
+      }
+
+      /**
        * Scroll al document i destacar referència
        */
       function scrollToDocReference(paraId, color) {
@@ -3981,6 +4000,62 @@
       }
 
       /**
+       * v17.9: Extreu el canvi petit d'un paràgraf complet
+       * Retorna {find, replace} si el canvi afecta menys de 5 paraules
+       * @returns {Object|null} { find, replace } o null si és canvi gran
+       */
+      function extractSmallChange(original, modified) {
+        if (!original || !modified || original === modified) return null;
+
+        // Comparar paraules (mantenir espais per preservar posició)
+        const origWords = original.split(/(\s+)/);
+        const modWords = modified.split(/(\s+)/);
+
+        // Trobar primer índex diferent des del principi
+        let startDiff = 0;
+        while (startDiff < origWords.length && startDiff < modWords.length && origWords[startDiff] === modWords[startDiff]) {
+          startDiff++;
+        }
+
+        // Trobar primer índex diferent des del final
+        let endDiffOrig = origWords.length - 1;
+        let endDiffMod = modWords.length - 1;
+        while (endDiffOrig >= startDiff && endDiffMod >= startDiff && origWords[endDiffOrig] === modWords[endDiffMod]) {
+          endDiffOrig--;
+          endDiffMod--;
+        }
+
+        // Si no hi ha diferència
+        if (startDiff > endDiffOrig && startDiff > endDiffMod) {
+          return null;
+        }
+
+        // Extreure fragments
+        const origDiffWords = origWords.slice(startDiff, endDiffOrig + 1);
+        const modDiffWords = modWords.slice(startDiff, endDiffMod + 1);
+
+        const findText = origDiffWords.join('').trim();
+        const replaceText = modDiffWords.join('').trim();
+
+        // Si el canvi és massa gran (>5 paraules), no és canvi petit
+        const origWordCount = origDiffWords.filter(w => w.trim()).length;
+        const modWordCount = modDiffWords.filter(w => w.trim()).length;
+        if (origWordCount > 5 || modWordCount > 5) {
+          return null;
+        }
+
+        // v17.24: Permetre insercions (find buit) i eliminacions (replace buit)
+        // Comparar normalitzat SENSE toLowerCase() - majúscules són canvis vàlids
+        const normalizeForCompare = (s) => (s || '').trim().replace(/\s+/g, ' ');
+        if (normalizeForCompare(findText) === normalizeForCompare(replaceText)) return null;
+
+        return {
+          find: findText,  // Pot ser "" per insercions
+          replace: replaceText  // Pot ser "" per eliminacions
+        };
+      }
+
+      /**
        * v14.6: Calcula estadístiques d'un canvi
        * @returns {Object} { charDiff, wordsAdded, wordsRemoved, isLarge }
        */
@@ -4006,6 +4081,82 @@
       }
 
       /**
+       * v17.0: Genera una descripció curta del canvi (màx 2-3 paraules)
+       * Exemples: "corregir «Informaciió»", "simplificar frase", "afegir accent"
+       */
+      function generateChangeDescription(original, proposed) {
+        if (!original || !proposed) return '';
+
+        const origText = original.trim();
+        const propText = proposed.trim();
+
+        // Si són idèntics, no hi ha descripció
+        if (origText === propText) return '';
+
+        // Trobar la paraula/fragment que canvia
+        const origWords = origText.split(/\s+/);
+        const propWords = propText.split(/\s+/);
+
+        // Buscar la primera diferència paraula per paraula
+        let diffWord = '';
+        let correctedWord = '';
+        for (let i = 0; i < Math.max(origWords.length, propWords.length); i++) {
+          const ow = origWords[i] || '';
+          const pw = propWords[i] || '';
+          if (ow !== pw) {
+            diffWord = ow;
+            correctedWord = pw;
+            break;
+          }
+        }
+
+        // Si no hi ha diferència a nivell de paraula, buscar a nivell de caràcter
+        if (!diffWord && origText !== propText) {
+          // Canvi petit dins d'una paraula (accent, lletra)
+          for (let i = 0; i < origWords.length; i++) {
+            if (origWords[i] !== propWords[i]) {
+              diffWord = origWords[i];
+              correctedWord = propWords[i];
+              break;
+            }
+          }
+        }
+
+        // Determinar tipus de canvi
+        if (!diffWord) {
+          // Canvi general
+          if (propText.length < origText.length * 0.7) return 'escurçar';
+          if (propText.length > origText.length * 1.3) return 'expandir';
+          return 'millorar';
+        }
+
+        // Limitar longitud de la paraula mostrada
+        const maxLen = 15;
+        const shortWord = diffWord.length > maxLen ? diffWord.substring(0, maxLen) + '…' : diffWord;
+
+        // Detectar tipus específic de canvi
+        const lowerOrig = diffWord.toLowerCase();
+        const lowerProp = (correctedWord || '').toLowerCase();
+
+        // Accent afegit?
+        if (lowerOrig.replace(/[àáèéíòóú]/g, c => 'aaeeioo'[['à','á','è','é','í','ò','ó','ú'].indexOf(c)]) ===
+            lowerProp.replace(/[àáèéíòóú]/g, c => 'aaeeioo'[['à','á','è','é','í','ò','ó','ú'].indexOf(c)])) {
+          // Mateixa paraula però diferent accentuació
+          if (correctedWord.match(/[àáèéíòóú]/)) {
+            return '«' + shortWord + '»';
+          }
+        }
+
+        // Lletra duplicada? (informaciió → informació)
+        if (diffWord.match(/(.)\1/) && !correctedWord.match(/(.)\1/)) {
+          return '«' + shortWord + '»';
+        }
+
+        // Retornar descripció amb la paraula afectada
+        return '«' + shortWord + '»';
+      }
+
+      /**
        * v14.6: Toggle expandir/col·lapsar una anotació
        */
       function toggleAnnotationExpand(annId) {
@@ -4027,25 +4178,66 @@
        * Renderitza una anotació de canvi (amb botons Accept/Reject)
        * v14.1: Afegit suport per indicadors WARN
        * v14.6: Vista col·lapsada per canvis grans
-       * v14.7: "Canvi proposat N:" en lloc de "Línia X" (només numerat si >1 canvi)
+       * v17.0: "Canvi N: descripció curta" en lloc de "Canvi proposat N:"
+       * v17.4: Canvis llargs mostren només "Paràgraf proposat:" amb text net
+       *        (original s'assenyala al document, proposat es mostra a la barra)
        */
       function renderChangeAnnotation(ann, changeNum, totalChanges) {
-        const diffHtml = ann.diffHtml || computeDiffHtml(ann.originalText || '', ann.proposedText || '');
         const statusClass = 'data-status="' + (ann.status || 'pending') + '"';
-        const stats = computeChangeStats(ann.originalText, ann.proposedText);
+
+        // v17.24: Decidir si és canvi puntual (find/replace) o canvi de línia completa
+        // IMPORTANT: find pot ser "" per insercions, replace pot ser "" per eliminacions
+        // Usar typeof per detectar si existeixen (no truthy check)
+        const hasFind = typeof ann.find === 'string';
+        const hasReplace = typeof ann.replace === 'string';
+        // v17.24: Normalitzar SENSE toLowerCase() - les majúscules SÓN canvis vàlids
+        const normalizeForCompare = (s) => (s || '').trim().replace(/\s+/g, ' ');
+        let isFindReplaceChange = hasFind && hasReplace &&
+          normalizeForCompare(ann.find) !== normalizeForCompare(ann.replace);
+
+        // v17.9: Si no tenim find/replace però el canvi és petit, calcular-los
+        let displayOriginal, displayProposed;
+        if (isFindReplaceChange) {
+          displayOriginal = ann.find;
+          displayProposed = ann.replace;
+        } else if (ann.originalText && ann.proposedText && ann.originalText !== ann.proposedText) {
+          // Intentar extreure el fragment que canvia
+          const extracted = extractSmallChange(ann.originalText, ann.proposedText);
+          if (extracted) {
+            displayOriginal = extracted.find;
+            displayProposed = extracted.replace;
+            isFindReplaceChange = true;  // Ara és un canvi petit!
+          } else {
+            displayOriginal = ann.originalText;
+            displayProposed = ann.proposedText;
+          }
+        } else {
+          displayOriginal = ann.originalText;
+          displayProposed = ann.proposedText;
+        }
+
+        const stats = computeChangeStats(displayOriginal, displayProposed);
+
+        // v17.7: Detectar si el canvi és prou llarg per mostrar només el proposat
+        // Per canvis find/replace petits, MAI mostrar com a "paràgraf complet"
+        const SHOW_PROPOSED_ONLY_THRESHOLD = 80;
+        const originalLen = (displayOriginal || '').length;
+        const isFullParagraphChange = !isFindReplaceChange && originalLen > SHOW_PROPOSED_ONLY_THRESHOLD;
 
         // v14.1: Afegir classe especial si és WARN
         const warnClass = ann._status === 'WARN' ? ' warn-change' : '';
         // v14.6: Classe per canvis grans (col·lapsats per defecte)
         const largeClass = stats.isLarge ? ' large-change' : '';
+        // v17.4: Classe per canvis de paràgraf complet
+        const fullParaClass = isFullParagraphChange ? ' full-paragraph-change' : '';
 
-        // v14.7: Només mostrar número si hi ha més d'un canvi
-        const locationLabel = (totalChanges > 1) ? 'Canvi proposat ' + changeNum + ':' : 'Canvi proposat:';
-
-        let html = '<div class="annotation-item change-item' + warnClass + largeClass + '" data-id="' + ann.id + '" ' + statusClass + '>';
+        let html = '<div class="annotation-item change-item' + warnClass + largeClass + fullParaClass + '" data-id="' + ann.id + '" ' + statusClass + '>';
         // v16.5: Header amb botons a la dreta
         html += '<div class="annotation-header">';
         html += '<div class="annotation-header-left">';
+
+        // v17.13: Format simplificat - només número de canvi, sense descripció
+        const locationLabel = (totalChanges > 1) ? 'Canvi ' + changeNum : 'Canvi';
         html += '<span class="annotation-location">' + locationLabel + '</span>';
 
         // v14.1: Mostrar badge WARN si aplica
@@ -4053,12 +4245,6 @@
           html += '<span class="annotation-warn-badge" title="' + escapeHtmlSafe(ann._warn_reason || 'Canvi gran que requereix revisió') + '">';
           html += icon('alertTriangle', 'i--sm i--warning') + ' Reviseu';
           html += '</span>';
-        }
-
-        // v15.1: Només mostrar reason si és diferent de "Canvi proposat" (evitar duplicat)
-        const reason = ann.reason || '';
-        if (reason && reason !== 'Canvi proposat') {
-          html += '<span class="annotation-reason">' + escapeHtmlSafe(reason) + '</span>';
         }
         html += '</div>'; // annotation-header-left
 
@@ -4072,8 +4258,12 @@
         html += '</span>';
         // Botons d'acció
         html += '<div class="annotation-actions">';
-        if (stats.isLarge) {
+        if (stats.isLarge && !isFullParagraphChange) {
           html += '<button class="btn-expand" onclick="toggleAnnotationExpand(\'' + ann.id + '\')" title="Expandir">' + icon('chevronDown', 'i--sm') + '</button>';
+        }
+        // v17.14: Botó info per mostrar l'explicació del canvi
+        if (ann.reason) {
+          html += '<button class="btn-info" onclick="toggleChangeInfo(\'' + ann.id + '\', this)" title="Informació del canvi">' + icon('info', 'i--sm') + '</button>';
         }
         html += '<button class="btn-view" onclick="showAnnotationHighlight(\'' + ann.id + '\', this)" title="Veure al document">' + icon('eye', 'i--sm') + '</button>';
         html += '<button class="btn-accept" onclick="acceptSingleAnnotation(\'' + ann.id + '\', this)" title="Acceptar">' + icon('check', 'i--sm') + '</button>';
@@ -4082,8 +4272,12 @@
 
         html += '</div>'; // annotation-header
 
-        // v14.6: Per canvis grans, mostrar vista col·lapsada
-        if (stats.isLarge) {
+        // v17.7: Per canvis de paràgraf complet, mostrar el text proposat net (sense diff)
+        if (isFullParagraphChange) {
+          html += '<div class="annotation-proposed-text">' + escapeHtmlSafe(displayProposed || '') + '</div>';
+        } else if (stats.isLarge) {
+          // v14.6: Per canvis grans (no de paràgraf), mostrar vista col·lapsada
+          const diffHtml = ann.diffHtml || computeDiffHtml(displayOriginal || '', displayProposed || '');
           // Estadístiques compactes
           html += '<div class="annotation-stats">';
           if (stats.wordsRemoved > 0) html += '<span class="stat-removed">−' + stats.wordsRemoved + ' p</span>';
@@ -4094,7 +4288,8 @@
           // Diff amagat (es mostra quan s'expandeix)
           html += '<div class="annotation-diff collapsed">' + diffHtml + '</div>';
         } else {
-          // Canvi petit: mostrar diff directament
+          // v17.7: Canvi petit o find/replace: mostrar diff directament
+          const diffHtml = ann.diffHtml || computeDiffHtml(displayOriginal || '', displayProposed || '');
           html += '<div class="annotation-diff">' + diffHtml + '</div>';
         }
 
@@ -4135,6 +4330,52 @@
       }
 
       /**
+       * v17.14: Mostrar/amagar informació del canvi (tooltip)
+       */
+      function toggleChangeInfo(annotationId, btn) {
+        console.log('[v17.28] toggleChangeInfo called for:', annotationId);
+        const ann = pendingAnnotations.find(a => a.id === annotationId);
+        console.log('[v17.28] annotation found:', !!ann, 'reason:', ann ? ann.reason : 'N/A');
+        if (!ann || !ann.reason) {
+          console.log('[v17.28] EARLY RETURN - no annotation or no reason');
+          return;
+        }
+
+        // v17.28: Usar closest() per trobar l'element CORRECTE (no el primer del DOM)
+        let el = btn ? btn.closest('.annotation-item[data-id="' + annotationId + '"]') : null;
+        if (!el) {
+          console.log('[v17.28] Element not found via closest, trying querySelector');
+          // Fallback al querySelector si btn no funciona
+          el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
+          if (!el) return;
+        }
+
+        // Comprovar si ja existeix el tooltip
+        let infoBox = el.querySelector('.change-info-box');
+        if (infoBox) {
+          // Toggle: amagar si ja està visible
+          infoBox.remove();
+          btn.classList.remove('active');
+          return;
+        }
+
+        // Crear el tooltip amb l'explicació
+        infoBox = document.createElement('div');
+        infoBox.className = 'change-info-box';
+        infoBox.innerHTML = '<div class="change-info-content">' + escapeHtmlSafe(ann.reason) + '</div>';
+
+        // Inserir just després del header
+        const header = el.querySelector('.annotation-header');
+        if (header && header.nextSibling) {
+          el.insertBefore(infoBox, header.nextSibling);
+        } else {
+          el.appendChild(infoBox);
+        }
+
+        btn.classList.add('active');
+      }
+
+      /**
        * Acceptar un canvi individual
        * v12.1: Router híbrid - FIX usa replaceText natiu, altres usen FormatPreserver
        */
@@ -4171,6 +4412,14 @@
           // v16.3: Debug logging per undo
           console.log('[acceptSingleAnnotation] result:', JSON.stringify(result));
           console.log('[acceptSingleAnnotation] modification_type:', annotationModificationType);
+
+          // v16.9: Verificar que el canvi s'ha aplicat realment (no skipped)
+          if (result && result.ok && result.applied === 0 && result.skipped > 0) {
+            console.warn('[acceptSingleAnnotation] Change was skipped, not applied');
+            showToast('No s\'ha pogut aplicar el canvi (text no trobat)', 'warning');
+            return;
+          }
+
           if (result && result.ok) {
             ann.status = 'accepted';
             // v16.1: Guardar snapshot local per undo immediat
@@ -4215,11 +4464,12 @@
             showToast(toastMsg, 'success');
             updateBulkActionsBar();
 
-            // v16.4: Auto-clear highlight després de 3 segons
+            // v16.4: Auto-clear highlight després d'1.5 segons
+            // v16.7: Reduït de 3s a 1.5s per feedback de l'usuari
             if (result.highlightApplied) {
               setTimeout(function() {
                 google.script.run.clearHighlightByParaId(ann.para_id);
-              }, 3000);
+              }, 1500);
             }
           } else {
             ann.status = 'pending';
@@ -4235,29 +4485,23 @@
           showToast('Error: ' + err.message, 'error');
         };
 
-        // v12.1: Router híbrid
-        if (annotationModificationType === 'fix') {
-          // Mode FIX: usa find/replace natiu
-          google.script.run
-            .withSuccessHandler(successHandler)
-            .withFailureHandler(failureHandler)
-            .applyFindReplaceChanges([{
-              targetId: ann.para_id,
-              find: ann.find || ann.originalText,
-              replace: ann.replace || ann.proposedText,
-              context: ann.context || null
-            }]);
-        } else {
-          // Altres modes: usa FormatPreserver
-          google.script.run
-            .withSuccessHandler(successHandler)
-            .withFailureHandler(failureHandler)
-            .applySingleChange({
-              targetId: ann.para_id,
-              originalText: ann.originalText,
-              proposedText: ann.proposedText
-            });
-        }
+        // v17.2: Unificat - sempre usa applyFindReplaceChanges amb fallbacks
+        google.script.run
+          .withSuccessHandler(successHandler)
+          .withFailureHandler(failureHandler)
+          .applyFindReplaceChanges([{
+            targetId: ann.para_id,
+            // Mode FIX: find/replace atòmic
+            find: ann.find || null,
+            replace: ann.replace || null,
+            // Mode IMPROVE/altres: original_text/new_text per full-replace
+            original_text: ann.originalText,
+            new_text: ann.proposedText,
+            // Highlight precís
+            highlight_find: ann.highlight_find || null,
+            highlight_replace: ann.highlight_replace || null,
+            context: ann.context || null
+          }]);
       }
 
       /**
@@ -4275,8 +4519,18 @@
 
         const successHandler = function(result) {
           if (result && result.ok) {
-            pending.forEach(ann => {
+            // v17.30: Guardar undoSnapshots per cada anotació per permetre undo individual
+            const snapshots = result.undoSnapshots || [];
+            pending.forEach((ann, i) => {
               ann.status = 'accepted';
+              // v17.30: Assignar undoSnapshot corresponent (per targetId o per índex)
+              const matchingSnapshot = snapshots.find(s => String(s.targetId) === String(ann.para_id)) || snapshots[i];
+              if (matchingSnapshot) {
+                ann.undoSnapshot = matchingSnapshot;
+                console.log('[v17.30] acceptAllAnnotations saved undoSnapshot for', ann.id, 'targetId:', ann.para_id);
+              } else {
+                console.warn('[v17.30] NO undoSnapshot found for', ann.id);
+              }
               updateAnnotationUI(ann.id, 'accepted');
             });
             updateBulkActionsBar();
@@ -4291,41 +4545,44 @@
           showToast('Error: ' + err.message, 'error');
         };
 
-        // v12.1: Router híbrid - FIX usa replaceText natiu, altres usen FormatPreserver
-        if (annotationModificationType === 'fix') {
-          // Mode FIX: usa find/replace natiu que preserva format automàticament
-          const changes = pending.map(ann => ({
-            targetId: ann.para_id,
-            find: ann.find || ann.originalText,  // Backend pot enviar 'find' específic
-            replace: ann.replace || ann.proposedText,
-            context: ann.context || null  // Context per unicitat (opcional)
-          }));
+        // v17.31: Unificat - sempre usa applyFindReplaceChanges amb mateixa estructura que acceptSingleAnnotation
+        // El backend decideix si usar find/replace o original_text/new_text
+        const changes = pending.map(ann => ({
+          targetId: ann.para_id,
+          // Mode FIX: find/replace atòmic (null si no existeix)
+          find: ann.find || null,
+          replace: ann.replace || null,
+          // Mode IMPROVE/altres: original_text/new_text per full-replace
+          original_text: ann.originalText,
+          new_text: ann.proposedText,
+          // Highlight precís
+          highlight_find: ann.highlight_find || null,
+          highlight_replace: ann.highlight_replace || null,
+          context: ann.context || null
+        }));
 
-          google.script.run
-            .withSuccessHandler(successHandler)
-            .withFailureHandler(failureHandler)
-            .applyFindReplaceChanges(changes);
-        } else {
-          // Altres modes: usa FormatPreserver per canvis complets de paràgraf
-          const changes = pending.map(ann => ({
-            targetId: ann.para_id,
-            originalText: ann.originalText,
-            proposedText: ann.proposedText
-          }));
-
-          google.script.run
-            .withSuccessHandler(successHandler)
-            .withFailureHandler(failureHandler)
-            .applyPendingChanges(changes, annotationDocSnapshot);
-        }
+        google.script.run
+          .withSuccessHandler(successHandler)
+          .withFailureHandler(failureHandler)
+          .applyFindReplaceChanges(changes);
       }
 
       /**
        * Actualitza la UI d'una anotació segons el seu status
        */
       function updateAnnotationUI(annotationId, status) {
+        console.log('[v17.29] updateAnnotationUI called with id:', annotationId, 'status:', status);
+        // v17.29: Debug - mostrar tots els elements amb data-id
+        const allItems = document.querySelectorAll('.annotation-item[data-id]');
+        console.log('[v17.29] All annotation-item elements:', allItems.length);
+        allItems.forEach(item => console.log('[v17.29] - data-id:', item.getAttribute('data-id')));
+
         const el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
-        if (!el) return;
+        if (!el) {
+          console.warn('[v17.29] Element NOT FOUND for id:', annotationId);
+          return;
+        }
+        console.log('[v17.29] Element FOUND, proceeding...');
 
         el.setAttribute('data-status', status);
 
@@ -4343,16 +4600,24 @@
 
         // v16.1: Afegir/treure botó Desfer segons estat
         const actionsEl = el.querySelector('.annotation-actions');
+        console.log('[v17.26] actionsEl found:', !!actionsEl, 'for', annotationId);
         if (actionsEl) {
           const ann = pendingAnnotations.find(a => a.id === annotationId);
           const existingUndoBtn = actionsEl.querySelector('.btn-undo');
+          const existingAcceptBtn = actionsEl.querySelector('.btn-accept');
 
-          // Mostrar botó desfer si tenim undoSnapshot (local) o event_id (persistent)
+          // v14.8: Mostrar sempre botó desfer quan accepted
           const canUndo = ann && (ann.undoSnapshot || ann.event_id);
-          // v16.3: Debug logging
-          console.log('[updateAnnotationUI] id:', annotationId, 'status:', status, 'canUndo:', canUndo, 'hasSnapshot:', !!ann?.undoSnapshot, 'hasEventId:', !!ann?.event_id);
+          console.log('[updateAnnotationUI] id:', annotationId, 'status:', status, 'canUndo:', canUndo);
 
-          if (status === 'accepted' && canUndo) {
+          if (status === 'accepted') {
+            // v17.18: Debug
+            console.log('[v17.18] ADDING UNDO BUTTON for', annotationId, 'existingAcceptBtn:', !!existingAcceptBtn, 'existingUndoBtn:', !!existingUndoBtn);
+            // Treure botó Accept quan s'accepta
+            if (existingAcceptBtn) {
+              existingAcceptBtn.remove();
+              console.log('[v17.18] Removed accept button');
+            }
             // Afegir botó Desfer si no existeix
             if (!existingUndoBtn) {
               const undoBtn = document.createElement('button');
@@ -4361,10 +4626,22 @@
               undoBtn.innerHTML = icon('undo', 'i--sm');
               undoBtn.onclick = function() { undoSingleAnnotation(annotationId); };
               actionsEl.appendChild(undoBtn);
+              console.log('[v17.18] Added undo button');
             }
-          } else if (status === 'undone' && existingUndoBtn) {
-            // Treure botó Desfer quan s'ha desfet
-            existingUndoBtn.remove();
+          } else if (status === 'pending') {
+            // v16.8: Treure botó Desfer i restaurar botó Acceptar quan tornem a pending
+            if (existingUndoBtn) {
+              existingUndoBtn.remove();
+            }
+            // Assegurar que el botó accept existeix i és visible
+            if (!existingAcceptBtn) {
+              const acceptBtn = document.createElement('button');
+              acceptBtn.className = 'btn-accept';
+              acceptBtn.title = 'Acceptar';
+              acceptBtn.innerHTML = icon('check', 'i--sm');
+              acceptBtn.onclick = function() { acceptSingleAnnotation(annotationId, acceptBtn); };
+              actionsEl.appendChild(acceptBtn);
+            }
           }
         }
       }
@@ -4391,14 +4668,27 @@
         }
 
         const handleUndoSuccess = function(result) {
+          // v16.8: Debug logging
+          console.log('[handleUndoSuccess] result:', JSON.stringify(result));
           // Verificar èxit segons el tipus de resposta
           const success = result && (result.ok || result.success || result.status === 'restored');
+          console.log('[handleUndoSuccess] success:', success);
           if (success) {
-            ann.status = 'undone';
+            // v16.8: Tornar a estat 'pending' per poder re-aplicar el canvi
+            ann.status = 'pending';
             ann.undoSnapshot = null;
-            ann.event_id = null;  // Ja no es pot tornar a desfer
-            updateAnnotationUI(annotationId, 'undone');
-            showToast('Canvi desfet', 'undo');
+            ann.event_id = null;
+            updateAnnotationUI(annotationId, 'pending');
+            showToast('Canvi desfet - pots tornar a aplicar-lo', 'undo');
+            updateBulkActionsBar();  // Actualitzar comptador de pendents
+
+            // v16.7: Netejar highlight del document després d'1.5 segons
+            const paraId = result.targetId !== undefined ? result.targetId : ann.para_id;
+            if (paraId !== undefined) {
+              setTimeout(function() {
+                google.script.run.clearHighlightByParaId(paraId);
+              }, 1500);
+            }
           } else {
             showToast(result.error || 'Error desfent canvi', 'error');
             if (undoBtn) {
@@ -4840,12 +5130,17 @@
                   type: 'change',
                   para_id: parseInt(c.targetId !== undefined ? c.targetId : c.paragraph_id),
                   // v16.3: Arreglat mapeig de camps - backend envia snake_case
-                  originalText: c.originalText || c.original_text || c.original || null,
-                  proposedText: c.proposedText || c.new_text || c.replacement || null,
+                  // v17.6: Netejar marcadors interns
+                  // v17.7: c.original és el paràgraf complet, NO usar com fallback per find
+                  originalText: cleanInternalMarkers(c.originalText || c.original_text || c.original || null),
+                  proposedText: cleanInternalMarkers(c.proposedText || c.new_text || c.replacement || null),
                   // v12.1: Camps per mode FIX (find/replace natiu)
-                  // v16.4: NO usar c.original com a fallback perquè és el paràgraf complet, no el fragment!
-                  find: c.find || null,
-                  replace: c.replace || c.replacement || null,
+                  // v17.7: NOMÉS usar c.find/c.replace - c.original és el paràgraf COMPLET, no el fragment
+                  find: cleanInternalMarkers(c.find || null),
+                  replace: cleanInternalMarkers(c.replace || null),
+                  // v16.7: Text exacte per highlight verd després d'aplicar (sense context extra)
+                  highlight_find: c.highlight_find || null,
+                  highlight_replace: c.highlight_replace || null,
                   context: c.context || null,
                   reason: c.reason || c.explanation || 'Canvi proposat',
                   status: 'pending'
@@ -5476,12 +5771,17 @@
                   type: 'change',
                   para_id: parseInt(c.targetId !== undefined ? c.targetId : c.paragraph_id),
                   // v16.3: Arreglat mapeig de camps - backend envia snake_case
-                  originalText: c.originalText || c.original_text || c.original || null,
-                  proposedText: c.proposedText || c.new_text || c.replacement || null,
+                  // v17.6: Netejar marcadors interns
+                  // v17.7: c.original és el paràgraf complet, NO usar com fallback per find
+                  originalText: cleanInternalMarkers(c.originalText || c.original_text || c.original || null),
+                  proposedText: cleanInternalMarkers(c.proposedText || c.new_text || c.replacement || null),
                   // v12.1: Camps per mode FIX (find/replace natiu)
-                  // v16.4: NO usar c.original com a fallback perquè és el paràgraf complet, no el fragment!
-                  find: c.find || null,
-                  replace: c.replace || c.replacement || null,
+                  // v17.7: NOMÉS usar c.find/c.replace - c.original és el paràgraf COMPLET, no el fragment
+                  find: cleanInternalMarkers(c.find || null),
+                  replace: cleanInternalMarkers(c.replace || null),
+                  // v16.7: Text exacte per highlight verd després d'aplicar (sense context extra)
+                  highlight_find: c.highlight_find || null,
+                  highlight_replace: c.highlight_replace || null,
                   context: c.context || null,
                   reason: c.reason || c.explanation || 'Canvi proposat',
                   status: 'pending'

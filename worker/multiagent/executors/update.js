@@ -21,9 +21,45 @@ import { sha256Sync, validateChangesV14 } from '../validator.js';
 // ═══════════════════════════════════════════════════════════════
 
 const UPDATE_PROMPTS = {
-  // v12.1: Prompt FIX amb Context Anchors per Find/Replace natiu
-  fix: `CORRECTOR QUIRÚRGIC (Mode Find/Replace v12.1)
+  // v17.21: Prompt FIX amb anti-al·lucinació
+  fix: `CORRECTOR QUIRÚRGIC (Mode Find/Replace v17.25)
 Objectiu: Corregir errors ortogràfics amb canvis MÍNIMS i ATÒMICS.
+
+## 🛑🛑🛑 REGLA #1: HONESTITAT ABSOLUTA 🛑🛑🛑
+
+SI NO HI HA ERRORS → DIGUES-HO CLARAMENT I RETORNA changes: []
+
+ÉS PERFECTAMENT ACCEPTABLE no trobar res. El text pot estar BÉ.
+NO INVENTIS errors per "ajudar". Això és PITJOR que no trobar res.
+La teva CREDIBILITAT depèn de ser HONEST.
+
+Resposta correcta si no hi ha errors:
+{"response": "He revisat el text i no he trobat cap error ortogràfic.", "changes": []}
+
+## ⚠️⚠️⚠️ REGLA #2: ANTI-AL·LUCINACIÓ ⚠️⚠️⚠️
+
+EL TEXT "find" HA D'EXISTIR **EXACTAMENT** AL TEXT INDICAT.
+- Copia el text EXACTE, no l'inventis
+- Si no trobes errors, retorna changes: [] - NO inventis errors
+- És MOLT MILLOR no trobar res que inventar errors falsos
+- MAI retornis un "find" que no existeixi literalment al text
+
+VERIFICACIÓ OBLIGATÒRIA abans de cada canvi:
+1. Busca el text "find" dins del paràgraf original
+2. Si NO el trobes EXACTAMENT → NO incloguis aquest canvi
+3. En cas de dubte → NO incloguis el canvi
+
+## 🚫🚫🚫 REGLA #3: MAI CANVIS IDÈNTICS 🚫🚫🚫
+
+ABANS de retornar CADA canvi, compara "find" i "replace":
+- Si find === replace → NO incloguis aquest canvi!
+- Si l'únic canvi és majúscules/minúscules i NO és inici de frase → NO incloguis!
+- Si l'únic canvi són espais → NO incloguis!
+
+EXEMPLES DE CANVIS QUE NO HAURIES DE RETORNAR:
+❌ {"find": "projecte", "replace": "projecte"} → IDÈNTIC!
+❌ {"find": "Barcelona", "replace": "barcelona"} → NO canviar majúscula de nom propi
+❌ {"find": "de  la", "replace": "de la"} → Només espais, no és error
 
 ## ⚠️ FORMAT DE SORTIDA CRÍTIC
 Retorna parells find/replace, NO el text complet del paràgraf.
@@ -50,6 +86,7 @@ Abans de retornar cada canvi, VERIFICA MENTALMENT:
 1. El "find" apareix EXACTAMENT UNA vegada al paràgraf? → Si no, afegir context
 2. El "replace" té la mateixa longitud ±10%? → Si no, potser és "improve"
 3. L'error és OBJECTIU (no estilístic)? → Si no, no corregir
+4. El "find" existeix LITERALMENT al text? → Si no, NO retornis aquest canvi!
 
 ## ERRORS A CORREGIR
 - Lletres repetides: "dde" → "de", "laa" → "la", "quee" → "que"
@@ -85,27 +122,46 @@ PROTOCOL:
       "paragraph_id": <número>,
       "find": "<text únic amb context si cal>",
       "replace": "<text corregit>",
-      "reason": "typo|accent|grammar|diacritic"
+      "reason": "<explicació clara i natural del canvi, ex: 'Falta l'accent obert a la e' o 'Error tipogràfic: lletra duplicada'>"
     }
   ]
 }
 \`\`\`
 
+IMPORTANT per "reason": Ha de ser una frase natural i clara que expliqui la naturalesa del canvi.
+Exemples bons: "Falta l'accent a la paraula 'àrea'", "Lletra duplicada 'docummentació'", "Concordança de gènere incorrecta"
+Exemples dolents: "typo", "accent", "grammar" (massa curt, no informatiu)
+
 ## RESPOSTA CONTEXTUAL (IMPORTANT)
 El camp "response" ha de:
 1. Fer referència directa a la INSTRUCCIÓ de l'usuari (no respostes genèriques)
-2. Ser breu i natural (1-2 frases)
-3. Mencionar específicament què s'ha trobat/fet
+2. Usar TO PROPOSITIU (l'usuari decideix si accepta) - NO dir "he corregit/he canviat"
+3. Ser breu i natural (1-2 frases)
 
 Exemples segons instrucció:
-- "Corregeix les faltes" → "He corregit 3 faltes d'ortografia: 'area' → 'àrea', 'documentacio' → 'documentació'..."
-- "Revisa l'ortografia del paràgraf 2" → "Al paràgraf 2 he trobat 2 errors d'accent que he marcat."
-- "Arregla els errors" → "He detectat i marcat 4 errors: 2 accents i 2 typos."
+- "Corregeix les faltes" → "He trobat 3 faltes d'ortografia: 'area' → 'àrea', 'documentacio' → 'documentació'. Proposo corregir-les."
+- "Revisa l'ortografia del paràgraf 2" → "Al paràgraf 2 he detectat 2 errors d'accent. Vols que els corregeixi?"
+- "Arregla els errors" → "He detectat 4 errors: 2 accents i 2 typos. Proposo les correccions."
 
-Si no hi ha errors: {"response": "He revisat el text segons la teva petició i no he trobat cap error a corregir.", "changes": []}`,
+Si no hi ha errors: {"response": "He revisat el text i no he trobat cap error a corregir.", "changes": []}`,
 
-  improve: `EDITOR DE MILLORES (Semàntic + Estil)
+  improve: `EDITOR DE MILLORES (Semàntic + Estil) v17.25
 Objectiu: Detectar i corregir QUALSEVOL problema de text que NO sigui ortogràfic pur.
+
+## 🛑🛑🛑 REGLA #1: HONESTITAT ABSOLUTA 🛑🛑🛑
+
+SI NO HI HA PROBLEMES → DIGUES-HO CLARAMENT I RETORNA changes: []
+
+ÉS PERFECTAMENT ACCEPTABLE no trobar res. El text pot estar BÉ.
+NO INVENTIS problemes per "ajudar". Això és PITJOR que no trobar res.
+La teva CREDIBILITAT depèn de ser HONEST.
+
+Resposta correcta si no hi ha problemes:
+{"response": "He revisat el text i no he trobat cap problema a millorar.", "changes": []}
+
+## ⚠️ FORMAT DE SORTIDA CRÍTIC ⚠️
+PER CANVIS PETITS (1-3 paraules): Usa find/replace, NO el paràgraf complet!
+PER CANVIS GRANS (frases senceres): Usa original_text/new_text
 
 ## PROBLEMES A DETECTAR (PRIORITAT ALTA)
 | Tipus | Què buscar | Acció |
@@ -134,32 +190,53 @@ Si l'usuari pregunta "Hi ha paraules fora de context?" busca:
 3. Verificar que el significat és IDÈNTIC
 4. Si dubtes, NO canviar
 
-## OUTPUT
+## OUTPUT - IMPORTANT: ESCULL EL FORMAT CORRECTE
+
+### Per canvis PETITS (1-3 paraules): usa find/replace
 \`\`\`json
 {
-  "response": "<resposta breu i natural a l'usuari>",
+  "response": "<resposta breu>",
   "changes": [
     {
       "paragraph_id": <número>,
-      "original_text": "<paràgraf original>",
-      "new_text": "<paràgraf millorat>",
-      "explanation": "[Tipus]: què s'ha millorat i per què"
+      "find": "<text EXACTE a trobar, inclou context si cal>",
+      "replace": "<text de reemplaçament>",
+      "reason": "<explicació clara i natural: què era el problema i com es millora>"
     }
   ]
 }
 \`\`\`
 
+### Per canvis GRANS (frases senceres o reescriptura): usa original_text/new_text
+\`\`\`json
+{
+  "response": "<resposta breu>",
+  "changes": [
+    {
+      "paragraph_id": <número>,
+      "original_text": "<paràgraf original>",
+      "new_text": "<paràgraf millorat>",
+      "reason": "<explicació clara i natural: què era el problema i com es millora>"
+    }
+  ]
+}
+\`\`\`
+
+IMPORTANT per "reason": Ha de ser una frase natural que expliqui clarament:
+- Quin era el problema original
+- Per què la nova versió és millor
+Exemples: "La paraula 'cosa' era massa genèrica, 'element' és més precís en aquest context",
+"La frase era massa llarga i confusa, ara està dividida en dues frases clares"
+
+## REGLA D'OR: Si canvies menys de 5 paraules, USA find/replace!
+
 ## RESPOSTA CONTEXTUAL (IMPORTANT)
 El camp "response" ha de:
 1. Fer referència directa a la INSTRUCCIÓ de l'usuari
-2. Explicar breument què s'ha millorat i per què
+2. Usar TO PROPOSITIU (l'usuari decideix si accepta) - MAI dir "he fet/he canviat"
+3. Explicar breument què es proposa i per què
 
-Exemples segons instrucció:
-- "Millora aquest text" → "He millorat la fluïdesa dividint dues frases massa llargues i eliminant repeticions."
-- "Fes-ho més clar" → "He simplificat l'estructura per fer-ho més llegible: he dividit un paràgraf dens en dos."
-- "Poleix el text" → "He refinat l'estil substituint connectors repetitius i aclarint una frase ambigua."
-
-Si el text ja és clar: {"response": "He revisat el text i ja està ben escrit, no proposo canvis.", "changes": []}`,
+Si el text ja és clar: {"response": "He revisat el text i no he trobat problemes. No proposo canvis.", "changes": []}`,
 
   expand: `DESENVOLUPADOR DE CONTINGUT
 Objectiu: Expandir text afegint detalls, exemples o explicacions rellevants.
@@ -568,6 +645,9 @@ async function callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal, modifi
  * v14.4: Extreu camp "response" per resposta natural de la IA
  */
 function parseUpdateResponse(responseText, modificationType = 'improve') {
+  // DEBUG: Log raw response
+  logDebug('Gemini raw response', { preview: responseText.substring(0, 500) });
+
   // Buscar JSON
   const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
   let jsonStr = jsonMatch ? jsonMatch[1] : responseText;
@@ -591,15 +671,48 @@ function parseUpdateResponse(responseText, modificationType = 'improve') {
     if (modificationType === 'fix') {
       return {
         response: aiResponse,
-        changes: changes.map(c => ({
-          paragraph_id: c.paragraph_id - 1,  // v12.1: 1-indexed → 0-indexed
-          find: c.find || c.original_text,  // Fallback a format antic
-          replace: c.replace || c.new_text,
-          reason: c.reason || c.explanation || 'fix',
-          // Preservar camps originals si existeixen
-          original_text: c.original_text,
-          new_text: c.new_text,
-        })),
+        changes: changes.map(c => {
+          let find = c.find;
+          let replace = c.replace;
+
+          // v17.20: Si Gemini retorna original_text/new_text però NO find/replace,
+          // calcular el find correcte a partir de la diferència
+          if (!find && c.original_text && c.new_text) {
+            const diff = findTextDifference(c.original_text, c.new_text);
+            if (diff && diff.originalFragment && diff.modifiedFragment) {
+              find = diff.originalFragment;
+              replace = diff.modifiedFragment;
+              logDebug('v17.20: Converted full-text to find/replace', {
+                original_len: c.original_text.length,
+                find: find,
+                replace: replace
+              });
+            } else {
+              // Fallback al format antic (paràgraf sencer)
+              find = c.original_text;
+              replace = c.new_text;
+              logWarn('v17.20: Could not extract diff, using full paragraph', {
+                original_preview: c.original_text?.substring(0, 50)
+              });
+            }
+          }
+
+          // v17.27: Generar reason descriptiu si Gemini no el proporciona
+          let reason = c.reason || c.explanation;
+          if (!reason || reason.length < 10) {
+            // Fallback: descriure el canvi de forma clara
+            reason = `Correcció: «${find}» → «${replace}»`;
+          }
+          return {
+            paragraph_id: c.paragraph_id - 1,  // v12.1: 1-indexed → 0-indexed
+            find: find,
+            replace: replace,
+            reason: reason,
+            // Preservar camps originals si existeixen
+            original_text: c.original_text,
+            new_text: c.new_text,
+          };
+        }),
       };
     }
 
@@ -670,52 +783,299 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
         continue;
       }
 
-      // Verificar que find !== replace
+      // v16.9: Validació estricta de canvis idèntics
+      // 1. Comparació EXACTA primer
       if (change.find === change.replace) {
-        logDebug('FIX change identical, skipping', { find: change.find });
+        logDebug('FIX change identical (exact match), skipping', {
+          find: change.find,
+          replace: change.replace
+        });
         continue;
       }
 
+      // 2. v17.23: Comparació normalitzada SENSE toLowerCase()
+      // Les majúscules SÓN correccions vàlides (demà → Demà és un canvi real)
+      const normalizeText = (t) => t.trim().replace(/[''`]/g, "'").replace(/\s+/g, ' ');
+      if (normalizeText(change.find) === normalizeText(change.replace)) {
+        logDebug('FIX change identical (normalized), skipping', {
+          find: change.find,
+          replace: change.replace
+        });
+        continue;
+      }
+
+      // 3. Comparació sense espais en blanc per detectar diferències només d'espaiat
+      const noWhitespace = (t) => t.replace(/\s+/g, '');
+      if (noWhitespace(change.find) === noWhitespace(change.replace)) {
+        logDebug('FIX change only whitespace difference, skipping', {
+          find: change.find,
+          replace: change.replace
+        });
+        continue;
+      }
+
+      // v16.3: HALLUCINATION CHECK - detectar repeticions inventades
+      // Si el find sembla una repetició (X X) però el text original no la té, és hallucination
+      const words = change.find.trim().split(/\s+/);
+      if (words.length === 2 && words[0].toLowerCase() === words[1].toLowerCase()) {
+        // El find és "paraula paraula" - verificar que realment existeix al text
+        const repeatedPattern = words[0] + ' ' + words[1];
+        if (!originalText.toLowerCase().includes(repeatedPattern.toLowerCase())) {
+          logWarn('HALLUCINATION: invented repetition', {
+            paragraph_id: change.paragraph_id,
+            find: change.find,
+            paragraph_preview: originalText.substring(0, 100),
+          });
+          continue;
+        }
+      }
+
+      // v16.3: Verificar que el resultat del reemplaçament és diferent de l'original
+      const resultText = originalText.replace(change.find, change.replace);
+      if (resultText === originalText) {
+        logDebug('FIX result identical to original, skipping', { find: change.find });
+        continue;
+      }
+
+      // v16.6: Calcular el text exacte a ressaltar (només la part que canvia)
+      // Gemini pot retornar context extra per unicitat: "aquest prosjecte se" → "aquest projecte se"
+      // Però el highlight ha de ser només "prosjecte"
+      // v17.8: Ara findTextDifference retorna modifiedFragment directament
+      let highlightFind = change.find;
+      let highlightReplace = change.replace;
+      const diffResult = findTextDifference(change.find, change.replace);
+      // v17.19: DEBUG - log per diagnosticar problema de highlight
+      logDebug('v17.19 FIX mode highlight calc', {
+        find_len: change.find?.length,
+        replace_len: change.replace?.length,
+        find_preview: change.find?.substring(0, 60),
+        replace_preview: change.replace?.substring(0, 60),
+        diffResult: diffResult ? { orig: diffResult.originalFragment, mod: diffResult.modifiedFragment } : null
+      });
+      if (diffResult) {
+        if (diffResult.originalFragment) highlightFind = diffResult.originalFragment;
+        if (diffResult.modifiedFragment) highlightReplace = diffResult.modifiedFragment;
+      }
+
       // v14.1: Format unificat amb original/replacement (find/replace → original/replacement)
+      // v17.27: Garantir reason descriptiu
+      let finalReason = change.reason;
+      if (!finalReason || finalReason.length < 10) {
+        finalReason = `Correcció: «${change.find}» → «${change.replace}»`;
+      }
       validated.push({
         id: generateItemId('c', changeIndex++),
         paragraph_id: change.paragraph_id,
+        targetId: change.paragraph_id,   // v17.30: Alias per compatibilitat frontend
         original: change.find,           // v14: 'original' en lloc de 'find'
         replacement: change.replace,     // v14: 'replacement' en lloc de 'replace'
         before_text,                     // v14: text complet del paràgraf
         before_hash,                     // v14: hash per detecció STALE
-        reason: change.reason || 'fix',
-        explanation: `"${change.find}" → "${change.replace}" (${change.reason || 'fix'})`,
+        reason: finalReason,
         // Camps legacy per compatibilitat frontend
         find: change.find,
         replace: change.replace,
+        // v16.6: Text exacte per highlight (sense context extra)
+        highlight_find: highlightFind,
+        highlight_replace: highlightReplace,
         original_text: originalText,
         new_text: originalText.replace(change.find, change.replace),
       });
       continue;
     }
 
+    // v17.9: Per mode improve, PRIORITZAR format find/replace (canvis petits)
+    // Si Gemini retorna find/replace, usar-lo encara que també retorni new_text
+    if (change.find && change.replace) {
+      // Gemini ha retornat find/replace per canvi petit - processar com find/replace
+
+      // HALLUCINATION CHECK: El text "find" ha d'existir al paràgraf
+      if (!originalText.includes(change.find)) {
+        logWarn('HALLUCINATION (improve): find text not found', {
+          paragraph_id: change.paragraph_id,
+          find: change.find,
+          paragraph_preview: originalText.substring(0, 100),
+        });
+        continue;
+      }
+
+      // Validació de canvis idèntics
+      if (change.find === change.replace) {
+        logDebug('IMPROVE find/replace identical, skipping', { find: change.find });
+        continue;
+      }
+
+      const normalizeImprove = (t) => t.trim().toLowerCase().replace(/[''`]/g, "'").replace(/\s+/g, ' ');
+      if (normalizeImprove(change.find) === normalizeImprove(change.replace)) {
+        logDebug('IMPROVE find/replace identical (normalized), skipping', { find: change.find });
+        continue;
+      }
+
+      // Construir new_text aplicant el canvi
+      const resultText = originalText.replace(change.find, change.replace);
+
+      // v17.27: Garantir reason descriptiu
+      let improveReason = change.reason || change.explanation;
+      if (!improveReason || improveReason.length < 10) {
+        improveReason = `Millora: «${change.find}» → «${change.replace}»`;
+      }
+      validated.push({
+        id: generateItemId('c', changeIndex++),
+        paragraph_id: change.paragraph_id,
+        targetId: change.paragraph_id,   // v17.30: Alias per compatibilitat frontend
+        find: change.find,
+        replace: change.replace,
+        highlight_find: change.find,
+        highlight_replace: change.replace,
+        original: change.find,
+        replacement: change.replace,
+        before_text,
+        before_hash,
+        original_text: originalText,
+        new_text: resultText,
+        reason: improveReason,
+        _status: 'pending',
+      });
+      continue;
+    }
+
     // Validació per altres modes (original_text/new_text)
-    if (!change.new_text || typeof change.new_text !== 'string') {
+    // v15.2: Permetre new_text buit (per eliminar paraules fora de context)
+    if (change.new_text === undefined || change.new_text === null || typeof change.new_text !== 'string') {
       logWarn('Change without new_text', { id: change.paragraph_id });
       continue;
     }
 
-    // Verificar que el canvi és diferent de l'original
+    // v15.2: Si Gemini retorna només la paraula/frase a canviar (no el paràgraf complet),
+    // convertir a format find/replace i aplicar al paràgraf complet
+    if (change.original_text && change.original_text !== originalText && originalText.includes(change.original_text)) {
+      // v17.0: Validació de canvis idèntics per conversions parcials
+      if (change.original_text === change.new_text) {
+        logDebug('Partial change identical (exact), skipping', { original: change.original_text });
+        continue;
+      }
+      // Comparació normalitzada
+      const normalizePartial = (t) => t.trim().toLowerCase().replace(/[''`]/g, "'").replace(/\s+/g, ' ');
+      if (normalizePartial(change.original_text) === normalizePartial(change.new_text)) {
+        logDebug('Partial change identical (normalized), skipping', { original: change.original_text });
+        continue;
+      }
+
+      logDebug('Converting partial change to find/replace', {
+        original_fragment: change.original_text,
+        new_fragment: change.new_text
+      });
+      const newFullText = originalText.replace(change.original_text, change.new_text);
+
+      // v17.8: Calcular el find exacte (només la part que canvia, no tot el fragment)
+      let exactFind = change.original_text;
+      let exactReplace = change.new_text;
+      const diff = findTextDifference(change.original_text, change.new_text);
+      if (diff) {
+        if (diff.originalFragment) exactFind = diff.originalFragment;
+        if (diff.modifiedFragment) exactReplace = diff.modifiedFragment;
+      }
+
+      // v17.3: VALIDACIÓ FINAL - assegurar que find i replace són realment diferents
+      if (exactFind === exactReplace) {
+        logDebug('Partial conversion: exactFind === exactReplace, skipping', { exactFind });
+        continue;
+      }
+      const normPartial = (t) => t.trim().toLowerCase().replace(/[''`]/g, "'").replace(/\s+/g, ' ');
+      if (normPartial(exactFind) === normPartial(exactReplace)) {
+        logDebug('Partial conversion: normalized find === replace, skipping', { exactFind, exactReplace });
+        continue;
+      }
+
+      // v17.31: Corregit generateItemId amb arguments correctes
+      validated.push({
+        id: generateItemId('c', changeIndex++),
+        paragraph_id: change.paragraph_id,
+        targetId: change.paragraph_id,   // v17.30: Alias per compatibilitat frontend
+        before_text: originalText,
+        before_hash: before_hash,
+        // v16.6: Usar el find exacte per highlight precís
+        find: exactFind,
+        replace: exactReplace,
+        // v17.1: highlight_find/highlight_replace per ressaltar NOMÉS el fragment canviat
+        highlight_find: exactFind,
+        highlight_replace: exactReplace,
+        // v17.31: Camps per compatibilitat - original_text és SEMPRE el paràgraf complet
+        original_text: originalText,
+        new_text: newFullText,
+        reason: change.reason || change.explanation || `Millora: "${exactFind}" → "${exactReplace}"`,
+        _status: 'pending',
+      });
+      continue;
+    }
+
+    // v16.9: Validació estricta que el canvi és diferent de l'original
+    // 1. Comparació exacta
+    if (change.new_text === originalText) {
+      logDebug('Change identical to original (exact), skipping', { id: change.paragraph_id });
+      continue;
+    }
+    // 2. Comparació sense espais extres
     if (change.new_text.trim() === originalText.trim()) {
-      logDebug('Change identical to original, skipping', { id: change.paragraph_id });
+      logDebug('Change identical to original (trimmed), skipping', { id: change.paragraph_id });
+      continue;
+    }
+    // 3. Comparació normalitzada (sense diferències d'espaiat)
+    const normalizeWhitespace = (t) => t.replace(/\s+/g, ' ').trim();
+    if (normalizeWhitespace(change.new_text) === normalizeWhitespace(originalText)) {
+      logDebug('Change only whitespace difference, skipping', { id: change.paragraph_id });
       continue;
     }
 
     // v14.1: Format unificat per modes non-FIX (improve, expand, simplify, translate)
+    // v17.8: Calcular find/replace exacte - ara amb modifiedFragment directe
+    let exactFind = null;
+    let exactReplace = null;
+    const diff = findTextDifference(originalText, change.new_text);
+    if (diff) {
+      exactFind = diff.originalFragment || null;
+      exactReplace = diff.modifiedFragment || null;
+      logDebug('v17.8: Extracted diff', { exactFind, exactReplace });
+    }
+
+    // v17.3: VALIDACIÓ FINAL - assegurar que hi ha una diferència real
+    if (exactFind && exactReplace) {
+      if (exactFind === exactReplace) {
+        logDebug('Non-FIX: exactFind === exactReplace, skipping', { exactFind });
+        continue;
+      }
+      const normNonFix = (t) => t.trim().toLowerCase().replace(/[''`]/g, "'").replace(/\s+/g, ' ');
+      if (normNonFix(exactFind) === normNonFix(exactReplace)) {
+        logDebug('Non-FIX: normalized find === replace, skipping', { exactFind, exactReplace });
+        continue;
+      }
+    }
+
+    // v17.27: Garantir reason descriptiu per canvis de paràgraf
+    let paraReason = change.reason || change.explanation;
+    if (!paraReason || paraReason.length < 10) {
+      // Crear una descripció més útil
+      if (exactFind && exactReplace && exactFind !== exactReplace) {
+        paraReason = `Canvi: «${exactFind.substring(0, 30)}${exactFind.length > 30 ? '...' : ''}» → «${exactReplace.substring(0, 30)}${exactReplace.length > 30 ? '...' : ''}»`;
+      } else {
+        paraReason = `Reescriptura de la línia`;
+      }
+    }
     validated.push({
       id: generateItemId('c', changeIndex++),
       paragraph_id: change.paragraph_id,
+      targetId: change.paragraph_id,     // v17.30: Alias per compatibilitat frontend
+      // v16.6: find/replace per highlight precís
+      find: exactFind,
+      replace: exactReplace,
+      // v17.1: highlight_find/highlight_replace per ressaltar NOMÉS el fragment canviat
+      highlight_find: exactFind,
+      highlight_replace: exactReplace,
       original: originalText,            // v14: text original complet
       replacement: change.new_text,      // v14: text nou complet
       before_text,                       // v14: igual que original per full-replace
       before_hash,                       // v14: hash per detecció STALE
-      explanation: change.explanation || null,
+      reason: paraReason,
       // Camps legacy per compatibilitat frontend
       original_text: originalText,
       new_text: change.new_text,
@@ -765,8 +1125,31 @@ function generateHighlightsFromChanges(changes, documentContext) {
     let start = 0;
     let end = paraText.length;
 
-    // Mode FIX: ressaltar el fragment "find"
-    if (change.find) {
+    // v17.11: Detectar si és canvi de paràgraf complet (sense find/replace vàlids)
+    const hasValidFind = change.find && change.find.length > 0;
+    const hasValidReplace = change.replace && change.replace.length > 0;
+    const isFullParagraphChange = !hasValidFind && !hasValidReplace &&
+      change.original_text && change.new_text &&
+      change.original_text !== change.new_text;
+
+    // v17.11: Per canvis de paràgraf complet, ressaltar TOT el paràgraf
+    if (isFullParagraphChange) {
+      textToHighlight = paraText;
+      start = 0;
+      end = paraText.length;
+    }
+    // v16.6: Prioritzar highlight_find (text exacte sense context) sobre find (amb context)
+    // Mode FIX: ressaltar el fragment exacte que canvia
+    else if (change.highlight_find) {
+      textToHighlight = change.highlight_find;
+      const pos = paraText.indexOf(textToHighlight);
+      if (pos !== -1) {
+        start = pos;
+        end = pos + textToHighlight.length;
+      }
+    }
+    // Fallback a find si no hi ha highlight_find
+    else if (change.find) {
       textToHighlight = change.find;
       const pos = paraText.indexOf(textToHighlight);
       if (pos !== -1) {
@@ -774,27 +1157,70 @@ function generateHighlightsFromChanges(changes, documentContext) {
         end = pos + textToHighlight.length;
       }
     }
+    // v16.6: Mode IMPROVE amb fragment original definit
+    else if (change.original && typeof change.original === 'string' && change.original.length > 0 && change.original !== change.original_text) {
+      textToHighlight = change.original;
+      const pos = paraText.indexOf(textToHighlight);
+      if (pos !== -1) {
+        start = pos;
+        end = pos + textToHighlight.length;
+      } else {
+        // Si no es troba el fragment exacte, primeres 3-4 paraules
+        const words = paraText.split(/\s+/).slice(0, 4);
+        textToHighlight = words.join(' ');
+        start = 0;
+        end = textToHighlight.length;
+      }
+    }
     // Altres modes: trobar la diferència entre original i new
     else if (change.original_text && change.new_text) {
       const diff = findTextDifference(change.original_text, change.new_text);
-      if (diff) {
+      if (diff && diff.originalFragment) {
         textToHighlight = diff.originalFragment;
-        start = diff.start;
-        end = diff.end;
-      } else {
-        // Si no es pot determinar la diferència, ressaltar tot
-        textToHighlight = paraText;
-      }
-    }
-    // Fallback
-    else {
-      textToHighlight = change.original || paraText;
-      if (textToHighlight !== paraText) {
-        const pos = paraText.indexOf(textToHighlight);
+        // v16.6: Buscar posició real dins del paràgraf
+        const pos = paraText.indexOf(diff.originalFragment);
         if (pos !== -1) {
           start = pos;
-          end = pos + textToHighlight.length;
+          end = pos + diff.originalFragment.length;
+        } else {
+          start = diff.start;
+          end = diff.end;
         }
+      } else {
+        // v16.2: Si no es pot determinar la diferència, primeres 3-4 paraules (mai tot)
+        const words = paraText.split(/\s+/).slice(0, 4);
+        textToHighlight = words.join(' ');
+        start = 0;
+        end = textToHighlight.length;
+      }
+    }
+    // Fallback: usar original_text si existeix, o primeres paraules del paràgraf
+    else {
+      // v16.2: Corregit - usar original_text (no 'original' que no existeix)
+      const fallbackText = change.original_text || change.original || null;
+      if (fallbackText) {
+        // Intentar trobar la diferència amb paraText
+        const diff = findTextDifference(paraText, fallbackText);
+        if (diff && diff.originalFragment) {
+          textToHighlight = diff.originalFragment;
+          start = diff.start;
+          end = diff.end;
+        } else {
+          // Si no hi ha diferència clara, usar primeres 3-4 paraules
+          const words = paraText.split(/\s+/).slice(0, 4);
+          textToHighlight = words.join(' ');
+          const pos = paraText.indexOf(textToHighlight);
+          if (pos !== -1) {
+            start = pos;
+            end = pos + textToHighlight.length;
+          }
+        }
+      } else {
+        // Últim recurs: primeres 3-4 paraules del paràgraf (mai tot el paràgraf)
+        const words = paraText.split(/\s+/).slice(0, 4);
+        textToHighlight = words.join(' ');
+        start = 0;
+        end = textToHighlight.length;
       }
     }
 
@@ -813,8 +1239,9 @@ function generateHighlightsFromChanges(changes, documentContext) {
       end: end,
       text: textToHighlight,
       matched_text: textToHighlight,  // Compatibilitat
+      snippet: textToHighlight,  // v16.2: Afegir snippet per cerca precisa a Code.gs
       color: color,
-      reason: change.explanation || change.reason || 'Canvi proposat',
+      reason: change.reason || 'Canvi proposat',
       change_id: change.id,  // v14.2: Vincular highlight amb el canvi
     });
   }
@@ -823,13 +1250,21 @@ function generateHighlightsFromChanges(changes, documentContext) {
 }
 
 /**
- * v14.4: Troba la diferència entre dos textos
- * Retorna el fragment del text original que ha canviat
+ * v17.8: Troba la diferència entre dos textos - VERSIÓ MILLORADA
+ * Suporta substitucions, insercions i eliminacions
+ * Retorna el fragment del text original que ha canviat I el fragment modificat
  */
 function findTextDifference(original, modified) {
   if (!original || !modified) return null;
   if (original === modified) return null;
 
+  // Primer intentem amb l'algorisme de paraules (més precís per canvis petits)
+  const wordDiff = findWordDifference(original, modified);
+  if (wordDiff) {
+    return wordDiff;
+  }
+
+  // Fallback a algorisme de caràcters
   // Trobar prefix comú
   let prefixLen = 0;
   const minLen = Math.min(original.length, modified.length);
@@ -846,33 +1281,111 @@ function findTextDifference(original, modified) {
     suffixLen++;
   }
 
-  // Calcular el fragment que canvia
-  const start = prefixLen;
-  const end = original.length - suffixLen;
+  // Calcular el fragment que canvia a l'original
+  const startOrig = prefixLen;
+  const endOrig = original.length - suffixLen;
+
+  // Calcular el fragment que canvia al modified
+  const startMod = prefixLen;
+  const endMod = modified.length - suffixLen;
 
   // Si el canvi és massa gran (>80% del text), no ressaltar fragment específic
-  const changeLen = end - start;
+  const changeLen = Math.max(endOrig - startOrig, endMod - startMod);
   if (changeLen > original.length * 0.8) {
     return null;
   }
 
-  const originalFragment = original.substring(start, end);
+  // Expandir als límits de paraula
+  let expandStartOrig = startOrig;
+  let expandEndOrig = endOrig;
 
-  // Si el fragment és molt curt, expandir una mica per donar context
-  if (originalFragment.length < 5 && original.length > 10) {
-    const expandStart = Math.max(0, start - 10);
-    const expandEnd = Math.min(original.length, end + 10);
-    return {
-      start: expandStart,
-      end: expandEnd,
-      originalFragment: original.substring(expandStart, expandEnd),
-    };
+  // Retrocedir al principi de la paraula
+  while (expandStartOrig > 0 && original[expandStartOrig - 1] !== ' ' && original[expandStartOrig - 1] !== '\n') {
+    expandStartOrig--;
   }
+  // Avançar al final de la paraula
+  while (expandEndOrig < original.length && original[expandEndOrig] !== ' ' && original[expandEndOrig] !== '\n') {
+    expandEndOrig++;
+  }
+
+  const originalFragment = original.substring(expandStartOrig, expandEndOrig).trim();
+
+  // Fer el mateix per modified
+  let expandStartMod = startMod;
+  let expandEndMod = endMod;
+  while (expandStartMod > 0 && modified[expandStartMod - 1] !== ' ' && modified[expandStartMod - 1] !== '\n') {
+    expandStartMod--;
+  }
+  while (expandEndMod < modified.length && modified[expandEndMod] !== ' ' && modified[expandEndMod] !== '\n') {
+    expandEndMod++;
+  }
+
+  const modifiedFragment = modified.substring(expandStartMod, expandEndMod).trim();
+
+  // Si ambdós fragments són buits, retornar null
+  if ((!originalFragment || originalFragment.length === 0) && (!modifiedFragment || modifiedFragment.length === 0)) {
+    return null;
+  }
+
+  return {
+    start: expandStartOrig,
+    end: expandEndOrig,
+    originalFragment: originalFragment || '',
+    modifiedFragment: modifiedFragment || '',
+  };
+}
+
+/**
+ * v17.8: Troba diferències a nivell de paraules
+ * Més precís per canvis petits (1-3 paraules)
+ */
+function findWordDifference(original, modified) {
+  const origWords = original.split(/(\s+)/);  // Mantenir espais
+  const modWords = modified.split(/(\s+)/);
+
+  // Trobar primer índex diferent des del principi
+  let startDiff = 0;
+  while (startDiff < origWords.length && startDiff < modWords.length && origWords[startDiff] === modWords[startDiff]) {
+    startDiff++;
+  }
+
+  // Trobar primer índex diferent des del final
+  let endDiffOrig = origWords.length - 1;
+  let endDiffMod = modWords.length - 1;
+  while (endDiffOrig >= startDiff && endDiffMod >= startDiff && origWords[endDiffOrig] === modWords[endDiffMod]) {
+    endDiffOrig--;
+    endDiffMod--;
+  }
+
+  // Si no hi ha diferència
+  if (startDiff > endDiffOrig && startDiff > endDiffMod) {
+    return null;
+  }
+
+  // Extreure fragments
+  const origDiffWords = origWords.slice(startDiff, endDiffOrig + 1);
+  const modDiffWords = modWords.slice(startDiff, endDiffMod + 1);
+
+  const originalFragment = origDiffWords.join('').trim();
+  const modifiedFragment = modDiffWords.join('').trim();
+
+  // Si el canvi és massa gran (>5 paraules), deixar que l'algorisme de caràcters ho gestioni
+  const origWordCount = origDiffWords.filter(w => w.trim()).length;
+  const modWordCount = modDiffWords.filter(w => w.trim()).length;
+  if (origWordCount > 5 || modWordCount > 5) {
+    return null;
+  }
+
+  // Calcular posició al text original
+  const prefix = origWords.slice(0, startDiff).join('');
+  const start = prefix.length;
+  const end = start + origDiffWords.join('').length;
 
   return {
     start,
     end,
     originalFragment,
+    modifiedFragment,
   };
 }
 
