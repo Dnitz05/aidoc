@@ -82,10 +82,10 @@ const CONFIDENCE_THRESHOLDS = {
 
 const TEMPERATURES = {
   classifier: 0.0,      // Determinisme absolut - lògica pura
-  fix: 0.0,             // Zero creativitat - només mecànica
+  fix: 0.2,             // v17.52: Puja de 0.0 a 0.2 per detectar errors subtils
   highlight: 0.1,       // Anàlisi estricta per reduir falsos positius
   chat: 0.3,            // Baixa per no inventar dades
-  improve: 0.5,         // Fluïdesa moderada per reformular
+  improve: 0.6,         // v17.52: Puja de 0.55 a 0.6 per millor detecció
   expand: 0.5,          // Creativitat moderada per afegir contingut
   simplify: 0.4,        // Equilibri per condensar
   translate: 0.3,       // Baixa per precisió

@@ -6,6 +6,204 @@ Format basat en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [17.54] - 2025-12-21
+
+### Fixed
+- **CRÍTICA: Memòria de conversa persistent** (v17.53/v17.54)
+  - Problema: El model perdia context entre torns i no entenia referències anafòriques
+  - Causa: Dos sistemes de memòria paral·lels que no es comunicaven
+    - Client: `chat_history` (complet, persistent)
+    - Servidor: `session.conversation.turns` (5 torns, TTL 30 min)
+  - Solució: Pipeline ara prioritza historial del client sobre servidor
+
+### Added
+- **Referències anafòriques** - Classifier entén "elimina-la", "canvia-ho", "fes-ho" referint-se a canvis pendents
+- **Context de canvis pendents** - `last_proposed_changes` accessible a classifier
+- **Historial ampliat** - Classifier veu 5 torns (abans 2)
+- **Inferència semàntica** - Classifier entén intencions sense patrons literals
+
+### Changed
+- **pipeline.js** - Extreu `_conversation` i prioritza client sobre servidor
+- **classifier.js** - Regles anafòriques i context de canvis pendents
+- **session.js** - `getConversationContext` inclou `last_proposed_changes`
+
+---
+
+## [14.8] - 2025-12-21
+
+### Changed
+- **UI Anotacions millorada**
+  - Fons gris clar per defecte (abans només en hover)
+  - Eliminat hover de les caixes de canvis
+  - Eliminat contenidor verd del text proposat - text directe sobre fons
+  - Fons transparent quan el canvi és acceptat
+- **Botó desfer sempre visible** - Quan el canvi és acceptat, el botó undo apareix sempre
+- **Espaiat globus de xat** - Millor diferenciació visual usuari vs IA
+- **Temperature improve: 0.55** - Ajustada per millor fluïdesa
+
+---
+
+## [14.7] - 2025-12-20
+
+### Changed
+- **Gemini 3 Flash Preview** - Actualització a nou model d'IA
+  - Tots els agents ara utilitzen `gemini-3-flash-preview`
+  - Millor rendiment i capacitats
+- **Etiquetes d'anotacions** - "Canvi proposat:" en lloc de "Línia X"
+  - Numeració només quan hi ha múltiples canvis
+- **Espai entre diff** - Separació visual entre text eliminat i afegit
+- **Padding de xat reduït** - Més amplada per al text
+
+---
+
+## [14.6] - 2025-12-19
+
+### Fixed
+- **CRÍTICA: Validació d'abast de selecció**
+  - Fix marcador de selecció: `⟦SEL⟧` ara detectat correctament
+  - Eliminat fallback perillós que assumia paràgraf 0
+  - Sistema només modifica paràgrafs seleccionats per l'usuari
+
+### Changed
+- **Classifier millorat** - Regles específiques per selecció parcial
+- **Executors amb validació** - Comproven scope abans de modificar
+
+---
+
+## [14.5] - 2025-12-18
+
+### Changed
+- **Botons d'anotació només icones** - Eliminat text, més compactes
+- **Barra bulk actions** - Només quan hi ha >1 canvi pendent
+
+---
+
+## [14.4] - 2025-12-17
+
+### Added
+- **Vista col·lapsada per canvis grans**
+  - Estadístiques: paraules afegides/eliminades, chars
+  - Botó expandir/col·lapsar
+  - Threshold: >80 chars diferència o >120 chars total
+
+### Changed
+- **Auto-clear highlights** - Es netegen quan usuari interactua
+- **Millores UX anotacions** - Respostes més naturals
+
+---
+
+## [14.3] - 2025-12-16
+
+### Added
+- **Detecció selecció parcial millorada**
+- **Lògica de represa** - Millor gestió de context
+
+---
+
+## [14.2] - 2025-12-15
+
+### Added
+- **Highlights per UPDATE_BY_ID** - Ressaltat de canvis
+- **Respostes de xat netes** - Sense markup innecessari
+
+### Changed
+- **Auto-clear highlights** - Quan usuari envia nova instrucció
+
+---
+
+## [14.1] - 2025-12-14
+
+### Added
+- **Indicadors WARN per canvis grans**
+  - Badge visual per canvis que requereixen revisió
+  - Edit distance tracking
+
+---
+
+## [14.0] - 2025-12-13
+
+### Added
+- **Sistema d'Anotacions de Canvis**
+  - Botons Accept/Reject per cada canvi
+  - Bulk actions (acceptar tots, rebutjar tots)
+  - Vista amb diff visual (eliminat/afegit)
+  - Estat pendent/acceptat/rebutjat
+
+### Changed
+- **Unified Executor** - Executor únic per tots els modes
+- **Format de resposta JSON estructurat**
+
+---
+
+## [13.x] - 2025-12
+
+### Added
+- **Unified Executor** - Consolidació d'executors
+- **Millores de classificació**
+
+---
+
+## [12.x] - 2025-11
+
+### Added
+- **Router híbrid** - Decisió intel·ligent entre executors
+- **Millores de validació**
+
+---
+
+## [11.x] - 2025-11
+
+### Added
+- **Optimitzacions de rendiment**
+- **Millores de cache**
+
+---
+
+## [10.x] - 2025-10
+
+### Added
+- **Millores d'estabilitat**
+- **Bug fixes diversos**
+
+---
+
+## [9.x] - 2025-09
+
+### Added
+- **Refinaments del classifier**
+- **Millores de prompts**
+
+---
+
+## [8.3] - 2025-08
+
+### Added
+- **Sistema Multi-Agent complet**
+  - Pipeline: Sanitizer → Gate0 → Classifier → Router → Executor
+  - Classifier semàntic amb Gemini
+  - Executors especialitzats (Chat, Highlight, Update, Rewrite)
+  - Cache L1 (sessió) + L2 (semàntic amb embeddings)
+  - Sessions amb Cloudflare KV
+  - Circuit breaker per protecció d'errors
+  - Gate0 fast paths per casos trivials
+  - Telemetria i mètriques
+
+### Technical
+- Nova carpeta `worker/multiagent/` amb 15+ mòduls
+- Thresholds de confiança per mode
+- Timeouts configurables (20s/25s/50s)
+
+---
+
+## [7.x] - 2025-07
+
+### Added
+- **Preparació per multi-agent**
+- **Refactorització de worker.js**
+- **Millores d'arquitectura**
+
+---
+
 ## [6.9] - 2024-12-07
 
 ### Added

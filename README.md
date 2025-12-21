@@ -2,9 +2,9 @@
 
 **"Lovable for Google Docs"** - Motor d'Enginyeria Documental amb IA
 
-[![Version](https://img.shields.io/badge/version-6.9-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-14.8-blue.svg)]()
 [![Platform](https://img.shields.io/badge/platform-Google%20Docs-green.svg)]()
-[![AI](https://img.shields.io/badge/AI-Gemini%202.0-orange.svg)]()
+[![AI](https://img.shields.io/badge/AI-Gemini%203%20Flash-orange.svg)]()
 
 ---
 
@@ -25,50 +25,49 @@ Docmile         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 
 ## Features
 
-### Core (v6.9)
+### Core (v14.8)
 
 | Feature | Descripció |
 |---------|------------|
+| **Multi-Agent System** (v8.3+) | Pipeline amb Classifier + Executors especialitzats |
+| **Gemini 3 Flash** | Model d'IA més recent amb capacitats avançades |
 | **Smart Selection** (v5.4) | Context expandit ±3 paràgrafs amb marcador ⟦SEL⟧ |
-| **Document References** (v6.7) | Referències vives que enllacen mencions al xat amb seccions del document |
-| **Reference Highlighting** (v6.7) | Ressaltat de seccions amb colors (groc, taronja, blau, lila) |
-| **Prompts Professionals** (v6.9) | Receptes amb instruccions detallades i específiques |
-| **Table Support** (v6.0) | Lectura i visualització de taules en format Markdown |
-| **Multimodal AI** (v6.0) | Suport per anàlisi d'imatges amb Gemini |
-| **Knowledge Library** | Biblioteca de fitxers compartida entre documents |
-| **Chat History** | Historial de converses persistent amb auto-save i debounce |
-| **Shadow Validator** | Sistema immunitari: valida i auto-corregeix respostes |
-| **Context Engine** | Entén l'estructura del document (headings, seccions, entitats) |
+| **Anotacions de Canvis** (v14.0) | Accept/Reject per cada canvi proposat |
+| **Vista Col·lapsada** (v14.4) | Canvis grans es mostren compactats |
+| **Document References** (v6.7) | Referències vives amb icona 👁️ clicable |
+| **Reference Highlighting** (v6.7) | Ressaltat de seccions amb colors |
+| **Validació d'Abast** (v14.6) | Només modifica paràgrafs seleccionats |
+| **Cache Semàntic** (v8.3) | L1 (sessió) + L2 (embeddings) |
+| **Sessions KV** | Estat persistent amb Cloudflare KV |
+| **Table Support** (v6.0) | Lectura de taules en format Markdown |
+| **Multimodal AI** (v6.0) | Suport per anàlisi d'imatges |
+| **Knowledge Library** | Biblioteca de fitxers compartida |
+| **Chat History** | Historial de converses persistent |
+| **Shadow Validator** | Valida i auto-corregeix respostes |
+| **Context Engine** | Entén l'estructura del document |
 | **Event Sourcing** | Historial complet d'edicions, revert qualsevol canvi |
-| **Auto-Structure** | Converteix títols visuals (negreta) a H2 reals |
-| **Banned Expressions** | Paraules/frases que la IA mai usarà |
-| **Mode Selector** | Edit / Xat - control total sobre el comportament |
-| **Chain of Thought** | La IA raona abans d'actuar (`thought` obligatori) |
-| **Atomic Operations** | `UPDATE_BY_ID` - edita paràgrafs específics |
-| **Time Budget** | Safety cutoff de 25s per evitar timeouts |
-| **Receipts** | Macros personalitzades amb 5 carpetes predefinides |
-| **File Upload** (v6.5) | Validació de MIME type, extensió i mida |
+| **BYOK** | Bring Your Own Key (multi-proveïdor) |
+| **Mode Selector** | Edit / Xat - control total |
 
 ### Modes d'Operació
 
-| Mode | Descripció | Output |
-|------|------------|--------|
-| **CHAT_ONLY** | Preguntes, opinions, anàlisi | Resposta al xat |
-| **UPDATE_BY_ID** | Edició quirúrgica de paràgrafs | Canvis atòmics |
-| **REWRITE** | Crear contingut nou | Blocs estructurats |
-| **REFERENCE_HIGHLIGHT** | Anàlisi visual del document | Ressaltats de colors |
+| Mode | Confiança | Descripció | Output |
+|------|-----------|------------|--------|
+| **CHAT_ONLY** | 0.60+ | Preguntes, opinions, anàlisi | Resposta al xat |
+| **REFERENCE_HIGHLIGHT** | 0.70+ | Anàlisi visual del document | Ressaltats de colors |
+| **UPDATE_BY_ID** | 0.80+ | Edició quirúrgica de paràgrafs | Canvis atòmics |
+| **REWRITE** | 0.85+ | Crear contingut nou | Blocs estructurats |
 
 ### UI/UX
 
 - Sidebar integrat a Google Docs
 - Temes Light/Dark
-- Skeleton Preview amb badges de color
-- Historial d'edicions navegable (Timeline)
-- Indicador de "pensant"
-- **Drawer de converses** amb agrupació per data
-- Cerca de converses anteriors
-- **Indicador de selecció activa** amb preview i comptador de paraules
-- **Referències clicables** amb icona 👁️
+- Anotacions amb botons Accept/Reject
+- Vista col·lapsada per canvis grans
+- Timeline d'edicions navegable
+- Indicador de selecció activa
+- Referències clicables amb icona 👁️
+- Drawer de converses amb agrupació per data
 - Pestanyes: Xat | Edicions | Receptes | Ajustos
 
 ---
@@ -76,47 +75,47 @@ Docmile         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 ## Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      GOOGLE DOCS                             │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │                   SIDEBAR (HTML)                     │    │
-│  │  • Chat UI          • Mode Selector                  │    │
-│  │  • Skeleton Preview • Edit History (Timeline)        │    │
-│  │  • Receipts         • Settings                       │    │
-│  │  • Selection Badge  • Document References            │    │
-│  └──────────────────────┬──────────────────────────────┘    │
-│                         │                                    │
-│  ┌──────────────────────▼──────────────────────────────┐    │
-│  │              CODE.GS + DOCSCANNER.GS                 │    │
-│  │  • processUserCommand()   • getDocSkeleton()         │    │
-│  │  • Event Sourcing         • applyAutoStructure()     │    │
-│  │  • Smart Selection (v5.4) • Reference Highlight      │    │
-│  └──────────────────────┬──────────────────────────────┘    │
-└─────────────────────────┼───────────────────────────────────┘
-                          │ HTTPS
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 CLOUDFLARE WORKER (v6.8)                     │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │           INTELLIGENT CONTEXT ENGINE                  │    │
-│  │  ┌─────────────────────────────────────────────┐    │    │
-│  │  │           SHADOW VALIDATOR                   │    │    │
-│  │  │  • validateResponse()  • Time Budget (25s)   │    │    │
-│  │  │  • buildRetryFeedback() • Graceful Degrad.   │    │    │
-│  │  └─────────────────────────────────────────────┘    │    │
-│  │  • System Prompt v6.8 ("Motor d'Enginyeria")        │    │
-│  │  • Smart Selection Handling (⟦SEL⟧ markers)         │    │
-│  │  • Document References Generator                     │    │
-│  │  • Multimodal Support (images)                      │    │
-│  └──────────────────────┬──────────────────────────────┘    │
-│                         │                                    │
-│            ┌────────────┴────────────┐                      │
-│            ▼                         ▼                      │
-│     ┌─────────────┐          ┌─────────────┐                │
-│     │   GEMINI    │          │  SUPABASE   │                │
-│     │   2.0 Flash │          │  PostgreSQL │                │
-│     └─────────────┘          └─────────────┘                │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           GOOGLE DOCS                                    │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                    SIDEBAR (HTML/CSS/JS)                         │    │
+│  │  • Chat UI           • Anotacions Accept/Reject                  │    │
+│  │  • Mode Selector     • Vista col·lapsada canvis                  │    │
+│  │  • Selection Badge   • Document References 👁️                    │    │
+│  └──────────────────────────┬──────────────────────────────────────┘    │
+│                              │                                           │
+│  ┌──────────────────────────▼──────────────────────────────────────┐    │
+│  │              CODE.GS + DOCSCANNER.GS                             │    │
+│  │  • processUserCommand()   • Smart Selection (⟦SEL⟧)              │    │
+│  │  • Event Sourcing         • Validació d'Abast                    │    │
+│  └──────────────────────────┬──────────────────────────────────────┘    │
+└──────────────────────────────┼──────────────────────────────────────────┘
+                               │ HTTPS
+                               ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                 CLOUDFLARE WORKER (Multi-Agent v14.8)                    │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                    PIPELINE MULTI-AGENT                          │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │    │
+│  │  │ Gate0    │→ │Classifier│→ │  Router  │→ │ Executor │        │    │
+│  │  │Fast Path │  │ Semàntic │  │          │  │          │        │    │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │    │
+│  │                                               ↓                  │    │
+│  │  ┌──────────────────────────────────────────────────────────┐   │    │
+│  │  │  EXECUTORS ESPECIALITZATS                                 │   │    │
+│  │  │  • ChatExecutor      • HighlightExecutor                  │   │    │
+│  │  │  • UpdateExecutor    • RewriteExecutor                    │   │    │
+│  │  │  • UnifiedExecutor                                        │   │    │
+│  │  └──────────────────────────────────────────────────────────┘   │    │
+│  └──────────────────────────┬──────────────────────────────────────┘    │
+│                              │                                           │
+│            ┌─────────────────┼─────────────────┐                        │
+│            ▼                 ▼                 ▼                        │
+│     ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │
+│     │   GEMINI    │  │  SUPABASE   │  │ CLOUDFLARE  │                  │
+│     │   3 Flash   │  │  PostgreSQL │  │     KV      │                  │
+│     └─────────────┘  └─────────────┘  └─────────────┘                  │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -128,9 +127,44 @@ Docmile         →  Documents →  Operacions Atòmiques (UPDATE_BY_ID)
 | Frontend | Google Apps Script (HTML/CSS/JS) |
 | Backend | Cloudflare Workers (ES Modules) |
 | Database | Supabase (PostgreSQL + RLS) |
-| AI Model | Google Gemini 2.0 Flash (Multimodal) |
-| Storage | DocumentProperties / UserProperties |
+| AI Model | Google Gemini 3 Flash Preview |
+| Sessions | Cloudflare KV |
+| Cache | L1 (memòria) + L2 (embeddings) |
 | Deploy | Clasp (GAS) + Wrangler (CF) |
+
+---
+
+## Sistema Multi-Agent (v8.3+)
+
+### Pipeline
+
+```
+Input → Sanitizer → Gate0 → Classifier → Router → Executor → Output
+           │          │         │           │          │
+           ▼          ▼         ▼           ▼          ▼
+        Normalitza  Fast     Gemini      Decideix   Genera
+        input      paths    classifica   executor   resposta
+```
+
+### Executors
+
+| Executor | Mode | Funció |
+|----------|------|--------|
+| **ChatExecutor** | CHAT_ONLY | Respostes conversacionals |
+| **HighlightExecutor** | REFERENCE_HIGHLIGHT | Marca seccions |
+| **UpdateExecutor** | UPDATE_BY_ID | Edita paràgrafs |
+| **RewriteExecutor** | REWRITE | Genera contingut nou |
+| **UnifiedExecutor** | Tots | Executor unificat |
+
+### Proveïdors d'IA (BYOK)
+
+| Proveïdor | Models |
+|-----------|--------|
+| **Gemini** | gemini-3-flash-preview, gemini-3-pro |
+| **OpenAI** | gpt-4o, o1, gpt-4o-mini |
+| **Claude** | claude-sonnet-4-5, claude-opus-4-5 |
+| **Mistral** | mistral-small, mistral-large |
+| **Groq** | llama-3.3-70b |
 
 ---
 
@@ -140,10 +174,7 @@ Quan l'usuari té text seleccionat, Docmile:
 
 1. **Expandeix el context** ±3 paràgrafs al voltant de la selecció
 2. **Marca la selecció** amb `⟦SEL⟧` per identificar-la
-3. **Interpreta intel·ligentment** la pregunta:
-   - Pregunta d'edició → Opera sobre ⟦SEL⟧
-   - Pregunta sobre document → Usa tot el context
-   - Pregunta sobre selecció → Respon basant-se en ⟦SEL⟧
+3. **Valida l'abast** (v14.6) - Només modifica paràgrafs seleccionats
 
 **Exemple de context enviat:**
 ```
@@ -155,14 +186,23 @@ Quan l'usuari té text seleccionat, Docmile:
 
 ---
 
-## Document References (v6.7)
+## Anotacions de Canvis (v14.0+)
 
-Les **Referències Vives** enllacen mencions al xat amb seccions del document:
+### Característiques
 
-- Icona 👁️ clicable al costat de referències
-- Clic → Ressalta la secció al document en blau
-- Auto-neteja després de 3 segons
-- Permet navegació ràpida pel document des del xat
+- **Accept/Reject individual** per cada canvi
+- **Bulk actions** quan hi ha múltiples canvis
+- **Vista col·lapsada** (v14.4) per canvis grans
+- **Diff visual**: ~~eliminat~~ afegit
+- **Estadístiques**: paraules afegides/eliminades
+
+### Format
+
+```
+Canvi proposat:
+[Vista diff amb colors]
+[Botons: 👁️ Veure | ✓ Acceptar | ✗ Rebutjar]
+```
 
 ---
 
@@ -170,23 +210,16 @@ Les **Referències Vives** enllacen mencions al xat amb seccions del document:
 
 ### 1. Google Apps Script
 
-1. Obre Google Docs
-2. Extensions → Apps Script
-3. Copia els fitxers de `docs-addon/`:
-   - `Code.gs`
-   - `DocScanner.gs`
-   - `Sidebar.html`
-   - `Styles.html`
-   - `appsscript.json`
-4. Refresca el document
-5. Menú "Docmile" → "Obrir Docmile"
+```bash
+cd docs-addon
+npx clasp push --force
+```
 
 ### 2. Cloudflare Worker
 
 ```bash
 cd worker
-npm install
-npx wrangler deploy
+CLOUDFLARE_API_TOKEN=xxx npx wrangler deploy
 ```
 
 ### 3. Variables d'entorn (Worker)
@@ -215,7 +248,6 @@ SUPABASE_SERVICE_ROLE_KEY=your_key
 "Què opines d'aquest text?"                → CHAT_ONLY
 "Escriu un email formal de reclamació"     → REWRITE
 "Analitza la coherència del document"      → REFERENCE_HIGHLIGHT
-"Una altra" (després d'un canvi)           → Nova alternativa
 ```
 
 ---
@@ -229,28 +261,6 @@ SUPABASE_SERVICE_ROLE_KEY=your_key
 
 ---
 
-## Publicació
-
-Docmile està preparat per publicar a Google Workspace Marketplace:
-
-- ✅ `appsscript.json` amb OAuth scopes i manifest complet
-- ✅ Política de privacitat (`docs/legal/privacy.html`)
-- ✅ Termes de servei (`docs/legal/terms.html`)
-- ✅ Pàgina de suport (`docs/support.html`)
-- ✅ Logos optimitzats (128px, 96px, 32px)
-
----
-
-## Contribuir
-
-1. Fork el repositori
-2. Crea una branca (`git checkout -b feature/nova-feature`)
-3. Commit (`git commit -m "Feat: descripció"`)
-4. Push (`git push origin feature/nova-feature`)
-5. Pull Request
-
----
-
 ## Llicència
 
 Propietari - Tots els drets reservats
@@ -260,3 +270,7 @@ Propietari - Tots els drets reservats
 ## Crèdits
 
 Desenvolupat amb Claude Code (Anthropic)
+
+---
+
+*Última actualització: 2025-12-20 (v14.7)*

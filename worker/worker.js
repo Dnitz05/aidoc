@@ -2080,6 +2080,10 @@ export default {
       if (body.action === 'get_timeline') {
         return await handleGetTimeline(body, env, corsHeaders);
       }
+      // v16.1: Save applied edit (quan l'usuari accepta un canvi individual)
+      if (body.action === 'save_applied_edit') {
+        return await handleSaveAppliedEdit(body, env, corsHeaders);
+      }
 
       // v5.0: Conversations endpoints
       if (body.action === 'list_conversations') {
@@ -3356,6 +3360,46 @@ async function handleConfirmEdit(body, env, corsHeaders) {
   return new Response(JSON.stringify({
     status: success ? "ok" : "error",
     confirmed: success
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+/**
+ * v16.1: Guarda un edit event quan l'usuari accepta un canvi individual
+ * Això permet historial persistent i undo diferit
+ */
+async function handleSaveAppliedEdit(body, env, corsHeaders) {
+  const { license_key, doc_id, target_id, before_text, after_text, instruction, reason } = body;
+
+  if (!license_key) throw new Error("missing_license");
+  if (!doc_id) throw new Error("missing_doc_id");
+
+  const licenseHash = await hashKey(license_key);
+
+  const eventData = {
+    license_key_hash: licenseHash,
+    doc_id: doc_id,
+    event_type: 'applied_edit',  // Nou tipus per distingir de propostes
+    target_id: target_id !== undefined ? parseInt(target_id, 10) : null,
+    before_text: before_text || null,
+    after_text: after_text || null,
+    user_instruction: instruction || 'Canvi acceptat',
+    thought: reason || null,
+    source: 'user_accepted',  // L'usuari ha acceptat explícitament
+    hash_confirmed: true,  // Ja aplicat al document
+  };
+
+  const savedEvent = await saveEditEvent(env, eventData);
+
+  if (!savedEvent) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "No s'ha pogut guardar l'event"
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  return new Response(JSON.stringify({
+    status: "ok",
+    event_id: savedEvent.id
   }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 

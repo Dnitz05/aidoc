@@ -12,26 +12,30 @@ Construir el **motor d'enginyeria documental** més potent, aplicant els mateixo
 
 ```
 1. CONTEXT ENGINE     →  Entendre el document (estructura, entitats, selecció)
-2. RUNTIME            →  Aplicar canvis (atomic ops, preview, undo)
-3. FEEDBACK LOOP      →  Validar i corregir (retry, user confirm, references)
+2. RUNTIME            →  Aplicar canvis (atomic ops, anotacions, undo)
+3. FEEDBACK LOOP      →  Validar i corregir (accept/reject, references)
 ```
 
 ---
 
-## Estat Actual: v6.9
+## Estat Actual: v14.8
 
 ```
 ████████████████████████████████████████ 100%
 
-✅ Motor d'Enginyeria Documental (System Prompt v6.9)
-✅ Chain of Thought obligatori
-✅ Shadow Validator amb Retry Loop
-✅ Mode Selector (Edit/Xat)
-✅ Atomic Operations (UPDATE_BY_ID)
+✅ Motor d'Enginyeria Documental
+✅ Sistema Multi-Agent (v8.3+) - Classifier + Executors
+✅ Gemini 3 Flash Preview
+✅ Anotacions de Canvis (v14.0) - Accept/Reject
+✅ Vista Col·lapsada (v14.4) - Canvis grans compactats
+✅ Validació d'Abast (v14.6) - Només modifica seleccionats
+✅ UI Anotacions Millorada (v14.8) - Fons gris, sense hover
 ✅ Smart Selection Context (v5.4) - ⟦SEL⟧ markers
 ✅ Document References (v6.7) - icones 👁️ clicables
 ✅ Reference Highlighting (v6.7) - ressaltat de colors
-✅ Prompts Professionals (v6.9) - receptes millorades
+✅ Cache Semàntic L1+L2 - 40-60% menys crides
+✅ Sessions KV - Estat persistent
+✅ BYOK - Multi-proveïdor (Gemini, OpenAI, Claude, Mistral, Groq)
 ✅ Multimodal AI (v6.0) - anàlisi d'imatges
 ✅ Table Support (v6.0) - lectura Markdown
 ✅ Knowledge Library (v5.1) - fitxers compartits
@@ -40,121 +44,73 @@ Construir el **motor d'enginyeria documental** més potent, aplicant els mateixo
 ✅ Timeline d'edicions (v6.6)
 ✅ Event Sourcing (edit_events)
 ✅ Context Engine (DocScanner + Skeleton)
-✅ Auto-Structure (Visual → H2)
-✅ Banned Expressions
+✅ Shadow Validator amb Retry Loop
 ✅ Dark/Light Theme
-✅ File Upload amb validació (v6.5)
-✅ Navegació Receptes (v6.9) - botó tornar enrere
 ```
 
 ---
 
 ## Versions Completades
 
-### v6.9 - Professional Prompts & UX (2024-12-07)
+### v14.x - Anotacions i UX (2025-12)
 
-- **Prompts Professionals**: Totes les receptes millorades amb instruccions específiques
-- **Nova recepta "Clarificar"**: Reorganitza idees, explicita connexions, elimina ambigüitats
-- **Navegació Receptes**: Botó tornar enrere a l'esquerra del camp de cerca
-- **Fix icones receptes**: `addBubbleHtml` per renderitzar correctament
-- **Fix landing receptes**: S'amaga quan s'executa una recepta
-- **Política privacitat actualitzada**: Conversation History i Knowledge Library documentats
+- **v14.8**: UI anotacions millorada, botó desfer sempre visible, espaiat xat
+- **v14.7**: Gemini 3 Flash Preview, etiquetes "Canvi proposat:", espai en diffs
+- **v14.6**: Fix validació d'abast de selecció (⟦SEL⟧)
+- **v14.5**: Botons d'anotació només icones
+- **v14.4**: Vista col·lapsada per canvis grans
+- **v14.2**: Auto-clear highlights, respostes netes
+- **v14.0**: Sistema d'anotacions Accept/Reject
 
-### v6.8 - UI Refinements (2024-12-06)
+### v8.3 - Multi-Agent System (2025-08)
 
-- Sticky bottom bar amb botons "Añadir" i "Borrar" al panel de Receptes
-- Millores d'interfície i consistència
+- Pipeline complet: Sanitizer → Gate0 → Classifier → Router → Executor
+- Executors especialitzats
+- Cache L1+L2 semàntic
+- Sessions amb Cloudflare KV
+- Circuit breaker
 
-### v6.7 - Document References (2024-12-05)
+### v6.x - References i UX (2024-12)
 
-- **References Vives**: mencions al xat enllaçen a seccions del document
-- **Reference Highlighting**: ressaltat de seccions amb colors (groc, taronja, blau, lila)
-- Mode REFERENCE_HIGHLIGHT per anàlisi visual
-- Icones 👁️ clicables per navegar al document
+- **v6.9**: Prompts professionals
+- **v6.8**: UI refinements
+- **v6.7**: Document References, Reference Highlighting
+- **v6.5**: File Upload Security
+- **v6.0**: Multimodal, Tables
 
-### v6.6 - Timeline & Drawer (2024-12-04)
+### v5.x - Persistència (2024-11/12)
 
-- Timeline visual d'edicions amb preview
-- Drawer de converses amb agrupació per data
-- Cerca de converses anteriors
+- **v5.4**: Smart Selection Context
+- **v5.1**: Knowledge Library
+- **v5.0**: Chat History persistent
 
-### v6.5 - File Upload Security (2024-12-03)
+### v3.x - Validació (2024-11)
 
-- Validació triple: MIME type, extensió, mida
-- Gestió d'errors millorada
-- Suport PDFs i imatges
-
-### v6.0 - Multimodal & Tables (2024-12-02)
-
-- Suport Gemini 2.0 Flash (multimodal)
-- Anàlisi d'imatges integrada
-- Lectura de taules en format Markdown
-
-### v5.4 - Smart Selection (2024-12-01)
-
-- Context expandit ±3 paràgrafs al voltant de selecció
-- Marcador ⟦SEL⟧ per identificar text seleccionat
-- IA interpreta intel·ligentment pregunta vs edició
-
-### v5.3 - Receipts Panel (2024-11-30)
-
-- Panel dedicat per receptes/macros
-- Gestió de custom actions
-
-### v5.1 - Knowledge Library (2024-11-28)
-
-- Biblioteca de fitxers compartida entre documents
-- Gestió via Gemini File API
-
-### v5.0 - Conversations (2024-11-25)
-
-- Historial de converses persistent
-- Auto-save amb debounce
-- Pinning de converses
-
-### v3.1 - Shadow Validator (2024-11-20)
-
-- Time Budget (25s safety cutoff)
-- Graceful Degradation amb `_meta`
-- Retry Feedback específic per error
-
-### v3.0 - Event Sourcing (2024-11-18)
-
-- Taula `edit_events` a Supabase
-- Historial complet de canvis
-- Undo de qualsevol edició
-
-### v2.9 - Context Engine (2024-11-15)
-
-- DocScanner amb extracció d'estructura
-- Document Skeleton
-- Entity Extraction
+- **v3.1**: Shadow Validator
+- **v3.0**: Event Sourcing
 
 ---
 
 ## Pròximes Versions
 
-### v7.0 - Preview Mode (Shadow State)
+### v15.0 - Streaming Responses
 
-**Objectiu:** Mostrar canvis abans d'aplicar.
-
-**Inspiració:** Cursor Shadow Workspace
+**Objectiu:** Respostes en temps real amb streaming.
 
 ```
 Prioritat: 🔴 ALTA
-Complexitat: Mitjana-Alta
-Impacte: Alt (user confidence, control)
+Complexitat: Mitjana
+Impacte: Alt (UX, perceived performance)
 ```
 
 | Feature | Descripció |
 |---------|------------|
-| Shadow State | Guardar canvis proposats sense aplicar |
-| Visual Diff | Mostrar - (vermell) / + (verd) |
-| Approve/Reject | Botons per acceptar o rebutjar |
-| Modify Before Apply | Editar proposta abans d'aplicar |
-| Batch Preview | Múltiples canvis en una preview |
+| SSE Streaming | Server-Sent Events per respostes |
+| Token-by-token | Mostrar text a mesura que es genera |
+| Cancel·lació | Poder aturar generació |
+| Progress indicators | Mostrar progrés real |
 
-### v7.1 - Google Workspace Marketplace
+### v15.1 - Google Workspace Marketplace
 
 **Objectiu:** Publicació oficial al Marketplace.
 
@@ -166,12 +122,12 @@ Impacte: Alt (distribució, visibilitat)
 
 | Feature | Descripció |
 |---------|------------|
-| OAuth Consent Screen | Configuració GCP |
+| OAuth Consent | Configuració GCP |
 | Screenshots | 5 captures 1280x800 |
-| Store Listing | Descripció, icones, categories |
+| Store Listing | Descripció, icones |
 | Review Process | Aprovació Google |
 
-### v7.2 - Advanced Collaboration
+### v16.0 - Advanced Collaboration
 
 **Objectiu:** Suport multi-usuari.
 
@@ -184,23 +140,30 @@ Impacte: Mitjà-Alt
 | Feature | Descripció |
 |---------|------------|
 | Conflict Detection | Detectar edicions simultànies |
-| Edit Locking | Bloqueig temporal de seccions |
-| Team Library | Biblioteca compartida per equip |
+| Edit Locking | Bloqueig temporal |
+| Team Library | Biblioteca compartida |
+| Shared Recipes | Receptes d'equip |
 
 ---
 
-## Futures Direccions (v8.x+)
+## Futures Direccions (v17.x+)
 
-### Synonym Memory
+### Voice Input
 ```
 Prioritat: 🟡 MITJANA
-Descripció: Recordar paraules rebutjades per no tornar-les a proposar
+Descripció: Instruccions per veu (Web Speech API)
 ```
 
-### Multi-Document Support
+### Templates Library
 ```
-Prioritat: 🟢 BAIXA
-Descripció: Treballar amb múltiples docs (referències creuades)
+Prioritat: 🟡 MITJANA
+Descripció: Plantilles predefinides per tipus de document
+```
+
+### AI Suggestions
+```
+Prioritat: 🟡 MITJANA
+Descripció: Suggeriments proactius sense instrucció
 ```
 
 ### MCP Integration
@@ -209,22 +172,10 @@ Prioritat: 🟢 BAIXA
 Descripció: Model Context Protocol per extensibilitat
 ```
 
-### Voice Input
+### Multi-Document Support
 ```
 Prioritat: 🟢 BAIXA
-Descripció: Instruccions per veu (Web Speech API)
-```
-
-### Templates Library
-```
-Prioritat: 🟡 MITJANA
-Descripció: Biblioteca de plantilles predefinides per tipus de document
-```
-
-### AI Suggestions
-```
-Prioritat: 🟡 MITJANA
-Descripció: Suggeriments proactius de millora sense instrucció explícita
+Descripció: Treballar amb múltiples docs (referències creuades)
 ```
 
 ---
@@ -233,40 +184,45 @@ Descripció: Suggeriments proactius de millora sense instrucció explícita
 
 ```
 2024-Q4 (Nov-Dec)
-├── v2.9  ✅ Context Engine (DocScanner + Skeleton)
-├── v3.0  ✅ Event Sourcing (edit_events)
+├── v2.9  ✅ Context Engine
+├── v3.0  ✅ Event Sourcing
 ├── v3.1  ✅ Shadow Validator
 ├── v5.0  ✅ Conversations
-├── v5.1  ✅ Knowledge Library
-├── v5.3  ✅ Receipts Panel
-├── v5.4  ✅ Smart Selection Context
+├── v5.4  ✅ Smart Selection
 ├── v6.0  ✅ Multimodal & Tables
-├── v6.5  ✅ File Upload Security
-├── v6.6  ✅ Timeline & Drawer
 ├── v6.7  ✅ Document References
-└── v6.8  ✅ UI Refinements
+└── v6.9  ✅ Professional Prompts
 
-2025-Q1 (Jan-Mar)
-├── v7.0  ⏳ Preview Mode (Visual Diff)
-└── v7.1  ⏳ Google Workspace Marketplace
+2025-Q1-Q3
+├── v7.x  ✅ Preparació multi-agent
+├── v8.3  ✅ Multi-Agent System complet
+├── v9-13 ✅ Refinaments i optimitzacions
+└── v14.0 ✅ Anotacions Accept/Reject
 
-2025-Q2+
-├── v7.2  ⏳ Advanced Collaboration
-└── v8.x  ⏳ Future features
+2025-Q4 (Actual)
+├── v14.4 ✅ Vista col·lapsada
+├── v14.6 ✅ Validació scope
+├── v14.7 ✅ Gemini 3 Flash Preview
+├── v15.0 ⏳ Streaming Responses
+└── v15.1 ⏳ Google Marketplace
+
+2026-Q1+
+├── v16.0 ⏳ Collaboration
+└── v17.x ⏳ Future features
 ```
 
 ---
 
 ## Mètriques d'Èxit
 
-| Mètrica | Target v7.0 |
-|---------|-------------|
+| Mètrica | Target |
+|---------|--------|
 | Temps resposta | < 3s |
 | Taxa d'èxit JSON | > 98% |
+| Cache hit rate | > 40% |
 | Undo success rate | > 99% |
+| Selection accuracy | > 95% |
 | User satisfaction | > 4.5/5 |
-| Docs > 10 pàgines | Funciona sense degradació |
-| Selection accuracy | > 95% (amb Smart Selection) |
 
 ---
 
@@ -281,4 +237,4 @@ Si tens idees o prioritats diferents:
 
 ---
 
-*Última actualització: 2024-12-06 (v6.8)*
+*Última actualització: 2025-12-21 (v14.8)*

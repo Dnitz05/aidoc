@@ -61,6 +61,8 @@ async function processInstruction(request, env, provider = null) {
     userMode = 'edit',
     hasSelection = false,
     isPartialSelection = false,
+    // v17.54: Historial de conversa del client (font principal de memòria)
+    _conversation = [],
   } = request;
 
   // BYOK: Usar provider si s'ha proporcionat, sinó fallback a apiKey central
@@ -91,11 +93,40 @@ async function processInstruction(request, env, provider = null) {
 
     // ═══════════════════════════════════════════════════════════
     // FASE 2: SESSION STATE (v8.4: async amb KV persistent)
+    // v17.54: Integrar historial del client com a font principal
     // ═══════════════════════════════════════════════════════════
     telemetry.checkpoint('session_start');
 
     const session = await getSession(sessionId, env);
-    const conversationContext = getConversationContext(session);
+
+    // v17.54: Combinar context del servidor amb historial del client
+    // El client té l'historial COMPLET, el servidor té metadata addicional
+    const serverContext = getConversationContext(session);
+
+    // Prioritzar l'historial del client (més complet i actualitzat)
+    const clientTurns = _conversation.length > 0 ? _conversation : [];
+
+    const conversationContext = {
+      // v17.54: Usar els últims 10 torns del client (no 2!)
+      turns: clientTurns.length > 0
+        ? clientTurns.slice(-10)  // Últims 10 del client
+        : serverContext.turns,     // Fallback al servidor
+      // Mantenir metadata del servidor
+      mentioned_paragraphs: serverContext.mentioned_paragraphs,
+      last_mode_used: serverContext.last_mode_used,
+      last_highlights: serverContext.last_highlights,
+      last_proposed_changes: serverContext.last_proposed_changes,
+      // v17.54: Info de debug
+      _source: clientTurns.length > 0 ? 'client' : 'server',
+      _client_turns_count: clientTurns.length,
+    };
+
+    logDebug('Conversation context built', {
+      source: conversationContext._source,
+      client_turns: clientTurns.length,
+      server_turns: serverContext.turns?.length || 0,
+      used_turns: conversationContext.turns.length,
+    });
 
     telemetry.checkpoint('session_end');
 
@@ -281,6 +312,7 @@ async function executeWithTimeout(operation, timeout) {
 /**
  * Finalitza el resultat afegint metadades
  * v8.4: async per suportar KV persistent
+ * v17.53: Incloure detalls dels canvis proposats al context de conversa
  */
 async function finalizeResult(result, session, sessionId, telemetry, sanitizedInput, env) {
   // Actualitzar sessió amb el torn de conversa
@@ -288,9 +320,30 @@ async function finalizeResult(result, session, sessionId, telemetry, sanitizedIn
     // Afegir torn d'usuari
     addConversationTurn(session, 'user', sanitizedInput.original || sanitizedInput.normalized);
 
+    // v17.53: Construir resposta d'assistent més informativa
+    let assistantContent = result.chat_response || '';
+
+    // v17.53: Si hi ha canvis proposats, afegir-los al context
+    if (result.changes && result.changes.length > 0) {
+      const changesDescription = result.changes.map(c => {
+        if (c.find && c.replace !== undefined) {
+          return `"${c.find}" → "${c.replace}"`;
+        }
+        return `§${c.paragraph_id + 1}`;
+      }).slice(0, 3).join(', ');
+
+      // Afegir informació dels canvis al final de la resposta
+      if (changesDescription) {
+        assistantContent += ` [Canvis proposats: ${changesDescription}]`;
+      }
+
+      // v17.53: Guardar els canvis pendents per context futur
+      session.last_proposed_changes = result.changes.slice(0, 5);
+    }
+
     // Afegir torn d'assistent
-    if (result.chat_response) {
-      addConversationTurn(session, 'assistant', result.chat_response, result.mode);
+    if (assistantContent) {
+      addConversationTurn(session, 'assistant', assistantContent, result.mode);
     }
 
     // Guardar sessió (async a KV)

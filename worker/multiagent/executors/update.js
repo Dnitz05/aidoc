@@ -22,19 +22,18 @@ import { sha256Sync, validateChangesV14 } from '../validator.js';
 
 const UPDATE_PROMPTS = {
   // v17.21: Prompt FIX amb anti-al·lucinació
-  fix: `CORRECTOR QUIRÚRGIC (Mode Find/Replace v17.25)
-Objectiu: Corregir errors ortogràfics amb canvis MÍNIMS i ATÒMICS.
+  fix: `CORRECTOR ORTOGRÀFIC v17.52
+Objectiu: Trobar i corregir TOTS els errors ortogràfics del text.
 
-## 🛑🛑🛑 REGLA #1: HONESTITAT ABSOLUTA 🛑🛑🛑
+## 🔍 MENTALITAT: BUSCA ACTIVAMENT ERRORS
+L'usuari t'ha demanat revisar el text perquè SOSPITA que hi ha errors.
+La teva feina és TROBAR-LOS. Busca amb atenció:
+- Accents oblidats o incorrectes
+- Lletres duplicades o que falten
+- Errors de concordança
+- Typos comuns
 
-SI NO HI HA ERRORS → DIGUES-HO CLARAMENT I RETORNA changes: []
-
-ÉS PERFECTAMENT ACCEPTABLE no trobar res. El text pot estar BÉ.
-NO INVENTIS errors per "ajudar". Això és PITJOR que no trobar res.
-La teva CREDIBILITAT depèn de ser HONEST.
-
-Resposta correcta si no hi ha errors:
-{"response": "He revisat el text i no he trobat cap error ortogràfic.", "changes": []}
+Si no trobes res després de revisar bé, retorna changes: []
 
 ## ⚠️⚠️⚠️ REGLA #2: ANTI-AL·LUCINACIÓ ⚠️⚠️⚠️
 
@@ -145,19 +144,20 @@ Exemples segons instrucció:
 
 Si no hi ha errors: {"response": "He revisat el text i no he trobat cap error a corregir.", "changes": []}`,
 
-  improve: `EDITOR DE MILLORES (Semàntic + Estil) v17.25
-Objectiu: Detectar i corregir QUALSEVOL problema de text que NO sigui ortogràfic pur.
+  improve: `DETECTOR DE PROBLEMES v17.52
+Objectiu: Trobar i corregir problemes semàntics, d'estil i coherència.
 
-## 🛑🛑🛑 REGLA #1: HONESTITAT ABSOLUTA 🛑🛑🛑
+## 🔍 MENTALITAT: L'USUARI SOSPITA QUE ALGO NO ESTÀ BÉ
+L'usuari t'ha demanat revisar el text. BUSCA ACTIVAMENT:
+- Paraules FORA DE CONTEXT (que no encaixen amb el tema)
+- Frases INCOHERENTS o que no tenen sentit
+- Expressions ESTRANYES o forçades
+- Paraules REPETIDES innecessàriament
+- Frases CONFUSES o ambigües
 
-SI NO HI HA PROBLEMES → DIGUES-HO CLARAMENT I RETORNA changes: []
+Revisa cada paràgraf i pregunta't: "Hi ha alguna cosa que sona malament?"
 
-ÉS PERFECTAMENT ACCEPTABLE no trobar res. El text pot estar BÉ.
-NO INVENTIS problemes per "ajudar". Això és PITJOR que no trobar res.
-La teva CREDIBILITAT depèn de ser HONEST.
-
-Resposta correcta si no hi ha problemes:
-{"response": "He revisat el text i no he trobat cap problema a millorar.", "changes": []}
+Si no trobes res després de revisar bé, retorna changes: []
 
 ## ⚠️ FORMAT DE SORTIDA CRÍTIC ⚠️
 PER CANVIS PETITS (1-3 paraules): Usa find/replace, NO el paràgraf complet!
@@ -636,6 +636,223 @@ async function callGeminiUpdate(systemPrompt, userPrompt, apiKey, signal, modifi
 }
 
 // ═══════════════════════════════════════════════════════════════
+// v14.8: GENERADOR INTEL·LIGENT DE REASONS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Genera una explicació natural i orgànica del canvi
+ * Analitza el tipus de canvi i genera una descripció humana
+ *
+ * @param {string} find - Text original
+ * @param {string} replace - Text nou
+ * @param {string} modificationType - Tipus de modificació (fix, improve, etc.)
+ * @returns {string} Explicació natural del canvi
+ */
+function generateSmartReason(find, replace, modificationType = 'fix') {
+  if (!find || !replace) return null;
+
+  const findTrim = find.trim();
+  const replaceTrim = replace.trim();
+
+  // Si són idèntics, no hi ha canvi real
+  if (findTrim === replaceTrim) return null;
+
+  // ═══════════════════════════════════════════════════════════
+  // 1. DETECCIÓ D'ACCENTS CATALANS
+  // ═══════════════════════════════════════════════════════════
+
+  const accentPairs = {
+    'a': ['à', 'á'], 'e': ['è', 'é'], 'i': ['í', 'ï'],
+    'o': ['ò', 'ó'], 'u': ['ú', 'ü'], 'c': ['ç']
+  };
+
+  // Buscar diferències d'accent
+  if (findTrim.length === replaceTrim.length) {
+    let accentChanges = [];
+    for (let i = 0; i < findTrim.length; i++) {
+      if (findTrim[i] !== replaceTrim[i]) {
+        const charLower = findTrim[i].toLowerCase();
+        const replaceCharLower = replaceTrim[i].toLowerCase();
+
+        // És un canvi d'accent?
+        for (const [base, accents] of Object.entries(accentPairs)) {
+          if ((charLower === base && accents.includes(replaceCharLower)) ||
+              (accents.includes(charLower) && replaceCharLower === base) ||
+              (accents.includes(charLower) && accents.includes(replaceCharLower))) {
+            accentChanges.push({ from: findTrim[i], to: replaceTrim[i], pos: i });
+          }
+        }
+      }
+    }
+
+    if (accentChanges.length > 0 && accentChanges.length <= 2) {
+      // Extreure la paraula afectada
+      const words = replaceTrim.split(/\s+/);
+      if (words.length === 1) {
+        const accentType = accentChanges[0].to.match(/[àèò]/) ? 'obert' :
+                          accentChanges[0].to.match(/[áéíóú]/) ? 'tancat' : 'diacrític';
+        return `Falta l'accent ${accentType} a «${replaceTrim}»`;
+      } else {
+        return `Correcció d'accent: «${findTrim}» necessita accent a «${replaceTrim}»`;
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 2. DETECCIÓ DE LLETRES DUPLICADES O MANCANTS
+  // ═══════════════════════════════════════════════════════════
+
+  const lenDiff = findTrim.length - replaceTrim.length;
+
+  if (Math.abs(lenDiff) === 1) {
+    const longer = lenDiff > 0 ? findTrim : replaceTrim;
+    const shorter = lenDiff > 0 ? replaceTrim : findTrim;
+
+    // Buscar quina lletra és diferent
+    for (let i = 0; i < longer.length; i++) {
+      const withoutChar = longer.slice(0, i) + longer.slice(i + 1);
+      if (withoutChar === shorter) {
+        const letter = longer[i];
+        if (lenDiff > 0) {
+          // Lletra duplicada eliminada
+          if (i > 0 && longer[i-1] === letter) {
+            return `Lletra duplicada «${letter}${letter}» → s'ha eliminat la repetició`;
+          }
+          return `S'ha eliminat la lletra «${letter}» sobrant`;
+        } else {
+          // Lletra mancant afegida
+          return `Faltava la lletra «${letter}» a «${shorter}»`;
+        }
+      }
+    }
+  }
+
+  // Detectar doble lletra més complexa (ex: "docummentació" → "documentació")
+  if (lenDiff > 0 && lenDiff <= 3) {
+    const doubleLetterMatch = findTrim.match(/(.)\1{2,}/);
+    if (doubleLetterMatch) {
+      return `Lletres repetides de més: «${doubleLetterMatch[0]}» corregit`;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 3. DETECCIÓ DE TRANSPOSICIONS (lletres intercanviades)
+  // ═══════════════════════════════════════════════════════════
+
+  if (findTrim.length === replaceTrim.length && findTrim.length <= 15) {
+    let diffs = 0;
+    let diffPositions = [];
+    for (let i = 0; i < findTrim.length; i++) {
+      if (findTrim[i] !== replaceTrim[i]) {
+        diffs++;
+        diffPositions.push(i);
+      }
+    }
+    if (diffs === 2 && diffPositions[1] - diffPositions[0] === 1) {
+      // Transposició de lletres adjacents
+      return `Lletres intercanviades: «${findTrim[diffPositions[0]]}${findTrim[diffPositions[1]]}» → «${replaceTrim[diffPositions[0]]}${replaceTrim[diffPositions[1]]}»`;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 4. DETECCIÓ DE CANVIS COMUNS
+  // ═══════════════════════════════════════════════════════════
+
+  // Apòstrof
+  if ((findTrim.includes("l'") && replaceTrim.includes("el ")) ||
+      (findTrim.includes("el ") && replaceTrim.includes("l'"))) {
+    return `Apostrofació: article «el/l'» ajustat segons la paraula següent`;
+  }
+
+  if ((findTrim.includes("d'") && replaceTrim.includes("de ")) ||
+      (findTrim.includes("de ") && replaceTrim.includes("d'"))) {
+    return `Apostrofació de la preposició «de/d'»`;
+  }
+
+  // Guionet
+  if (findTrim.includes('-') !== replaceTrim.includes('-')) {
+    return findTrim.includes('-')
+      ? `S'ha eliminat el guionet innecessari`
+      : `S'ha afegit guionet necessari`;
+  }
+
+  // Majúscules/minúscules
+  if (findTrim.toLowerCase() === replaceTrim.toLowerCase()) {
+    if (findTrim[0] !== replaceTrim[0]) {
+      return replaceTrim[0] === replaceTrim[0].toUpperCase()
+        ? `Cal majúscula inicial: «${replaceTrim}»`
+        : `No cal majúscula: «${replaceTrim}»`;
+    }
+    return `Correcció de majúscules/minúscules`;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 5. SEGONS TIPUS DE MODIFICACIÓ
+  // ═══════════════════════════════════════════════════════════
+
+  // Paraules curtes - mostrar el canvi directe
+  if (findTrim.split(/\s+/).length <= 3 && replaceTrim.split(/\s+/).length <= 3) {
+    switch (modificationType) {
+      case 'fix':
+        // Intentar detectar el tipus d'error
+        if (findTrim.length < replaceTrim.length) {
+          return `Faltaven lletres: «${findTrim}» → «${replaceTrim}»`;
+        } else if (findTrim.length > replaceTrim.length) {
+          return `Lletres sobrants: «${findTrim}» → «${replaceTrim}»`;
+        }
+        return `Error ortogràfic corregit: «${findTrim}» → «${replaceTrim}»`;
+
+      case 'improve':
+        return `Millora d'expressió: «${findTrim}» → «${replaceTrim}» (més precís)`;
+
+      case 'expand':
+        return `Text ampliat per més claredat`;
+
+      case 'simplify':
+        return `Simplificat: expressió més directa`;
+
+      case 'translate':
+        return `Traducció adaptada al context`;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 6. FRASES MÉS LLARGUES
+  // ═══════════════════════════════════════════════════════════
+
+  const findWords = findTrim.split(/\s+/).length;
+  const replaceWords = replaceTrim.split(/\s+/).length;
+
+  if (modificationType === 'simplify') {
+    if (replaceWords < findWords) {
+      return `Simplificat: ${findWords} → ${replaceWords} paraules, més directe`;
+    }
+    return `Reestructurat per major claredat`;
+  }
+
+  if (modificationType === 'expand') {
+    if (replaceWords > findWords) {
+      return `Ampliat amb detall addicional (+${replaceWords - findWords} paraules)`;
+    }
+    return `Contingut enriquit amb més context`;
+  }
+
+  if (modificationType === 'translate') {
+    return `Traducció natural mantenint el to original`;
+  }
+
+  if (modificationType === 'improve') {
+    if (Math.abs(findWords - replaceWords) <= 2) {
+      return `Reformulat per millorar la fluïdesa`;
+    }
+    return `Reestructurat: expressió més clara i natural`;
+  }
+
+  // Fallback final (hauria de ser rar arribar aquí)
+  return `Canvi de «${findTrim.substring(0, 25)}${findTrim.length > 25 ? '...' : ''}» per versió millorada`;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // RESPONSE PARSING
 // ═══════════════════════════════════════════════════════════════
 
@@ -697,11 +914,11 @@ function parseUpdateResponse(responseText, modificationType = 'improve') {
             }
           }
 
-          // v17.27: Generar reason descriptiu si Gemini no el proporciona
+          // v14.8: Generar reason intel·ligent si Gemini no el proporciona
           let reason = c.reason || c.explanation;
-          if (!reason || reason.length < 10) {
-            // Fallback: descriure el canvi de forma clara
-            reason = `Correcció: «${find}» → «${replace}»`;
+          if (!reason || reason.length < 15) {
+            // Usar generador intel·ligent en lloc de fallback genèric
+            reason = generateSmartReason(find, replace, 'fix') || `Correcció ortogràfica`;
           }
           return {
             paragraph_id: c.paragraph_id - 1,  // v12.1: 1-indexed → 0-indexed
@@ -858,10 +1075,10 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
       }
 
       // v14.1: Format unificat amb original/replacement (find/replace → original/replacement)
-      // v17.27: Garantir reason descriptiu
+      // v14.8: Usar generador intel·ligent de reasons
       let finalReason = change.reason;
-      if (!finalReason || finalReason.length < 10) {
-        finalReason = `Correcció: «${change.find}» → «${change.replace}»`;
+      if (!finalReason || finalReason.length < 15) {
+        finalReason = generateSmartReason(change.find, change.replace, modificationType) || `Correcció aplicada`;
       }
       validated.push({
         id: generateItemId('c', changeIndex++),
@@ -914,10 +1131,10 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
       // Construir new_text aplicant el canvi
       const resultText = originalText.replace(change.find, change.replace);
 
-      // v17.27: Garantir reason descriptiu
+      // v14.8: Usar generador intel·ligent de reasons
       let improveReason = change.reason || change.explanation;
-      if (!improveReason || improveReason.length < 10) {
-        improveReason = `Millora: «${change.find}» → «${change.replace}»`;
+      if (!improveReason || improveReason.length < 15) {
+        improveReason = generateSmartReason(change.find, change.replace, 'improve') || `Millora d'estil`;
       }
       validated.push({
         id: generateItemId('c', changeIndex++),
@@ -1003,7 +1220,7 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
         // v17.31: Camps per compatibilitat - original_text és SEMPRE el paràgraf complet
         original_text: originalText,
         new_text: newFullText,
-        reason: change.reason || change.explanation || `Millora: "${exactFind}" → "${exactReplace}"`,
+        reason: change.reason || change.explanation || generateSmartReason(exactFind, exactReplace, 'improve') || `Millora aplicada`,
         _status: 'pending',
       });
       continue;
@@ -1051,14 +1268,14 @@ function validateChanges(changes, documentContext, validTargets, modificationTyp
       }
     }
 
-    // v17.27: Garantir reason descriptiu per canvis de paràgraf
+    // v14.8: Usar generador intel·ligent de reasons per canvis de paràgraf
     let paraReason = change.reason || change.explanation;
-    if (!paraReason || paraReason.length < 10) {
-      // Crear una descripció més útil
+    if (!paraReason || paraReason.length < 15) {
+      // Usar generador intel·ligent en lloc de fallback genèric
       if (exactFind && exactReplace && exactFind !== exactReplace) {
-        paraReason = `Canvi: «${exactFind.substring(0, 30)}${exactFind.length > 30 ? '...' : ''}» → «${exactReplace.substring(0, 30)}${exactReplace.length > 30 ? '...' : ''}»`;
+        paraReason = generateSmartReason(exactFind, exactReplace, modificationType) || `Text reformulat`;
       } else {
-        paraReason = `Reescriptura de la línia`;
+        paraReason = `Reestructuració del paràgraf per millorar la claredat`;
       }
     }
     validated.push({

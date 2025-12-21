@@ -168,6 +168,23 @@ Exemples amb selecció PARCIAL activa:
 | "Millora el text" | document | UPDATE_BY_ID | Vol millorar la selecció |
 | "De què parla?" | chat | CHAT_ONLY | Pregunta sobre la selecció |
 
+### ⚠️ REFERÈNCIES ANAFÒRIQUES (v17.53) - REGLA CRÍTICA ⚠️
+Si hi ha CANVIS PENDENTS i l'usuari diu:
+- "elimina-la", "canvia-ho", "fes-ho", "accepta", "aplica-ho"
+- "treu-la", "borra-la", "suprimeix-la"
+- "sí", "ok", "d'acord", "confirmo"
+
+→ L'usuari es refereix als CANVIS PENDENTS, NO vol nova classificació!
+→ mode: UPDATE_BY_ID
+→ target_paragraphs: els dels canvis pendents
+→ modification_type: "fix" (per aplicar el canvi ja proposat)
+
+Exemple:
+- Torn anterior: "He trobat 'bajoques' [Canvis proposats: 'bajoques' → 'Signat']"
+- Usuari diu: "elimina-la"
+→ L'usuari vol eliminar "bajoques" = aplicar el canvi proposat
+→ mode: UPDATE_BY_ID, target_paragraphs: [del canvi pendent]
+
 ### Extracció de keywords
 - Entre cometes → terme EXACTE: "busca 'la'" → ["la"]
 - Sense cometes → últim substantiu: "on apareix PAE" → ["PAE"]
@@ -311,13 +328,14 @@ ${sanitizedInput.language}
   }
 
   // Afegir context de conversa si disponible
+  // v17.54: Ara rebem fins a 10 torns del client - mostrem els últims 5 al classifier
   if (conversationContext && conversationContext.turns && conversationContext.turns.length > 0) {
-    const lastTurns = conversationContext.turns.slice(-2);
+    const lastTurns = conversationContext.turns.slice(-5);  // v17.54: 5 torns (no 2!)
     prompt += `
-## CONTEXT DE CONVERSA (últims 2 torns)
+## CONTEXT DE CONVERSA (últims ${lastTurns.length} torns)
 `;
     for (const turn of lastTurns) {
-      prompt += `- ${turn.role}: "${turn.content.substring(0, 200)}${turn.content.length > 200 ? '...' : ''}"
+      prompt += `- ${turn.role}: "${turn.content.substring(0, 300)}${turn.content.length > 300 ? '...' : ''}"
 `;
       if (turn.mode) {
         prompt += `  (mode: ${turn.mode})
@@ -327,6 +345,21 @@ ${sanitizedInput.language}
 
     if (conversationContext.mentioned_paragraphs?.length > 0) {
       prompt += `- Paràgrafs mencionats recentment: ${conversationContext.mentioned_paragraphs.join(', ')}
+`;
+    }
+
+    // v17.53: Mostrar canvis proposats anteriors si existeixen
+    if (conversationContext.last_proposed_changes?.length > 0) {
+      prompt += `
+## CANVIS PENDENTS (proposats en torn anterior)
+`;
+      for (const change of conversationContext.last_proposed_changes.slice(0, 3)) {
+        if (change.find && change.replace !== undefined) {
+          prompt += `- §${(change.paragraph_id || 0) + 1}: "${change.find}" → "${change.replace}"
+`;
+        }
+      }
+      prompt += `⚠️ Si l'usuari diu "elimina-la", "canvia-ho", "fes-ho", "accepta", etc. es refereix a aquests canvis!
 `;
     }
   }

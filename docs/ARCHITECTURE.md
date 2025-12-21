@@ -1,4 +1,4 @@
-# Arquitectura Tècnica - Docmile v6.8
+# Arquitectura Tècnica - Docmile v14.8
 
 ## Visió General
 
@@ -10,7 +10,7 @@ Docmile és un **Motor d'Enginyeria Documental** que opera com a sidebar dins de
 │                             │                                            │
 │                             ▼                                            │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
-│                    GOOGLE DOCS + SIDEBAR                          │   │
+│  │                    GOOGLE DOCS + SIDEBAR                          │   │
 │  │  ┌─────────────────┐      ┌─────────────────────────────────┐    │   │
 │  │  │   Sidebar.html  │◄────►│         Code.gs                 │    │   │
 │  │  │   (UI/UX)       │      │   (Apps Script Backend)         │    │   │
@@ -19,23 +19,28 @@ Docmile és un **Motor d'Enginyeria Documental** que opera com a sidebar dins de
 │                                              │ HTTPS                     │
 │                                              ▼                           │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │                    CLOUDFLARE WORKER (v6.8)                       │   │
-│  │                         worker.js                                 │   │
-│  │  ┌─────────────────┐      ┌─────────────────────────────────┐    │   │
-│  │  │  System Prompt  │      │      Business Logic             │    │   │
-│  │  │  (v6.8 Engine)  │      │  • Shadow Validator             │    │   │
-│  │  │                 │      │  • Smart Selection Handler      │    │   │
-│  │  │                 │      │  • Document References          │    │   │
-│  │  └─────────────────┘      │  • Multimodal Support           │    │   │
-│  │                           └──────────────┬──────────────────┘    │   │
-│  └──────────────────────────────────────────┼───────────────────────┘   │
-│                              ┌──────────────┴──────────────┐             │
-│                              ▼                              ▼             │
-│                   ┌─────────────────┐          ┌─────────────────┐       │
-│                   │  GEMINI 2.0     │          │   SUPABASE      │       │
-│                   │  Flash API      │          │   PostgreSQL    │       │
-│                   │  (Multimodal)   │          │                 │       │
-│                   └─────────────────┘          └─────────────────┘       │
+│  │              CLOUDFLARE WORKER (Multi-Agent v14.8)                │   │
+│  │  ┌────────────────────────────────────────────────────────────┐  │   │
+│  │  │                  PIPELINE MULTI-AGENT                       │  │   │
+│  │  │                                                             │  │   │
+│  │  │  ┌────────┐ ┌──────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │  │   │
+│  │  │  │Sanitize│→│  Gate0   │→│Classify│→│ Router │→│Execute │ │  │   │
+│  │  │  └────────┘ └──────────┘ └────────┘ └────────┘ └────────┘ │  │   │
+│  │  │                                                    ↓        │  │   │
+│  │  │  ┌──────────────────────────────────────────────────────┐  │  │   │
+│  │  │  │            EXECUTORS ESPECIALITZATS                   │  │  │   │
+│  │  │  │  ChatExecutor │ HighlightExecutor │ UpdateExecutor   │  │  │   │
+│  │  │  │  RewriteExecutor │ UnifiedExecutor                   │  │  │   │
+│  │  │  └──────────────────────────────────────────────────────┘  │  │   │
+│  │  └────────────────────────────────────────────────────────────┘  │   │
+│  │                                                                   │   │
+│  │          ┌──────────────┬──────────────┬──────────────┐          │   │
+│  │          ▼              ▼              ▼              ▼          │   │
+│  │   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌────────┐    │   │
+│  │   │   GEMINI    │ │  SUPABASE   │ │ CLOUDFLARE  │ │ CACHE  │    │   │
+│  │   │  3 Flash    │ │  PostgreSQL │ │     KV      │ │ L1+L2  │    │   │
+│  │   └─────────────┘ └─────────────┘ └─────────────┘ └────────┘    │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -45,18 +50,19 @@ Docmile és un **Motor d'Enginyeria Documental** que opera com a sidebar dins de
 
 ### 1. Sidebar.html (Frontend)
 
-**Ubicació:** `docs-addon/Sidebar.html`
+**Ubicació:** `docs-addon/Sidebar.html` (~8600 línies)
 
 El frontend és una pàgina HTML injectada com a sidebar a Google Docs.
 
 #### Responsabilitats:
 - UI de xat amb historial de converses
 - Mode Selector (Edit/Xat)
-- Gestió de Receipts (macros)
-- Configuració (tema, preferències)
-- Indicador de selecció activa amb preview
+- **Anotacions de canvis** amb Accept/Reject (v14.0)
+- **Vista col·lapsada** per canvis grans (v14.4)
 - Document References (icones 👁️ clicables)
+- Gestió de Receipts (macros)
 - Timeline d'edicions
+- Indicador de selecció activa amb preview
 - Comunicació amb Code.gs via `google.script.run`
 
 #### Estructura:
@@ -67,25 +73,26 @@ Sidebar.html + Styles.html
 │   ├── #header - Logo + Chat Header
 │   ├── #conversations-drawer - Historial converses
 │   ├── #chat-panel - Xat principal
-│   │   ├── #chatHistory - Missatges
+│   │   ├── #chatHistory - Missatges + Anotacions
 │   │   ├── #selection-indicator - Preview selecció
 │   │   └── #input-area - Input + Mode Selector
 │   ├── #timeline-panel - Historial edicions
 │   ├── #recipes-panel - Receptes/Macros
 │   └── #settings-panel - Configuració
 └── <script> - Lògica JS
-    ├── Mode management
-    ├── Selection polling (400ms)
+    ├── renderChangeAnnotation() - Anotacions de canvis
+    ├── computeChangeStats() - Estadístiques de canvis
+    ├── toggleAnnotationExpand() - Vista col·lapsada
+    ├── acceptAnnotation() / rejectAnnotation()
     ├── sendMessage()
-    ├── Document References handler
-    └── Conversation management
+    └── Document References handler
 ```
 
 ---
 
 ### 2. Code.gs (Apps Script Backend)
 
-**Ubicació:** `docs-addon/Code.gs`
+**Ubicació:** `docs-addon/Code.gs` (~7200 línies)
 
 Pont entre el frontend i el worker extern. Opera dins del context de Google Docs.
 
@@ -119,44 +126,124 @@ Quan hi ha selecció, `captureFullDocument()`:
 
 ---
 
-### 3. Worker.js (Cloudflare Worker v6.8)
+### 3. Worker - Sistema Multi-Agent (v14.8)
 
-**Ubicació:** `worker/worker.js`
+**Ubicació:** `worker/` (~10.000 línies total)
 
-Backend serverless que processa les peticions i comunica amb Gemini.
+Backend serverless amb arquitectura multi-agent.
 
-#### Responsabilitats:
-- System Prompt v6.8 amb Smart Selection Handling
-- Validació de llicències (via Supabase)
-- Crida a Gemini API (incloent multimodal)
-- Shadow Validator amb retry loop
-- Mode Enforcement (edit/chat)
-- Document References generator
-- Reference Highlighting support
-
-#### Modes de Resposta:
-
-| Mode | Descripció | Quan s'usa |
-|------|------------|------------|
-| `UPDATE_BY_ID` | Edita paràgraf específic | Modificacions puntuals |
-| `REWRITE` | Reescriu text complet | Generació nova |
-| `CHAT_ONLY` | Només conversa | Consultes, opinions |
-| `REFERENCE_HIGHLIGHT` | Ressalta seccions | Anàlisi visual (v6.7) |
-
-#### Smart Selection Handling (v5.4):
-
-El system prompt inclou instruccions per gestionar seleccions:
+#### Estructura de Fitxers:
 
 ```
-GESTIÓ DE SELECCIÓ INTEL·LIGENT (v5.4)
-═══════════════════════════════════════
-Quan vegis ⟦SEL⟧:
-
-1. EDICIÓ → Opera sobre ⟦SEL⟧
-2. PREGUNTA DOCUMENT → Usa tot el context
-3. PREGUNTA SELECCIÓ → Respon basant-se en ⟦SEL⟧
-4. AMBIGU → Prioritza context complet
+worker/
+├── worker.js              # Handler principal (4600 línies)
+├── wrangler.toml          # Config Cloudflare
+└── multiagent/            # Sistema multi-agent
+    ├── index.js           # Exports
+    ├── pipeline.js        # Pipeline principal
+    ├── classifier.js      # Classificador IA
+    ├── router.js          # Router d'intents
+    ├── config.js          # Configuració
+    ├── types.js           # Tipus i enums
+    ├── sanitizer.js       # Normalització input
+    ├── gate0.js           # Fast paths
+    ├── session.js         # Sessions (KV)
+    ├── cache.js           # Cache L1+L2
+    ├── context.js         # Windowing document
+    ├── validator.js       # Validació sortides
+    ├── circuitbreaker.js  # Protecció errors
+    ├── telemetry.js       # Logging
+    ├── integration.js     # Integració legacy
+    ├── executors/
+    │   ├── index.js       # Registry
+    │   ├── unified.js     # Executor unificat (v14.0)
+    │   ├── chat.js        # CHAT_ONLY
+    │   ├── highlight.js   # REFERENCE_HIGHLIGHT
+    │   ├── update.js      # UPDATE_BY_ID
+    │   └── rewrite.js     # REWRITE
+    └── providers/
+        ├── index.js       # Factory
+        ├── base.js        # Base class
+        ├── gemini.js      # Google Gemini
+        ├── openai.js      # OpenAI
+        ├── claude.js      # Anthropic
+        ├── mistral.js     # Mistral
+        └── groq.js        # Groq
 ```
+
+#### Pipeline Multi-Agent:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        PIPELINE FLOW                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  INPUT (instruction + document)                                      │
+│     │                                                                │
+│     ▼                                                                │
+│  ┌──────────────┐                                                    │
+│  │  SANITIZER   │  Normalitza, detecta idioma, extreu metadata      │
+│  └──────┬───────┘                                                    │
+│         ▼                                                            │
+│  ┌──────────────┐                                                    │
+│  │   GATE0      │  Fast paths: salutacions, agraïments (< 50ms)     │
+│  └──────┬───────┘                                                    │
+│         ▼                                                            │
+│  ┌──────────────┐                                                    │
+│  │    CACHE     │  L1 (sessió) + L2 (semàntic amb embeddings)       │
+│  └──────┬───────┘                                                    │
+│         ▼                                                            │
+│  ┌──────────────┐                                                    │
+│  │  CLASSIFIER  │  Gemini determina output_target + mode            │
+│  │              │  Confidence: 0.60 - 0.85 segons mode              │
+│  └──────┬───────┘                                                    │
+│         ▼                                                            │
+│  ┌──────────────┐                                                    │
+│  │   ROUTER     │  Decideix executor o demana clarificació          │
+│  └──────┬───────┘                                                    │
+│         ▼                                                            │
+│  ┌──────────────┐                                                    │
+│  │  EXECUTOR    │  ChatExecutor / HighlightExecutor /               │
+│  │              │  UpdateExecutor / RewriteExecutor                  │
+│  └──────┬───────┘                                                    │
+│         ▼                                                            │
+│  ┌──────────────┐                                                    │
+│  │  VALIDATOR   │  Valida JSON, banned words, length                 │
+│  └──────┬───────┘                                                    │
+│         ▼                                                            │
+│  OUTPUT { response, highlights?, changes?, _meta }                   │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Modes i Thresholds:
+
+| Mode | Threshold | Descripció |
+|------|-----------|------------|
+| CHAT_ONLY | 0.60 | Respostes conversacionals |
+| REFERENCE_HIGHLIGHT | 0.70 | Marcar seccions |
+| UPDATE_BY_ID | 0.80 | Editar paràgrafs |
+| REWRITE | 0.85 | Generar contingut |
+
+#### Timeouts:
+
+| Operació | Timeout |
+|----------|---------|
+| Classifier | 20s |
+| Executor (fast) | 10s |
+| Executor (thinking) | 25s |
+| Pipeline total | 50s |
+
+#### Models d'IA:
+
+| Agent | Model |
+|-------|-------|
+| Classifier | gemini-3-flash-preview |
+| Highlight | gemini-3-flash-preview |
+| Update | gemini-3-flash-preview |
+| Rewrite | gemini-3-flash-preview |
+| Chat | gemini-3-flash-preview |
+| Embeddings | text-embedding-004 |
 
 ---
 
@@ -170,8 +257,7 @@ licenses (
   id UUID PRIMARY KEY,
   license_key_hash TEXT UNIQUE,
   credits_remaining INTEGER,
-  is_active BOOLEAN,
-  ...
+  is_active BOOLEAN
 )
 
 -- Converses (v5.0)
@@ -181,8 +267,7 @@ conversations (
   doc_id TEXT,
   title TEXT,
   messages JSONB,
-  is_pinned BOOLEAN,
-  ...
+  is_pinned BOOLEAN
 )
 
 -- Historial d'edicions (v3.0)
@@ -194,19 +279,55 @@ edit_events (
   target_id INTEGER,
   before_text TEXT,
   after_text TEXT,
-  ...
+  reverted_at TIMESTAMPTZ
 )
 
 -- Knowledge Library (v5.1)
 knowledge_library (
   id UUID PRIMARY KEY,
   license_key_hash TEXT,
-  file_data TEXT,  -- base64
+  file_name TEXT,
   gemini_file_uri TEXT,
-  gemini_expires_at TIMESTAMPTZ,
-  ...
+  gemini_expires_at TIMESTAMPTZ
 )
 ```
+
+---
+
+### 5. Cloudflare KV (Sessions)
+
+Sessions persistents amb TTL de 30 minuts:
+
+```javascript
+{
+  sessionId: "string",
+  conversation: {
+    turns: [{role, content, timestamp}, ...],  // Últims 5 torns
+    mentioned_paragraphs: [1, 3, 5],
+    last_mode: "edit|chat"
+  },
+  pending_intent: {
+    intent: {...},
+    clarification_asked: false
+  }
+}
+```
+
+---
+
+### 6. Cache (L1 + L2)
+
+#### L1 Cache (In-Memory):
+- Clau: instruction_hash
+- TTL: Sessió
+- Hit: Exact match
+
+#### L2 Cache (Semàntic):
+- Clau: instruction_hash + doc_hash
+- Backend: Cloudflare KV
+- Similaritat: Cosine distance (embeddings)
+- TTL: 7 dies
+- Threshold: 0.92
 
 ---
 
@@ -222,104 +343,56 @@ Selecció → captureFullDocument() → {
 }
      │
      ▼
-processElement(element, index, ..., isSelected) → {
-  content: "{{n}} ⟦SEL⟧ text..." (si seleccionat)
-}
+Worker rep context amb marcadors ⟦SEL⟧
      │
      ▼
-Worker rep context expandit amb marcadors
+Classifier detecta selecció parcial
      │
      ▼
-IA interpreta intel·ligentment pregunta vs selecció
+Executor valida scope (v14.6) - NOMÉS modifica seleccionats
 ```
 
-### 2. Document References (v6.7)
+### 2. Anotacions de Canvis (v14.0)
 
 ```
-Resposta IA → Conté referències a paràgrafs
+Executor genera changes[]
      │
      ▼
-Frontend detecta referències (regex)
+Frontend renderitza anotacions
      │
      ▼
-Renderitza amb icona 👁️ clicable
+Usuari: Accept / Reject
      │
      ▼
-Clic → google.script.run.highlightParagraph(id)
+Si Accept → applyEdit() al document
+Si Reject → descarta canvi
+```
+
+### 3. Vista Col·lapsada (v14.4)
+
+```
+computeChangeStats(original, proposed)
      │
      ▼
-Document ressalta secció en blau (3s)
+isLarge = charDiff > 80 || totalChars > 120
+     │
+     ├─ true  → Mostra estadístiques + botó expandir
+     └─ false → Mostra diff directament
 ```
 
-### 3. Shadow Validator
+### 4. Document References (v6.7)
 
 ```
-Petició → Gemini → validateResponse() → Vàlid? → Retorna
-                         ↓ No
-                  buildRetryFeedback() → Retry (màx 2)
-                         ↓ Timeout?
-                  Graceful Degradation → _meta.warning
-```
-
-### 4. Event Sourcing
-
-```
-Edit → saveEditEvent() → Supabase → getEditHistory() → Timeline UI
-                                  → revertEdit() → Restore
-```
-
-### 5. Universal Doc Reader
-
-```
-Document → captureFullDocument() → {
-  header: "Capçalera...",
-  body: [paragraphs, lists, tables (Markdown)],
-  footer: "Peu de pàgina...",
-  footnotes: ["Nota 1...", "Nota 2..."],
-  stats: { paragraphs, tables, total_chars }
-}
-```
-
----
-
-## Estructura de Fitxers
-
-```
-aidoc/
-├── docs-addon/
-│   ├── Code.gs              # Backend Apps Script principal
-│   ├── DocScanner.gs        # Context Engine
-│   ├── Sidebar.html         # Frontend HTML/JS
-│   ├── Styles.html          # CSS separat
-│   └── appsscript.json      # Manifest (OAuth, addOns)
-│
-├── worker/
-│   ├── worker.js            # Cloudflare Worker (v6.8)
-│   ├── package.json         # Dependencies
-│   └── wrangler.toml        # Config deployment
-│
-├── supabase/
-│   ├── conversations.sql    # Schema converses
-│   ├── edit_events.sql      # Schema edicions
-│   └── knowledge_library.sql # Schema fitxers
-│
-├── docs/
-│   ├── ARCHITECTURE.md      # Aquest fitxer
-│   ├── legal/
-│   │   ├── privacy.html     # Política privacitat
-│   │   └── terms.html       # Termes servei
-│   ├── support.html         # Pàgina suport
-│   └── index.html           # Landing page
-│
-├── assets/
-│   ├── logo.svg             # Logo vectorial
-│   ├── logo-128.png         # Logo 128x128
-│   ├── logo-96.png          # Logo 96x96
-│   └── logo-32.png          # Logo 32x32
-│
-├── README.md                # Documentació principal
-├── CHANGELOG.md             # Historial de versions
-└── ROADMAP.md               # Plans futurs
+Resposta IA → Conté {{N}} referències
+     │
+     ▼
+Frontend detecta patró
+     │
+     ▼
+Renderitza amb icona 👁️
+     │
+     ▼
+Clic → highlightParagraph(N)
 ```
 
 ---
@@ -328,19 +401,18 @@ aidoc/
 
 ### Worker API
 
-**Endpoint:** `POST https://docmile-api.conteucontes.workers.dev`
+**Endpoint:** `POST https://docmile-api.conteucontes.workers.dev/chat`
 
 **Request:**
 ```json
 {
   "user_instruction": "Tradueix al castellà",
   "text": "{{0}} ⟦SEL⟧ Text seleccionat...\n{{1}} Context...",
-  "license_key": "xxxxx-xxxxx-xxxxx",
+  "license_key_hash": "sha256...",
   "has_selection": true,
+  "user_mode": "edit",
   "chat_history": [...],
-  "user_mode": "edit|chat",
-  "doc_skeleton": {...},
-  "chat_attachments": [...]
+  "doc_metadata": {...}
 }
 ```
 
@@ -348,21 +420,18 @@ aidoc/
 ```json
 {
   "status": "ok",
-  "data": {
-    "mode": "UPDATE_BY_ID",
-    "updates": { "0": "Texto traducido..." },
-    "change_summary": "He traduït el paràgraf.",
-    "thought": "Raonament de la IA...",
-    "doc_references": [
-      { "para_id": 0, "snippet": "Texto traducido..." }
-    ]
-  },
-  "credits_remaining": 95,
-  "event_id": "uuid",
+  "response": "He traduït el text.",
+  "mode": "UPDATE_BY_ID",
+  "highlights": [
+    {"para_id": 2, "color": "success", "reason": "Traduït"}
+  ],
+  "changes": [
+    {"para_id": 2, "original": "...", "replacement": "..."}
+  ],
   "_meta": {
-    "validation_passed": true,
-    "retries": 0,
-    "elapsed_ms": 1234
+    "classifier_confidence": 0.92,
+    "execution_time_ms": 2145,
+    "cache_hit": false
   }
 }
 ```
@@ -374,26 +443,15 @@ aidoc/
 ### Autenticació
 - Llicències validades via hash SHA-256
 - Crèdits limitats per llicència
-- Validació a cada petició
 
-### OAuth Scopes (v5.4)
-```json
-{
-  "oauthScopes": [
-    "https://www.googleapis.com/auth/documents.currentonly",
-    "https://www.googleapis.com/auth/script.external_request",
-    "https://www.googleapis.com/auth/script.container.ui"
-  ]
-}
-```
+### Validació d'Abast (v14.6)
+- Només modifica paràgrafs amb `⟦SEL⟧`
+- Rebutja canvis fora de scope
 
-### Secrets
-| Secret | Ubicació |
-|--------|----------|
-| `GEMINI_API_KEY` | Cloudflare Worker Secrets |
-| `SUPABASE_URL` | Cloudflare Worker Secrets |
-| `SUPABASE_SERVICE_ROLE_KEY` | Cloudflare Worker Secrets |
-| Llicència usuari | UserProperties (Google) |
+### Shadow Validator
+- Valida JSON, banned words
+- Time budget (25s)
+- Graceful degradation
 
 ---
 
@@ -401,20 +459,19 @@ aidoc/
 
 | Aspecte | Implementació |
 |---------|---------------|
-| Latència | Worker edge (Cloudflare) + Gemini Flash |
-| Tokens | IDs curts (`{{n}}`) + context expandit (±3) |
-| Selecció | Polling cada 400ms amb debounce |
-| Retry | Màxim 2 retries amb timeout 25s |
+| Latència | Worker edge + Gemini 3 Flash |
+| Tokens | IDs curts + context expandit |
+| Cache | L1+L2 → 40-60% menys crides |
+| Fast paths | Gate0 → 5-10% sense LLM |
 
 ---
 
 ## Limitacions Conegudes
 
-1. **Documents molt llargs**: >10.000 paraules poden excedir límits de tokens
-2. **Taules**: Només lectura, no editables directament
-3. **Imatges**: Placeholders, no contingut visual
-4. **Concurrent editing**: No hi ha gestió de conflictes multi-usuari
+1. **Documents molt llargs**: >10.000 paraules poden excedir límits
+2. **Taules**: Només lectura
+3. **Concurrent editing**: No hi ha gestió multi-usuari
 
 ---
 
-*Última actualització: 2024-12-06 (v6.8)*
+*Última actualització: 2025-12-21 (v14.8)*

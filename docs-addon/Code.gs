@@ -2772,24 +2772,69 @@ function applyFindReplaceChanges(changes) {
       const hasOriginalText = change.original_text && change.original_text.length > 0;
       const hasNewText = change.new_text !== null && change.new_text !== undefined;  // "" és vàlid!
 
+      // v17.41: Debug exhaustiu per diagnosticar problemes d'eliminació
+      console.log('[applyFindReplaceChanges] v17.41 DEBUG - change object:', JSON.stringify(change).substring(0, 300));
+      console.log('[applyFindReplaceChanges] v17.41 DEBUG - hasFind=' + hasFind + ', hasReplace=' + hasReplace + ', hasOriginalText=' + hasOriginalText + ', hasNewText=' + hasNewText);
+      console.log('[applyFindReplaceChanges] v17.41 DEBUG - original_text type: ' + typeof change.original_text + ', new_text type: ' + typeof change.new_text);
+
       // Prioritat 1: Mode find/replace (correccions atòmiques - mode FIX)
-      if (hasFind && hasReplace) {
-        // Verificar que el text 'find' existeix al paràgraf
-        if (!currentText.includes(change.find)) {
-          skippedCount++;
-          continue;
+      // v17.33: Només entrar si find existeix al text actual
+      // v17.40: Cerca més tolerant - normalitzar espais
+      let findExistsInText = hasFind && hasReplace && currentText.includes(change.find);
+      let actualFind = change.find;  // El que realment usarem per cercar
+
+      // v17.40: Si no es troba exacte, provar amb normalització d'espais
+      if (hasFind && hasReplace && !findExistsInText) {
+        const normalizeSpaces = (s) => s.replace(/\s+/g, ' ').trim();
+        const normalizedFind = normalizeSpaces(change.find);
+        const normalizedCurrent = normalizeSpaces(currentText);
+
+        if (normalizedCurrent.includes(normalizedFind)) {
+          console.log('[applyFindReplaceChanges] v17.40 - Found with normalized spaces');
+          // Trobar la posició al text normalitzat i reconstruir el find real
+          const pos = normalizedCurrent.indexOf(normalizedFind);
+          // Usar el text normalitzat per la cerca
+          findExistsInText = true;
+          // Però necessitem trobar el text real al document
+          // Usar regex flexible per espais
+          const regexPattern = change.find.split(/\s+/).map(escapeRegExp).join('\\s+');
+          const regex = new RegExp(regexPattern);
+          const match = currentText.match(regex);
+          if (match) {
+            actualFind = match[0];  // El text real trobat
+            console.log('[applyFindReplaceChanges] v17.40 - Real match: "' + actualFind + '"');
+          }
         }
+      }
+
+      console.log('[applyFindReplaceChanges] MODE CHECK - targetId=' + targetId + ', hasFind=' + hasFind + ', hasReplace=' + hasReplace + ', findExistsInText=' + findExistsInText);
+      if (hasFind && !findExistsInText) {
+        console.log('[applyFindReplaceChanges] v17.40 DEBUG - find NOT in text');
+        console.log('[applyFindReplaceChanges] v17.40 DEBUG - find: "' + change.find + '"');
+        console.log('[applyFindReplaceChanges] v17.40 DEBUG - currentText: "' + currentText.substring(0, 100) + '..."');
+      }
+
+      if (findExistsInText) {
+        console.log('[applyFindReplaceChanges] MODE FIX - find="' + actualFind + '"');
 
         // Guardar snapshot per undo ABANS del canvi
-        undoSnapshots.push({
+        // v17.47: Afegir find/replace per permetre undo atòmic (no restaurar tot el paràgraf)
+        const snapshot = {
           targetId: change.targetId,
           originalText: currentText,
           bodyIndex: getBodyIndex(targetElement),
-          highlight_find: change.highlight_find || change.find || null
-        });
+          highlight_find: change.highlight_find || actualFind || null,
+          // v17.47: Per undo atòmic MODE FIX
+          mode: 'fix',
+          find: actualFind,
+          replace: change.replace
+        };
+        undoSnapshots.push(snapshot);
+        console.log('[applyFindReplaceChanges] FIX - Created undoSnapshot:', JSON.stringify(snapshot).substring(0, 200));
 
         // MAGIC: replaceText() natiu preserva el format automàticament!
-        text.replaceText(escapeRegExp(change.find), change.replace);
+        // v17.40: Usar actualFind (pot ser diferent de change.find si s'han normalitzat espais)
+        text.replaceText(escapeRegExp(actualFind), change.replace);
         appliedCount++;
 
         // v17.3: Highlight PRECÍS després d'aplicar
@@ -2817,27 +2862,72 @@ function applyFindReplaceChanges(changes) {
 
         continue;  // Processat - següent canvi
       }
+      // v17.33: Si find/replace existeix però find NO es troba al text, deixar que caigui al mode IMPROVE
 
       // Prioritat 2: Mode full-replace (paràgraf complet - mode IMPROVE)
       if (hasOriginalText && hasNewText) {
-        // v17.5: VALIDACIÓ CRÍTICA - Verificar que el text actual coincideix amb l'original
-        // Això prevé aplicar canvis al paràgraf equivocat si el document ha canviat
-        const normalizeForCompare = (t) => t.trim().replace(/\s+/g, ' ');
-        if (normalizeForCompare(currentText) !== normalizeForCompare(change.original_text)) {
-          console.warn('[applyFindReplaceChanges] Text mismatch for full-replace, targetId=' + targetId);
-          console.warn('[applyFindReplaceChanges] Expected: "' + change.original_text.substring(0, 80) + '..."');
-          console.warn('[applyFindReplaceChanges] Found: "' + currentText.substring(0, 80) + '..."');
+        console.log('[applyFindReplaceChanges] MODE IMPROVE - targetId=' + targetId);
+        console.log('[applyFindReplaceChanges] original_text: "' + change.original_text.substring(0, 60) + '..."');
+        console.log('[applyFindReplaceChanges] currentText: "' + currentText.substring(0, 60) + '..."');
+
+        // v17.35: STALE check relaxat - confiar en l'usuari ja que ha vist i acceptat el canvi
+        // Normalització agressiva per ignorar diferències menors
+        const normalizeAggressive = (t) => t.trim()
+          .replace(/\s+/g, ' ')  // Espais múltiples a un sol espai
+          .replace(/[\u200B\u200C\u200D\uFEFF]/g, '')  // Caràcters invisibles
+          .replace(/\r\n/g, '\n')  // Normalitzar salts de línia
+          .toLowerCase();
+
+        const normalizedCurrent = normalizeAggressive(currentText);
+        const normalizedOriginal = normalizeAggressive(change.original_text);
+
+        // v17.35: Check de similitud - si el 90% del text coincideix, acceptar
+        const minLen = Math.min(normalizedCurrent.length, normalizedOriginal.length);
+        const maxLen = Math.max(normalizedCurrent.length, normalizedOriginal.length);
+        const lengthRatio = maxLen > 0 ? minLen / maxLen : 1;
+
+        // Comparar prefix comú
+        let commonPrefix = 0;
+        while (commonPrefix < minLen && normalizedCurrent[commonPrefix] === normalizedOriginal[commonPrefix]) {
+          commonPrefix++;
+        }
+        const prefixRatio = maxLen > 0 ? commonPrefix / maxLen : 1;
+
+        // v17.42: Skip STALE check per eliminacions (new_text === "")
+        // Si l'usuari vol eliminar un paràgraf, la ràtio serà 0 però és vàlid!
+        const isDeletion = change.new_text === '';
+
+        // v17.42: Per eliminacions, validar que original_text coincideixi amb currentText (>70% similitud)
+        let deletionValid = true;
+        if (isDeletion) {
+          // Per eliminacions, el prefixRatio és entre original_text i currentText
+          deletionValid = prefixRatio >= 0.7;  // 70% mínim de coincidència
+          console.log('[applyFindReplaceChanges] v17.42 DELETION - prefixRatio=' + prefixRatio.toFixed(2) + ', valid=' + deletionValid);
+        }
+
+        const isStale = isDeletion ? !deletionValid : (lengthRatio < 0.8 || prefixRatio < 0.7);
+
+        console.log('[applyFindReplaceChanges] v17.42 STALE CHECK - isDeletion=' + isDeletion + ', isStale=' + isStale + ', lengthRatio=' + lengthRatio.toFixed(2) + ', prefixRatio=' + prefixRatio.toFixed(2));
+
+        if (isStale) {
+          console.warn('[applyFindReplaceChanges] v17.35 STALE - text ha canviat massa, targetId=' + targetId);
+          console.warn('[applyFindReplaceChanges] normalizedOriginal: "' + normalizedOriginal.substring(0, 60) + '..."');
+          console.warn('[applyFindReplaceChanges] normalizedCurrent: "' + normalizedCurrent.substring(0, 60) + '..."');
+          // v17.35: IMPORTANT - Encara creem l'undoSnapshot per permetre undo encara que sigui STALE
+          // Però mostrem warning i NO apliquem el canvi automàticament
           skippedCount++;
           continue;
         }
 
         // Guardar snapshot per undo ABANS del canvi
-        undoSnapshots.push({
+        const snapshot = {
           targetId: change.targetId,
           originalText: currentText,
           bodyIndex: getBodyIndex(targetElement),
           highlight_find: change.highlight_find || null
-        });
+        };
+        undoSnapshots.push(snapshot);
+        console.log('[applyFindReplaceChanges] IMPROVE - Created undoSnapshot for targetId=' + targetId);
 
         // Substituir tot el paràgraf
         text.setText(change.new_text);
@@ -2908,10 +2998,21 @@ function applyFindReplaceChanges(changes) {
     // Invalidar cache
     invalidateCaptureCache();
 
+    // v17.42: Debug - retornar info del primer canvi per diagnosticar
+    const debugInfo = changes.length > 0 ? {
+      first_change_keys: Object.keys(changes[0]),
+      has_original_text: changes[0].original_text !== undefined,
+      has_new_text: changes[0].new_text !== undefined,
+      new_text_value: changes[0].new_text,
+      new_text_type: typeof changes[0].new_text,
+      new_text_is_empty_string: changes[0].new_text === ''
+    } : null;
+
     return {
       ok: true,
       applied: appliedCount,
       skipped: skippedCount,
+      _debug_v17_42: debugInfo,
       undoSnapshots: undoSnapshots,
       highlightApplied: appliedCount > 0  // v15.4
     };
@@ -2929,7 +3030,7 @@ function applyFindReplaceChanges(changes) {
  */
 function undoAnnotationChange(snapshot) {
   try {
-    if (!snapshot || !snapshot.originalText) {
+    if (!snapshot || (!snapshot.originalText && !snapshot.mode)) {
       return { ok: false, error: "Snapshot invàlid" };
     }
 
@@ -2946,8 +3047,50 @@ function undoAnnotationChange(snapshot) {
       return { ok: false, error: "No s'ha trobat el paràgraf original" };
     }
 
-    // Restaurar el text original
     const textObj = targetElement.asText();
+
+    // v17.48: MODE FIX - fer find/replace invers (atòmic, no afecta altres canvis)
+    if (snapshot.mode === 'fix' && snapshot.find && snapshot.replace !== undefined) {
+      console.log('[undoAnnotationChange] v17.48 MODE FIX - replace invers: "' + snapshot.replace + '" → "' + snapshot.find + '"');
+      const currentText = textObj.getText();
+      console.log('[undoAnnotationChange] v17.48 - currentText length:', currentText.length, 'replace length:', snapshot.replace.length);
+      console.log('[undoAnnotationChange] v17.48 - currentText preview:', currentText.substring(0, 100));
+
+      // v17.48: Verificar que el replace existeix al text actual (amb fallback a originalText)
+      const replaceExists = currentText.includes(snapshot.replace);
+      console.log('[undoAnnotationChange] v17.48 - replaceExists:', replaceExists);
+
+      if (!replaceExists) {
+        console.warn('[undoAnnotationChange] v17.48 - replace text not found, falling back to MODE IMPROVE');
+        // Fallback: restaurar tot el paràgraf si tenim originalText
+        if (snapshot.originalText) {
+          console.log('[undoAnnotationChange] v17.48 - using originalText fallback');
+          textObj.setText(snapshot.originalText);
+          invalidateCaptureCache();
+          return { ok: true, targetId: targetId, fallback: true };
+        }
+        return { ok: false, error: "Text ja modificat, no es pot desfer" };
+      }
+
+      // Fer el reemplaçament invers (replace → find)
+      textObj.replaceText(escapeRegExp(snapshot.replace), snapshot.find);
+
+      // Highlight el text restaurat
+      try {
+        const UNDO_HIGHLIGHT_COLOR = '#FFF3CD';
+        const newText = textObj.getText();
+        const pos = newText.indexOf(snapshot.find);
+        if (pos !== -1) {
+          textObj.setBackgroundColor(pos, pos + snapshot.find.length - 1, UNDO_HIGHLIGHT_COLOR);
+        }
+      } catch (e) {}
+
+      invalidateCaptureCache();
+      return { ok: true, targetId: targetId };
+    }
+
+    // MODE IMPROVE (paràgraf complet) - restaurar tot el text original
+    console.log('[undoAnnotationChange] MODE IMPROVE - restaurar paràgraf complet');
     textObj.setText(snapshot.originalText);
 
     // v17.2: Highlight PRECÍS per undo
@@ -3049,7 +3192,10 @@ const REFERENCE_COLORS = {
   yellow: '#FFF59D',   // Atenció / Repeticions
   orange: '#FFCC80',   // Problemes d'estil
   blue: '#90CAF9',     // Recomanacions
-  purple: '#CE93D8'    // Preguntes / Clarificacions
+  purple: '#CE93D8',   // Preguntes / Clarificacions
+  // v17.46: Colors per preview de canvis
+  lightBlue: '#D6EAF8',  // Blau molt clar - text ABANS del canvi (original)
+  lightGreen: '#D4EDDA'  // Verd molt clar - text DESPRÉS del canvi (acceptat)
 };
 
 /**
@@ -6344,6 +6490,23 @@ function clearHighlight() {
       props.deleteProperty('docRefHighlight');
     }
 
+    // v17.46: Netejar highlight de paràgraf (usat per highlightParagraphById)
+    const highlightParaId = props.getProperty('highlight_para_id');
+    if (highlightParaId) {
+      try {
+        const doc = DocumentApp.getActiveDocument();
+        const body = doc.getBody();
+        const { map: mapIdToElement } = buildElementIndexMap(body);
+        const targetElement = mapIdToElement[highlightParaId] || mapIdToElement[String(highlightParaId)];
+        if (targetElement) {
+          const textObj = targetElement.asText();
+          const len = textObj.getText().length;
+          if (len > 0) textObj.setBackgroundColor(0, len - 1, null);
+        }
+      } catch (e) {}
+      props.deleteProperty('highlight_para_id');
+    }
+
   } catch (e) {
     // Ignorar errors de neteja
   }
@@ -6417,10 +6580,12 @@ function applyPendingRewrite(blocks, isSelection) {
 
 /**
  * v15.4: Ressaltar un paràgraf sencer per ID (usat quan el text s'ha eliminat)
+ * v17.46: Afegit paràmetre colorName per diferenciar abans/després
  * @param {number} paragraphId - L'índex del paràgraf
+ * @param {string} colorName - Nom del color ('lightBlue' per original, 'lightGreen' per acceptat)
  * @returns {Object} - {applied: number, error?: string}
  */
-function highlightParagraphById(paragraphId) {
+function highlightParagraphById(paragraphId, colorName) {
   try {
     const doc = DocumentApp.getActiveDocument();
     const body = doc.getBody();
@@ -6435,13 +6600,13 @@ function highlightParagraphById(paragraphId) {
       return { applied: 0, error: 'Paràgraf no trobat: ' + targetId };
     }
 
-    // Ressaltar tot el paràgraf en verd suau
-    const PARAGRAPH_HIGHLIGHT_COLOR = '#FFF3CD';  // Groc suau (info)
+    // v17.46: Usar color passat o default a lightBlue (original)
+    const color = REFERENCE_COLORS[colorName] || REFERENCE_COLORS.lightBlue;
     const textObj = targetElement.asText();
     const text = textObj.getText();
 
     if (text.length > 0) {
-      textObj.setBackgroundColor(0, text.length - 1, PARAGRAPH_HIGHLIGHT_COLOR);
+      textObj.setBackgroundColor(0, text.length - 1, color);
 
       // Guardar per poder netejar després
       const props = PropertiesService.getDocumentProperties();

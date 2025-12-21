@@ -210,6 +210,7 @@ function getLastTurns(session, n = 2) {
  * Obté el context de conversa per al classifier
  * @param {SessionState} session - Estat de sessió
  * @returns {ConversationContext}
+ * v17.53: Incloure last_proposed_changes per context anafòric
  */
 function getConversationContext(session) {
   if (!session) {
@@ -218,6 +219,7 @@ function getConversationContext(session) {
       mentioned_paragraphs: [],
       last_mode_used: null,
       last_highlights: [],
+      last_proposed_changes: [],
     };
   }
 
@@ -226,6 +228,7 @@ function getConversationContext(session) {
     mentioned_paragraphs: session.conversation.mentioned_paragraphs || [],
     last_mode_used: session.conversation.last_mode_used,
     last_highlights: session.conversation.last_highlights || [],
+    last_proposed_changes: session.last_proposed_changes || [],
   };
 }
 

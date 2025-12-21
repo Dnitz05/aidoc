@@ -1028,7 +1028,41 @@
       let requestInProgress = false;
       let requestCancelled = false;
 
-      console.log('[Docmile v6.9] Loaded - ESC cancellation');
+      // v14.8: Sistema centralitzat de gestió de listeners (memory leak fix)
+      const registeredListeners = [];
+      let listenersInitialized = false;
+
+      /**
+       * Registra un event listener i guarda la referència per cleanup
+       * @param {Element} element - Element DOM o document/window
+       * @param {string} event - Nom de l'event (click, blur, etc.)
+       * @param {Function} handler - Funció handler
+       * @param {Object} options - Opcions del listener (opcional)
+       */
+      function registerListener(element, event, handler, options) {
+        if (!element) return;
+        element.addEventListener(event, handler, options);
+        registeredListeners.push({ element, event, handler, options });
+      }
+
+      /**
+       * Elimina tots els listeners registrats
+       * Cridat automàticament a beforeunload per evitar memory leaks
+       */
+      function cleanupAllListeners() {
+        console.log('[Docmile v14.8] Cleaning up', registeredListeners.length, 'listeners');
+        registeredListeners.forEach(({ element, event, handler, options }) => {
+          try {
+            element.removeEventListener(event, handler, options);
+          } catch (e) {
+            // Ignorar errors si l'element ja no existeix
+          }
+        });
+        registeredListeners.length = 0;
+        listenersInitialized = false;
+      }
+
+      console.log('[Docmile v14.8] Loaded - Memory leak fix');
 
       const MODES = {
         edit: { icon: 'edit', label: 'Mode Edit' },
@@ -1344,16 +1378,18 @@
       }
 
       // v6.5: Initialize scroll listener for lazy loading
+      // v14.8: Amb registre per cleanup
       function initChatScrollListener() {
         const chatHistory = document.getElementById('chatHistory');
         if (!chatHistory) return;
 
-        chatHistory.addEventListener('scroll', function() {
+        const handleChatScroll = function() {
           // Load more when near the top
           if (chatHistory.scrollTop < 100 && hasMoreMessages && !isLoadingMessages && currentConversationId) {
             loadMoreMessages();
           }
-        });
+        };
+        registerListener(chatHistory, 'scroll', handleChatScroll);
       }
 
       function updateConversationTitle(title) {
@@ -1770,15 +1806,16 @@
         // v4.1: Pre-load timeline in background
         preloadTimeline();
 
-        // Enter key handler for banned word input
+        // v14.8: Enter key handler for banned word input amb registre per cleanup
         const bannedWordInput = document.getElementById('newBannedWord');
         if (bannedWordInput) {
-          bannedWordInput.addEventListener('keydown', function(e) {
+          const handleBannedWordEnter = function(e) {
             if (e.key === 'Enter') {
               e.preventDefault();
               addBannedWord();
             }
-          });
+          };
+          registerListener(bannedWordInput, 'keydown', handleBannedWordEnter);
         }
 
         // Load file info
@@ -1786,21 +1823,23 @@
           if (info.hasFile) showFileStatus(info.name);
         }).getKnowledgeFileInfo();
 
-        // Enter key handler
-        document.getElementById('userInput').addEventListener('keydown', function(e) {
+        // v14.8: Enter key handler amb registre per cleanup
+        const userInputEl = document.getElementById('userInput');
+        const handleEnterKey = function(e) {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
           }
-        });
+        };
+        registerListener(userInputEl, 'keydown', handleEnterKey);
 
-        // Auto-resize textarea (v5.3 - més compacte)
-        const userInput = document.getElementById('userInput');
-        userInput.addEventListener('input', function() {
+        // v14.8: Auto-resize textarea amb registre per cleanup
+        const handleAutoResize = function() {
           this.style.height = 'auto';
           const newHeight = Math.min(Math.max(this.scrollHeight, 32), 120);
           this.style.height = newHeight + 'px';
-        });
+        };
+        registerListener(userInputEl, 'input', handleAutoResize);
 
         // v5.3: Polling intel·ligent per selecció (1s)
         selectionPollingActive = true;
@@ -1897,32 +1936,36 @@
         pollSelection();
         scheduleNextPoll();
 
-        // Accelerar polling quan sidebar perd focus (usuari probablement al document)
-        document.addEventListener('blur', function() {
+        // v14.8: Handlers amb referència per cleanup
+        const handlePollingBlur = function() {
           pollingInterval = 200;
           if (pollingIndicator) pollingIndicator.classList.add('fast');
           if (recipesPollingIndicator) recipesPollingIndicator.classList.add('fast');
           // Reiniciar amb nou interval
           clearTimeout(pollingTimeoutId);
           scheduleNextPoll();
-        });
+        };
 
-        document.addEventListener('focus', function() {
+        const handlePollingFocus = function() {
           pollingInterval = 600;
           if (pollingIndicator) pollingIndicator.classList.remove('fast');
           if (recipesPollingIndicator) recipesPollingIndicator.classList.remove('fast');
-        });
+        };
 
         // Pausar polling mentre escriu (però NO amagar l'indicador)
         let typingTimeout = null;
-        document.getElementById('userInput').addEventListener('input', function() {
+        const handleTypingPause = function() {
           selectionPollingActive = false;
-
           clearTimeout(typingTimeout);
           typingTimeout = setTimeout(function() {
             selectionPollingActive = true;
           }, 800); // Reprendre 0.8s després d'escriure
-        });
+        };
+
+        // v14.8: Registrar listeners amb cleanup
+        registerListener(document, 'blur', handlePollingBlur);
+        registerListener(document, 'focus', handlePollingFocus);
+        registerListener(document.getElementById('userInput'), 'input', handleTypingPause);
 
         // Poll immediat quan l'usuari interactua amb el sidebar
         let lastImmediatePoll = 0;
@@ -1935,14 +1978,23 @@
           pollSelection();
         }
 
-        // Detectar quan el ratolí entra a l'àrea d'input
+        // v14.8: Detectar interaccions amb registre per cleanup
         const inputArea = document.getElementById('inputArea');
         if (inputArea) {
-          inputArea.addEventListener('mouseenter', triggerImmediatePoll);
+          registerListener(inputArea, 'mouseenter', triggerImmediatePoll);
         }
+        registerListener(document.getElementById('userInput'), 'focus', triggerImmediatePoll);
 
-        // Detectar quan l'usuari fa focus al textarea
-        document.getElementById('userInput').addEventListener('focus', triggerImmediatePoll);
+        // v17.46: Netejar highlights del document amb qualsevol clic a la sidebar
+        // (excepte si es clica el botó de l'ull que vol mostrar el highlight)
+        registerListener(document, 'click', function(e) {
+          // Ignorar si es clica el botó "veure" (ull)
+          if (e.target.closest('.view-btn')) return;
+          // Netejar TOTS els highlights del document
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run.clearHighlight();
+          }
+        });
 
         // Select first icon
         selectIcon('zap');
@@ -1958,8 +2010,8 @@
         if (savedMode === 'auto') savedMode = 'edit';
         selectMode(savedMode, false);
 
-        // Close dropdown when clicking outside (both selectors)
-        document.addEventListener('click', function(e) {
+        // v14.8: Handlers amb referència per cleanup
+        const handleDropdownClose = function(e) {
           const chatSelector = document.getElementById('modeSelector');
           const recipesSelector = document.getElementById('recipesModeSelector');
           if (chatSelector && !chatSelector.contains(e.target)) {
@@ -1968,7 +2020,20 @@
           if (recipesSelector && !recipesSelector.contains(e.target)) {
             recipesSelector.classList.remove('open');
           }
-        });
+        };
+
+        const handleClearHighlights = function(e) {
+          // Ignorar si es clica el botó "veure" (ull)
+          if (e.target.closest('.view-btn')) return;
+          // Netejar highlights del document
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run.clearReferenceHighlights();
+          }
+        };
+
+        // v14.8: Registrar amb cleanup
+        registerListener(document, 'click', handleDropdownClose);
+        registerListener(document, 'click', handleClearHighlights);
       }
 
       function toggleModeDropdown(source) {
@@ -2197,14 +2262,19 @@
               // original_text és SEMPRE el paràgraf complet
               originalText: cleanInternalMarkers(c.originalText || c.original_text || null),
               // v17.31: NO usar c.replacement com fallback - en mode FIX és el fragment, no el paràgraf!
-              proposedText: cleanInternalMarkers(c.proposedText || c.new_text || null),
+              // v17.44: typeof check per preservar "" (eliminacions!)
+              proposedText: cleanInternalMarkers(
+                typeof c.proposedText === 'string' ? c.proposedText :
+                typeof c.new_text === 'string' ? c.new_text : null
+              ),
               // v12.1: Camps per mode FIX (find/replace natiu)
               // v17.7: NOMÉS usar c.find/c.replace - c.original és el paràgraf COMPLET, no el fragment
-              find: cleanInternalMarkers(c.find || null),
-              replace: cleanInternalMarkers(c.replace || null),
+              // v17.39: Preservar strings buits per eliminacions (replace pot ser "")
+              find: cleanInternalMarkers(typeof c.find === 'string' ? c.find : null),
+              replace: cleanInternalMarkers(typeof c.replace === 'string' ? c.replace : null),
               // v16.6: Text exacte per highlight (sense context extra de Gemini)
-              highlight_find: c.highlight_find || null,
-              highlight_replace: c.highlight_replace || null,
+              highlight_find: typeof c.highlight_find === 'string' ? c.highlight_find : null,
+              highlight_replace: typeof c.highlight_replace === 'string' ? c.highlight_replace : null,
               context: c.context || null,
               reason: c.reason || c.explanation || 'Canvi proposat',
               status: 'pending',
@@ -2521,11 +2591,14 @@
         }
       }
 
-      // Save on page unload
+      // v14.8: Save on page unload i cleanup de listeners
       window.addEventListener('beforeunload', function() {
+        // Guardar missatges pendents
         if (pendingSaveMessages.length > 0) {
           flushPendingMessages();
         }
+        // Cleanup de tots els listeners registrats per evitar memory leaks
+        cleanupAllListeners();
       });
 
       // ═══════════════════════════════════════════════════════════
@@ -3657,14 +3730,17 @@
       function bindLaserCleanup() {
         if (laserCleanupBound) return;
 
-        const input = document.getElementById('user-input');
+        // v14.8: Fix ID (era 'user-input', correcte és 'userInput') + registre per cleanup
+        const input = document.getElementById('userInput');
         if (input) {
-          input.addEventListener('focus', function() {
+          const handleLaserCleanupFocus = function() {
             clearInteractiveScreen(true);
-          });
-          input.addEventListener('keydown', function() {
+          };
+          const handleLaserCleanupKeydown = function() {
             clearInteractiveScreen(true);
-          });
+          };
+          registerListener(input, 'focus', handleLaserCleanupFocus);
+          registerListener(input, 'keydown', handleLaserCleanupKeydown);
         }
 
         laserCleanupBound = true;
@@ -3771,7 +3847,7 @@
               stopBreathing();
               showToast('Text eliminat: "' + (ann.find || ann.originalText || '').substring(0, 30) + '"', 'info');
             })
-            .highlightParagraphById(ann.para_id);
+            .highlightParagraphById(ann.para_id, isAccepted ? 'lightGreen' : 'lightBlue');
           return;
         }
 
@@ -3779,6 +3855,30 @@
           // Mode FIX: si acceptat mostra el replacement, si no el find original
           textToHighlight = isAccepted ? ann.replace : ann.find;
         } else if (ann.originalText && ann.proposedText) {
+          // v17.45: Detectar canvi de paràgraf complet (MODE IMPROVE)
+          // Si no té find/replace, és un canvi de paràgraf complet → ressaltar tot
+          const isFullParagraphChange = !ann.find && ann.originalText.length > 50;
+
+          if (isFullParagraphChange) {
+            // v17.45: Per canvis de paràgraf complet, ressaltar tot el paràgraf
+            google.script.run
+              .withSuccessHandler(function(result) {
+                stopBreathing();
+                if (result && result.applied > 0) {
+                  annotationHighlightsActive = true;
+                  showToast('Paràgraf ressaltat', 'info');
+                } else {
+                  showToast('No s\'ha pogut ressaltar el paràgraf', 'warning');
+                }
+              })
+              .withFailureHandler(function(err) {
+                stopBreathing();
+                showToast('Error ressaltant', 'error');
+              })
+              .highlightParagraphById(ann.para_id, isAccepted ? 'lightGreen' : 'lightBlue');
+            return;
+          }
+
           // v14.5.2: Trobar només les paraules que canvien
           const diff = findChangeFragment(
             isAccepted ? ann.proposedText : ann.originalText,
@@ -3823,7 +3923,8 @@
           .applyReferenceHighlights([{
             para_id: ann.para_id,
             snippet: textToHighlight,
-            color: 'blue'  // v14.5: Blau per canvis (coherent amb estils)
+            // v17.46: Blau clar abans, verd clar després
+            color: isAccepted ? 'lightGreen' : 'lightBlue'
           }]);
       }
 
@@ -4378,6 +4479,7 @@
       /**
        * Acceptar un canvi individual
        * v12.1: Router híbrid - FIX usa replaceText natiu, altres usen FormatPreserver
+       * v17.37: Usar closest() per trobar l'element correcte quan hi ha duplicats
        */
       function acceptSingleAnnotation(annotationId, btn) {
         const ann = pendingAnnotations.find(a => a.id === annotationId);
@@ -4399,8 +4501,13 @@
         // v14.5: NO netejar tots els highlights - només el d'aquest canvi es netejarà
         // perquè el text original canviarà. Els altres highlights es mantenen.
 
-        // Actualitzar UI immediatament (optimistic)
-        const el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
+        // v17.37: Usar closest() per trobar l'element correcte (no el primer del DOM)
+        // Això és CRÍTIC quan hi ha duplicats per converses antigues
+        let el = btn ? btn.closest('.annotation-item[data-id="' + annotationId + '"]') : null;
+        if (!el) {
+          el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
+        }
+        console.log('[v17.37] acceptSingleAnnotation found element via', btn ? 'closest()' : 'querySelector()', ':', !!el);
         if (el) {
           el.setAttribute('data-status', 'applying');
           const btnReject = el.querySelector('.btn-reject');
@@ -4413,6 +4520,17 @@
           console.log('[acceptSingleAnnotation] result:', JSON.stringify(result));
           console.log('[acceptSingleAnnotation] modification_type:', annotationModificationType);
 
+          // v17.33: Debug exhaustiu
+          console.log('[v17.33] acceptSingleAnnotation SUCCESS HANDLER');
+          console.log('[v17.33] result.ok:', result?.ok);
+          console.log('[v17.33] result.applied:', result?.applied);
+          console.log('[v17.33] result.skipped:', result?.skipped);
+          console.log('[v17.33] result.undoSnapshots:', JSON.stringify(result?.undoSnapshots || 'undefined'));
+          // v17.42: Debug - mostrar què ha rebut Code.gs
+          if (result?._debug_v17_42) {
+            console.log('[v17.42] DEBUG from Code.gs:', JSON.stringify(result._debug_v17_42, null, 2));
+          }
+
           // v16.9: Verificar que el canvi s'ha aplicat realment (no skipped)
           if (result && result.ok && result.applied === 0 && result.skipped > 0) {
             console.warn('[acceptSingleAnnotation] Change was skipped, not applied');
@@ -4423,15 +4541,17 @@
           if (result && result.ok) {
             ann.status = 'accepted';
             // v16.1: Guardar snapshot local per undo immediat
+            console.log('[v17.33] Checking for undoSnapshot...');
             if (result.undoSnapshots && result.undoSnapshots.length > 0) {
               ann.undoSnapshot = result.undoSnapshots[0];
-              console.log('[acceptSingleAnnotation] Using undoSnapshots[0]');
+              console.log('[v17.33] ✅ Using undoSnapshots[0]:', JSON.stringify(ann.undoSnapshot).substring(0, 100));
             } else if (result.undoSnapshot) {
               ann.undoSnapshot = result.undoSnapshot;
-              console.log('[acceptSingleAnnotation] Using undoSnapshot');
+              console.log('[v17.33] ✅ Using undoSnapshot:', JSON.stringify(ann.undoSnapshot).substring(0, 100));
             } else {
-              console.warn('[acceptSingleAnnotation] NO undoSnapshot in result!');
+              console.warn('[v17.33] ❌ NO undoSnapshot in result!');
             }
+            console.log('[v17.33] ann.undoSnapshot after assignment:', !!ann.undoSnapshot);
 
             // v16.1: Guardar a Supabase per historial persistent (async, no bloqueja)
             const editData = {
@@ -4449,7 +4569,8 @@
               })
               .saveAppliedEdit(editData);
 
-            updateAnnotationUI(annotationId, 'accepted');
+            // v17.37: Passar l'element per evitar problemes amb duplicats
+            updateAnnotationUI(annotationId, 'accepted', el);
             // v15.4: Toast més informatiu
             let toastMsg = 'Canvi aplicat';
             if (ann.find || ann.originalText) {
@@ -4473,7 +4594,8 @@
             }
           } else {
             ann.status = 'pending';
-            updateAnnotationUI(annotationId, 'pending');
+            // v17.37: Passar l'element
+            updateAnnotationUI(annotationId, 'pending', el);
             showToast(result.error || 'Error aplicant canvi', 'error');
           }
         };
@@ -4481,25 +4603,40 @@
         const failureHandler = function(err) {
           stopBreathing();  // v16.2: Aturar breathing
           ann.status = 'pending';
-          updateAnnotationUI(annotationId, 'pending');
+          // v17.37: Passar l'element
+          updateAnnotationUI(annotationId, 'pending', el);
           showToast('Error: ' + err.message, 'error');
         };
 
         // v17.2: Unificat - sempre usa applyFindReplaceChanges amb fallbacks
+        // v17.36: Debug logging per diagnosticar undoSnapshot
+        console.log('[v17.36] acceptSingleAnnotation sending to backend:', {
+          targetId: ann.para_id,
+          hasFind: !!ann.find,
+          hasReplace: !!ann.replace,
+          hasOriginalText: !!ann.originalText,
+          hasProposedText: !!ann.proposedText,
+          originalText_preview: ann.originalText ? ann.originalText.substring(0, 50) : 'NULL',
+          proposedText_preview: ann.proposedText ? ann.proposedText.substring(0, 50) : 'NULL'
+        });
+        // v17.39: IMPORTANT - No usar || per strings que poden ser buits!
+        // "" || null = null (INCORRECTE per eliminacions)
+        // typeof x === 'string' preserva strings buits
         google.script.run
           .withSuccessHandler(successHandler)
           .withFailureHandler(failureHandler)
           .applyFindReplaceChanges([{
             targetId: ann.para_id,
-            // Mode FIX: find/replace atòmic
-            find: ann.find || null,
-            replace: ann.replace || null,
+            // Mode FIX: find/replace atòmic (replace pot ser "" per eliminacions!)
+            find: typeof ann.find === 'string' ? ann.find : null,
+            replace: typeof ann.replace === 'string' ? ann.replace : null,
             // Mode IMPROVE/altres: original_text/new_text per full-replace
-            original_text: ann.originalText,
-            new_text: ann.proposedText,
+            // v17.43: typeof check per preservar "" (Google Apps Script converteix "" a null!)
+            original_text: typeof ann.originalText === 'string' ? ann.originalText : null,
+            new_text: typeof ann.proposedText === 'string' ? ann.proposedText : null,
             // Highlight precís
-            highlight_find: ann.highlight_find || null,
-            highlight_replace: ann.highlight_replace || null,
+            highlight_find: typeof ann.highlight_find === 'string' ? ann.highlight_find : null,
+            highlight_replace: typeof ann.highlight_replace === 'string' ? ann.highlight_replace : null,
             context: ann.context || null
           }]);
       }
@@ -4518,18 +4655,25 @@
         showToast('Aplicant ' + pending.length + ' canvis...', 'info');
 
         const successHandler = function(result) {
+          // v17.32: Debug logging complet
+          console.log('[v17.32] acceptAllAnnotations result:', JSON.stringify(result));
+          console.log('[v17.32] undoSnapshots count:', result?.undoSnapshots?.length || 0);
+
           if (result && result.ok) {
             // v17.30: Guardar undoSnapshots per cada anotació per permetre undo individual
             const snapshots = result.undoSnapshots || [];
+            console.log('[v17.32] Processing', pending.length, 'pending annotations with', snapshots.length, 'snapshots');
+
             pending.forEach((ann, i) => {
               ann.status = 'accepted';
               // v17.30: Assignar undoSnapshot corresponent (per targetId o per índex)
               const matchingSnapshot = snapshots.find(s => String(s.targetId) === String(ann.para_id)) || snapshots[i];
+              console.log('[v17.32] ann', ann.id, 'para_id:', ann.para_id, 'matchingSnapshot:', !!matchingSnapshot, matchingSnapshot ? 'targetId=' + matchingSnapshot.targetId : '');
               if (matchingSnapshot) {
                 ann.undoSnapshot = matchingSnapshot;
-                console.log('[v17.30] acceptAllAnnotations saved undoSnapshot for', ann.id, 'targetId:', ann.para_id);
+                console.log('[v17.32] SAVED undoSnapshot for', ann.id);
               } else {
-                console.warn('[v17.30] NO undoSnapshot found for', ann.id);
+                console.warn('[v17.32] NO undoSnapshot found for', ann.id, '- snapshots:', snapshots.map(s => s.targetId));
               }
               updateAnnotationUI(ann.id, 'accepted');
             });
@@ -4547,19 +4691,32 @@
 
         // v17.31: Unificat - sempre usa applyFindReplaceChanges amb mateixa estructura que acceptSingleAnnotation
         // El backend decideix si usar find/replace o original_text/new_text
-        const changes = pending.map(ann => ({
-          targetId: ann.para_id,
-          // Mode FIX: find/replace atòmic (null si no existeix)
-          find: ann.find || null,
-          replace: ann.replace || null,
-          // Mode IMPROVE/altres: original_text/new_text per full-replace
-          original_text: ann.originalText,
-          new_text: ann.proposedText,
-          // Highlight precís
-          highlight_find: ann.highlight_find || null,
-          highlight_replace: ann.highlight_replace || null,
-          context: ann.context || null
-        }));
+        const changes = pending.map(ann => {
+          // v17.32: Debug logging per diagnosticar undo
+          console.log('[v17.32] Building change for', ann.id, {
+            para_id: ann.para_id,
+            hasFind: !!ann.find,
+            hasOriginalText: !!ann.originalText,
+            hasProposedText: !!ann.proposedText,
+            find_preview: ann.find ? ann.find.substring(0, 30) : null,
+            originalText_preview: ann.originalText ? ann.originalText.substring(0, 50) : null
+          });
+          // v17.39: Preservar strings buits per eliminacions
+          return {
+            targetId: ann.para_id,
+            // Mode FIX: find/replace atòmic (replace pot ser "" per eliminacions!)
+            find: typeof ann.find === 'string' ? ann.find : null,
+            replace: typeof ann.replace === 'string' ? ann.replace : null,
+            // Mode IMPROVE/altres: original_text/new_text per full-replace
+            // v17.43: typeof check per preservar "" (Google Apps Script converteix "" a null!)
+            original_text: typeof ann.originalText === 'string' ? ann.originalText : null,
+            new_text: typeof ann.proposedText === 'string' ? ann.proposedText : null,
+            // Highlight precís
+            highlight_find: typeof ann.highlight_find === 'string' ? ann.highlight_find : null,
+            highlight_replace: typeof ann.highlight_replace === 'string' ? ann.highlight_replace : null,
+            context: ann.context || null
+          };
+        });
 
         google.script.run
           .withSuccessHandler(successHandler)
@@ -4568,82 +4725,68 @@
       }
 
       /**
-       * Actualitza la UI d'una anotació segons el seu status
+       * v17.52: Actualitza la UI d'una anotació segons el seu status
+       * Actualitza TOTS els elements amb el mateix ID (per duplicats de converses anteriors)
        */
-      function updateAnnotationUI(annotationId, status) {
-        console.log('[v17.29] updateAnnotationUI called with id:', annotationId, 'status:', status);
-        // v17.29: Debug - mostrar tots els elements amb data-id
-        const allItems = document.querySelectorAll('.annotation-item[data-id]');
-        console.log('[v17.29] All annotation-item elements:', allItems.length);
-        allItems.forEach(item => console.log('[v17.29] - data-id:', item.getAttribute('data-id')));
+      function updateAnnotationUI(annotationId, status, providedElement) {
+        // v17.52: Trobar TOTS els elements amb aquest ID
+        const allItems = document.querySelectorAll('.annotation-item[data-id="' + annotationId + '"]');
+        console.log('[v17.52] updateAnnotationUI:', annotationId, '→', status, '| Found', allItems.length, 'elements');
 
-        const el = document.querySelector('.annotation-item[data-id="' + annotationId + '"]');
-        if (!el) {
-          console.warn('[v17.29] Element NOT FOUND for id:', annotationId);
+        if (allItems.length === 0) {
+          console.warn('[v17.52] No elements found for:', annotationId);
           return;
         }
-        console.log('[v17.29] Element FOUND, proceeding...');
 
-        el.setAttribute('data-status', status);
+        // v17.52: Actualitzar CADA element trobat
+        allItems.forEach(function(el, idx) {
+          var oldStatus = el.getAttribute('data-status');
+          console.log('[v17.52] Element', idx, ':', oldStatus, '→', status);
 
-        // v16.0: Actualitzar contingut del status (només accepted)
-        const statusEl = el.querySelector('.annotation-status');
-        if (statusEl) {
-          if (status === 'accepted') {
-            statusEl.innerHTML = icon('checkCircle', 'i--sm') + ' Aplicat';
-          } else if (status === 'undone') {
-            statusEl.innerHTML = icon('undo', 'i--sm') + ' Desfet';
-          } else {
-            statusEl.innerHTML = '';
-          }
-        }
+          // 1. Actualitzar data-status
+          el.setAttribute('data-status', status);
 
-        // v16.1: Afegir/treure botó Desfer segons estat
-        const actionsEl = el.querySelector('.annotation-actions');
-        console.log('[v17.26] actionsEl found:', !!actionsEl, 'for', annotationId);
-        if (actionsEl) {
-          const ann = pendingAnnotations.find(a => a.id === annotationId);
-          const existingUndoBtn = actionsEl.querySelector('.btn-undo');
-          const existingAcceptBtn = actionsEl.querySelector('.btn-accept');
-
-          // v14.8: Mostrar sempre botó desfer quan accepted
-          const canUndo = ann && (ann.undoSnapshot || ann.event_id);
-          console.log('[updateAnnotationUI] id:', annotationId, 'status:', status, 'canUndo:', canUndo);
-
-          if (status === 'accepted') {
-            // v17.18: Debug
-            console.log('[v17.18] ADDING UNDO BUTTON for', annotationId, 'existingAcceptBtn:', !!existingAcceptBtn, 'existingUndoBtn:', !!existingUndoBtn);
-            // Treure botó Accept quan s'accepta
-            if (existingAcceptBtn) {
-              existingAcceptBtn.remove();
-              console.log('[v17.18] Removed accept button');
+          // 2. Actualitzar text d'status
+          var statusEl = el.querySelector('.annotation-status');
+          if (statusEl) {
+            if (status === 'accepted') {
+              statusEl.innerHTML = icon('checkCircle', 'i--sm') + ' Aplicat';
+            } else if (status === 'pending') {
+              statusEl.innerHTML = '';
             }
-            // Afegir botó Desfer si no existeix
-            if (!existingUndoBtn) {
-              const undoBtn = document.createElement('button');
-              undoBtn.className = 'btn-undo';
-              undoBtn.title = 'Desfer aquest canvi';
-              undoBtn.innerHTML = icon('undo', 'i--sm');
-              undoBtn.onclick = function() { undoSingleAnnotation(annotationId); };
-              actionsEl.appendChild(undoBtn);
-              console.log('[v17.18] Added undo button');
+          }
+
+          // 3. Actualitzar botons
+          var actionsEl = el.querySelector('.annotation-actions');
+          if (!actionsEl) return;
+
+          var undoBtn = actionsEl.querySelector('.btn-undo');
+          var acceptBtn = actionsEl.querySelector('.btn-accept');
+
+          if (status === 'accepted') {
+            // Treure accept, afegir undo
+            if (acceptBtn) acceptBtn.remove();
+            if (!undoBtn) {
+              var newUndoBtn = document.createElement('button');
+              newUndoBtn.className = 'btn-undo';
+              newUndoBtn.title = 'Desfer';
+              newUndoBtn.innerHTML = icon('undo', 'i--sm');
+              newUndoBtn.onclick = function() { undoSingleAnnotation(annotationId); };
+              actionsEl.appendChild(newUndoBtn);
             }
           } else if (status === 'pending') {
-            // v16.8: Treure botó Desfer i restaurar botó Acceptar quan tornem a pending
-            if (existingUndoBtn) {
-              existingUndoBtn.remove();
-            }
-            // Assegurar que el botó accept existeix i és visible
-            if (!existingAcceptBtn) {
-              const acceptBtn = document.createElement('button');
-              acceptBtn.className = 'btn-accept';
-              acceptBtn.title = 'Acceptar';
-              acceptBtn.innerHTML = icon('check', 'i--sm');
-              acceptBtn.onclick = function() { acceptSingleAnnotation(annotationId, acceptBtn); };
-              actionsEl.appendChild(acceptBtn);
-            }
+            // Treure undo, afegir accept
+            if (undoBtn) undoBtn.remove();
+            if (acceptBtn) acceptBtn.remove(); // Treure per evitar duplicats
+            var newAcceptBtn = document.createElement('button');
+            newAcceptBtn.className = 'btn-accept';
+            newAcceptBtn.title = 'Acceptar';
+            newAcceptBtn.innerHTML = icon('check', 'i--sm');
+            newAcceptBtn.onclick = function() { acceptSingleAnnotation(annotationId, newAcceptBtn); };
+            actionsEl.appendChild(newAcceptBtn);
+            console.log('[v17.52] Created accept button for element', idx);
           }
-        }
+        });
       }
 
       /**
@@ -4651,10 +4794,24 @@
        * Usa event_id (persistent via Supabase) o undoSnapshot (local immediat)
        */
       function undoSingleAnnotation(annotationId) {
+        // v17.38: Debug exhaustiu
+        console.log('[v17.38] undoSingleAnnotation called for:', annotationId);
+        console.log('[v17.38] pendingAnnotations count:', pendingAnnotations.length);
+        console.log('[v17.38] pendingAnnotations IDs:', pendingAnnotations.map(a => a.id));
+
         const ann = pendingAnnotations.find(a => a.id === annotationId);
+
+        // v17.38: Debug de l'anotació trobada
+        console.log('[v17.38] Found ann:', !!ann);
+        if (ann) {
+          console.log('[v17.38] ann.status:', ann.status);
+          console.log('[v17.38] ann.undoSnapshot:', !!ann.undoSnapshot, ann.undoSnapshot ? JSON.stringify(ann.undoSnapshot).substring(0, 100) : 'null');
+          console.log('[v17.38] ann.event_id:', ann.event_id);
+        }
 
         // Verificar que tenim algun mètode de desfer
         if (!ann || (!ann.undoSnapshot && !ann.event_id)) {
+          console.warn('[v17.38] Cannot undo - no snapshot or event_id!');
           showToast('No es pot desfer aquest canvi', 'warning');
           return;
         }
@@ -4668,17 +4825,21 @@
         }
 
         const handleUndoSuccess = function(result) {
-          // v16.8: Debug logging
-          console.log('[handleUndoSuccess] result:', JSON.stringify(result));
+          // v17.49: Debug logging exhaustiu
+          console.log('[v17.49] handleUndoSuccess CALLED for:', annotationId);
+          console.log('[v17.49] result:', JSON.stringify(result));
           // Verificar èxit segons el tipus de resposta
           const success = result && (result.ok || result.success || result.status === 'restored');
-          console.log('[handleUndoSuccess] success:', success);
+          console.log('[v17.49] success:', success, 'result.ok:', result?.ok, 'result.fallback:', result?.fallback);
           if (success) {
-            // v16.8: Tornar a estat 'pending' per poder re-aplicar el canvi
+            // v17.49: Tornar a estat 'pending' per poder re-aplicar el canvi
+            console.log('[v17.49] Setting ann.status to pending');
             ann.status = 'pending';
             ann.undoSnapshot = null;
             ann.event_id = null;
+            console.log('[v17.49] Calling updateAnnotationUI with pending');
             updateAnnotationUI(annotationId, 'pending');
+            console.log('[v17.49] updateAnnotationUI completed');
             showToast('Canvi desfet - pots tornar a aplicar-lo', 'undo');
             updateBulkActionsBar();  // Actualitzar comptador de pendents
 
@@ -4706,19 +4867,31 @@
           }
         };
 
-        // v16.1: Prioritzar event_id (persistent) sobre undoSnapshot (local)
-        if (ann.event_id) {
-          // Usar revertEditById per undo persistent via Supabase
-          google.script.run
-            .withSuccessHandler(handleUndoSuccess)
-            .withFailureHandler(handleUndoFailure)
-            .revertEditById(ann.event_id);
-        } else if (ann.undoSnapshot) {
-          // Fallback a undo local (snapshot)
+        // v17.48: Prioritzar undoSnapshot (local, immediat) sobre event_id
+        // v16.1 tenia event_id primer però és més lent (Supabase async)
+        if (ann.undoSnapshot) {
+          // v17.48: Debug complet del snapshot
+          console.log('[v17.48] Using undoSnapshot:', {
+            mode: ann.undoSnapshot.mode,
+            find: ann.undoSnapshot.find,
+            replace: ann.undoSnapshot.replace,
+            targetId: ann.undoSnapshot.targetId,
+            hasOriginalText: !!ann.undoSnapshot.originalText
+          });
           google.script.run
             .withSuccessHandler(handleUndoSuccess)
             .withFailureHandler(handleUndoFailure)
             .undoAnnotationChange(ann.undoSnapshot);
+        } else if (ann.event_id) {
+          // Fallback a undo persistent via Supabase
+          console.log('[v17.48] Using event_id fallback:', ann.event_id);
+          google.script.run
+            .withSuccessHandler(handleUndoSuccess)
+            .withFailureHandler(handleUndoFailure)
+            .revertEditById(ann.event_id);
+        } else {
+          console.error('[v17.48] No undo method available!');
+          showToast('No es pot desfer aquest canvi', 'error');
         }
       }
 
@@ -4921,13 +5094,14 @@
         console.log('[Docmile] Request cancelled by user (ESC)');
       }
 
-      // v6.9: ESC key listener
-      document.addEventListener('keydown', function(e) {
+      // v14.8: ESC key listener amb registre per cleanup
+      const handleEscapeKey = function(e) {
         if (e.key === 'Escape' && requestInProgress) {
           e.preventDefault();
           cancelCurrentRequest();
         }
-      });
+      };
+      registerListener(document, 'keydown', handleEscapeKey);
 
       // ═══════════════════════════════════════════════════════════
       // OPTIMISTIC UI UNDO (v2.6 Sprint)
@@ -5133,14 +5307,20 @@
                   // v17.6: Netejar marcadors interns
                   // v17.7: c.original és el paràgraf complet, NO usar com fallback per find
                   originalText: cleanInternalMarkers(c.originalText || c.original_text || c.original || null),
-                  proposedText: cleanInternalMarkers(c.proposedText || c.new_text || c.replacement || null),
+                  // v17.44: typeof check per preservar "" (eliminacions!)
+                  proposedText: cleanInternalMarkers(
+                    typeof c.proposedText === 'string' ? c.proposedText :
+                    typeof c.new_text === 'string' ? c.new_text :
+                    typeof c.replacement === 'string' ? c.replacement : null
+                  ),
                   // v12.1: Camps per mode FIX (find/replace natiu)
                   // v17.7: NOMÉS usar c.find/c.replace - c.original és el paràgraf COMPLET, no el fragment
-                  find: cleanInternalMarkers(c.find || null),
-                  replace: cleanInternalMarkers(c.replace || null),
+                  // v17.39: Preservar strings buits per eliminacions (replace pot ser "")
+                  find: cleanInternalMarkers(typeof c.find === 'string' ? c.find : null),
+                  replace: cleanInternalMarkers(typeof c.replace === 'string' ? c.replace : null),
                   // v16.7: Text exacte per highlight verd després d'aplicar (sense context extra)
-                  highlight_find: c.highlight_find || null,
-                  highlight_replace: c.highlight_replace || null,
+                  highlight_find: typeof c.highlight_find === 'string' ? c.highlight_find : null,
+                  highlight_replace: typeof c.highlight_replace === 'string' ? c.highlight_replace : null,
                   context: c.context || null,
                   reason: c.reason || c.explanation || 'Canvi proposat',
                   status: 'pending'
@@ -5774,14 +5954,20 @@
                   // v17.6: Netejar marcadors interns
                   // v17.7: c.original és el paràgraf complet, NO usar com fallback per find
                   originalText: cleanInternalMarkers(c.originalText || c.original_text || c.original || null),
-                  proposedText: cleanInternalMarkers(c.proposedText || c.new_text || c.replacement || null),
+                  // v17.44: typeof check per preservar "" (eliminacions!)
+                  proposedText: cleanInternalMarkers(
+                    typeof c.proposedText === 'string' ? c.proposedText :
+                    typeof c.new_text === 'string' ? c.new_text :
+                    typeof c.replacement === 'string' ? c.replacement : null
+                  ),
                   // v12.1: Camps per mode FIX (find/replace natiu)
                   // v17.7: NOMÉS usar c.find/c.replace - c.original és el paràgraf COMPLET, no el fragment
-                  find: cleanInternalMarkers(c.find || null),
-                  replace: cleanInternalMarkers(c.replace || null),
+                  // v17.39: Preservar strings buits per eliminacions (replace pot ser "")
+                  find: cleanInternalMarkers(typeof c.find === 'string' ? c.find : null),
+                  replace: cleanInternalMarkers(typeof c.replace === 'string' ? c.replace : null),
                   // v16.7: Text exacte per highlight verd després d'aplicar (sense context extra)
-                  highlight_find: c.highlight_find || null,
-                  highlight_replace: c.highlight_replace || null,
+                  highlight_find: typeof c.highlight_find === 'string' ? c.highlight_find : null,
+                  highlight_replace: typeof c.highlight_replace === 'string' ? c.highlight_replace : null,
                   context: c.context || null,
                   reason: c.reason || c.explanation || 'Canvi proposat',
                   status: 'pending'
@@ -7536,9 +7722,9 @@
         const chatHistory = document.getElementById('chatHistory');
         if (!chatHistory) return;
 
-        // Detectar selecció de text al xat
-        chatHistory.addEventListener('mouseup', handleTextSelection);
-        document.addEventListener('mousedown', hideBanTooltip);
+        // v14.8: Detectar selecció de text al xat amb registre per cleanup
+        registerListener(chatHistory, 'mouseup', handleTextSelection);
+        registerListener(document, 'mousedown', hideBanTooltip);
       }
 
       function handleTextSelection(e) {
